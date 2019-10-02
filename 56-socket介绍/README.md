@@ -26,3 +26,31 @@ connect(): 建立与对等socket之间的连接
 ```
 
 默认情况下，socket的系统调用如send、recv、sentto、recvfrom在IO无法立即完成时阻塞，可以通过fcntl的 F_SETFL操作启用O_NONBLOCK执行非阻塞
+
+##### socket()：创建一个socket
+
+```
+#include <sys/socket.h>
+
+int socket(int domain, int type, int protocol);
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+
+type的类型：
+SOCK_DGRAM: 固定长度的、无连接的、不可靠的报文传递
+SOCK_RAW:   IP协议的数据报接口
+SOCK_SEQPACKET: 固定长度的、有序的、可靠的、面向连接的报文传递
+SOCK_STREAM: 有序的、可靠的、双向的、面向连接的字节流
+
+protocol：
+IPPROTO_IP: IPv4
+IPPROTO_IPV6: IPv6
+IPPROTO_ICMP: 因特网控制报文协议（Internet Control Message Protocol）
+IPPROTO_RAW: 原始IP数据包协议
+IPPROTO_TCP: 传输控制协议（Transmission Control Protocol）
+IPPROTO_UDP: 用户数据报协议（User Datagram Protocol）
+
+从内核2.6.27开始，为type提供了第二种用途，允许两个非标准的标记与sock类型取OR：
+SOCK_CLOEXEC：导致内核为新文件描述符启动FD_CLOEXEC
+SOCK_NONBLOCK：导致内核为新文件描述符启动O_NONBLOCK
+```
+
