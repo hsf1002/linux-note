@@ -54,3 +54,12 @@ SOCK_CLOEXEC：导致内核为新文件描述符启动FD_CLOEXEC
 SOCK_NONBLOCK：导致内核为新文件描述符启动O_NONBLOCK
 ```
 
+##### bind()：将绑定到地址
+
+```
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+// 返回值：若成功，返回0，若出错，返回-1
+
+一般会将服务器的socket绑定到一个众所周知的地址，即一个固定的客户端提前就知道的地址，除了这种绑定之外，还有其他做法：对于Internet domain socket，可以不调用bind而直接调用listen，这导致内核为该socket选择一个临时端口，然后服务器通过getsockname获取socket地址，服务器需要向一个中心目录服务程序注册服务器的地址，之后客户端通过这个中心目录服务程序获取
+```
+
