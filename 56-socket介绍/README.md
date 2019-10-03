@@ -84,3 +84,12 @@ struct socketaddr_in
 }
 ```
 
+##### 流socket
+
+1. 首先双方都需要通过socket()创建，如同安装电话
+2. 双方进行连接
+   * 服务端调用bind将socket绑定到一个众所周知的地址，再调用listen通知内核它接受接入连接的意愿
+   * 客户端通过connect建立连接，同时需要指定需要连接的socket地址，类似拨打号码
+   * 服务端调用accept接受连接，如果在connect前调用了accept，就会阻塞
+3. 通过传统的read/write或socket特有的send/recv进行通信，直到一方调用close关闭连接
+
