@@ -93,6 +93,8 @@ struct socketaddr_in
    * 服务端调用accept接受连接，如果在connect前调用了accept，就会阻塞
 3. 通过传统的read/write或socket特有的send/recv进行通信，直到一方调用close关闭连接
 
+![SOCKET](https://images2015.cnblogs.com/blog/700495/201611/700495-20161122153736846-1965205030.png)
+
 ##### listen()：监听接入连接
 
 ```
@@ -101,5 +103,16 @@ int listen(int sockfd, int backlog)
 // 无法在一个已连接的socket上（已经成功执行connect的socket或从accept返回的socket）进行listen
 // 要理解backlog，首先注意到客户端可能会在服务器调用accept之前调用connect，此时会产生一个未决的连接
 // backlog提示系统该进程所要入队的未决的连接的请求数量，TCP最大值的默认值是128，一旦队列满，系统就会拒绝多余的连接请求，backlog的值应该基于服务器期望负载和处理量（接受连接请求与气动服务的数量）来选择
+```
+
+##### accept(): 接受连接
+
+```
+int accept(int sockfd,struct sockaddr *addr,socklen_t *addrlen);
+// 返回值：若成功，返回0，若出错，返回-1，如果不关心客户端的地址，addr和addrlen置为NULL，后续可通过getpeername来获取对端地址
+// 如果套接字描述符处于非阻塞模式，就会返回-1，且将errno设置为EAGAIN或EWOULDBLOCK
+// 如果服务器调用accept，且当前没有连接请求，会阻塞直到一个请求到来，服务器可以使用poll或select等待一个请求的到来
+// 关键是accept会创建一个新的socket，正是这个新的socket会和执行connect的客户端进行连接
+// 从内核2.6.28开始，Linux支持新的非标准系统调用accept4()，新增一个额外的flag，支持两个标记：SOCK_CLOEXEC和SOCK_NONBLOCK
 ```
 
