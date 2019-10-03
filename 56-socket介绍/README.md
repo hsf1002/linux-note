@@ -63,3 +63,24 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 一般会将服务器的socket绑定到一个众所周知的地址，即一个固定的客户端提前就知道的地址，除了这种绑定之外，还有其他做法：对于Internet domain socket，可以不调用bind而直接调用listen，这导致内核为该socket选择一个临时端口，然后服务器通过getsockname获取socket地址，服务器需要向一个中心目录服务程序注册服务器的地址，之后客户端通过这个中心目录服务程序获取
 ```
 
+##### struct sockaddr：通用socket地址结构
+
+```
+struct sockaddr
+{
+    sa_family_t  sa_family: /* 地址协议族 */
+    char  sa_data[14]; /* 可变长度的地址 */
+    ...
+}
+它的唯一用途是将各种domain的特定地址结构转换为单个类型提供给socket系统调用中的参数使用
+
+Internet domain socket的地址结构：
+struct socketaddr_in
+{
+    sa_family_t  sin_family: /* 地址协议族 */
+    in_port_t  sin_port;  /* 端口号 */
+    struct in6_addr  sin6_addr; /* IPv4地址 */
+    unsigned char sin_zero[8];  /* 填充字段，应该全部置为0 */
+}
+```
+
