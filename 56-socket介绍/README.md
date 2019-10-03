@@ -93,3 +93,13 @@ struct socketaddr_in
    * 服务端调用accept接受连接，如果在connect前调用了accept，就会阻塞
 3. 通过传统的read/write或socket特有的send/recv进行通信，直到一方调用close关闭连接
 
+##### listen()：监听接入连接
+
+```
+int listen(int sockfd, int backlog)
+// 返回值：若成功，返回0，若出错，返回-1
+// 无法在一个已连接的socket上（已经成功执行connect的socket或从accept返回的socket）进行listen
+// 要理解backlog，首先注意到客户端可能会在服务器调用accept之前调用connect，此时会产生一个未决的连接
+// backlog提示系统该进程所要入队的未决的连接的请求数量，TCP最大值的默认值是128，一旦队列满，系统就会拒绝多余的连接请求，backlog的值应该基于服务器期望负载和处理量（接受连接请求与气动服务的数量）来选择
+```
+
