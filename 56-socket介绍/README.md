@@ -127,3 +127,16 @@ int connect(int sockfd, const struct sockaddr* addr, socklen_t len);
 // connect可以用于无连接的网络服务，SOCK_DGRAM，这样传输的报文的目标地址会设置成connect调用中指定的地址，每次传输时不需要再提供地址
 ```
 
+##### close(): 连接终止
+
+终止一个连接的常见方式是调用close，如果多个文件描述符引用一个socket，所有描述符关闭后连接就会终止
+
+##### shutdown()：连接终止
+
+```
+nt shutdown(int sockfd, int how);
+// 若成功，返回0，若出错，返回-1
+
+close可以关闭一个套接字，但是只有最后一个活动引用关闭时，close才会释放网络端点，而shutdown允许一个套接字处于不活动状态
+```
+
