@@ -116,3 +116,14 @@ int accept(int sockfd,struct sockaddr *addr,socklen_t *addrlen);
 // 从内核2.6.28开始，Linux支持新的非标准系统调用accept4()，新增一个额外的flag，支持两个标记：SOCK_CLOEXEC和SOCK_NONBLOCK
 ```
 
+##### connect(): 连接到对等socket
+
+```
+int connect(int sockfd, const struct sockaddr* addr, socklen_t len);
+// 返回值：若成功，返回0，若出错，返回-1
+// 如果套接字描述符处于非阻塞模式，连接不能马上建立，就会返回-1，且将errno设置为EINPROGRESS，可以使用poll或select判断文件描述符何时可写，如果可写，连接完成
+// 如果sockfd没有绑定到一个地址，connect会给调用者绑定一个默认地址
+// 基于BSD的套接字实现中，如果第一次连接失败，那么在TCP中继续使用同一个套接字描述符，仍然会失败，程序应该处理关闭套接字，如果需要重试，必须打开一个新的套接字
+// connect可以用于无连接的网络服务，SOCK_DGRAM，这样传输的报文的目标地址会设置成connect调用中指定的地址，每次传输时不需要再提供地址
+```
+
