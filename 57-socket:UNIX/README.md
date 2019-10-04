@@ -33,3 +33,17 @@ struct socketaddr_un
 
 socket文件的所有权和权限决定了哪些进程能够与这个socket进行通信，默认情况下，创建socket（通过bind）时会给所有者、组和other用户赋予所有的权限，要改变这种行为可以在调用bind前用umask禁用不希望赋予的权限
 
+##### sockpair(): 创建互联socket对
+
+有时候单个进程创建一对socket并将它们连接起来比较有用，sockpair提供了一种快捷方式：
+
+```
+#include <sys/socket.h>
+ 
+int socketpair(int domain, int type, int protocol, int fd[2]);
+// 返回值：若成功，返回0，若出错，返回-1
+// domain只能指定为AF_UNIX，type可以是SOCK_DGRAM或SOCK_STREAM，protocol必须是0，fd数组返回了引用这两个互相连接的socket的文件描述符
+// 将type指定为SOCK_STREAM，相当于之间一个双向管道，每个socket都可以用来读写，并且这两个socket之间每个方向上的数据信道是分开的
+// 使用socketpair创建的一对socket不会绑定到任何地址，它们对于其他进程完全不可见
+```
+
