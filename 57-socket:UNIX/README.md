@@ -47,3 +47,29 @@ int socketpair(int domain, int type, int protocol, int fd[2]);
 // 使用socketpair创建的一对socket不会绑定到任何地址，它们对于其他进程完全不可见
 ```
 
+##### Linux抽象socket名空间
+
+抽象路径名空间是Linux特有的，它允许将一个UNIX domain socket绑定到一个名字但不会在文件系统中创建该名字，有如下优势：
+
+* 无须担心与文件系统既有名称产生冲突
+* 没必要在使用完socket后删除socket路径名，socket被关闭后会自动删除这个抽象名
+* 无需为socket创建一个文件系统路径名，对于不具备文件系统写权限时比较有用
+
+要创建一个抽象绑定，需要将sun_path字段的第一个字节指定为NULL
+
+```
+void create_virtual_socket()
+{
+    int sockfd;
+    struct sockaddr_un addr;
+    memset(&addr, 0x00, sizeof(struct sockaddr_un));
+
+    // addr.sun_path[0] has been set to 0 by memset
+    strncpy(&addr.sun_path[1], "xyz", sizeof(addr.sun_path) - 2);
+    if (-1 == (sockfd = socket(AF_UNIX, SOCK_STREAM, 0)))
+        perror("socket error");
+    if (-1 == bind(sockfd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)))
+        perror("bind error");
+}
+```
+
