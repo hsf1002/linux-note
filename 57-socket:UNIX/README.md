@@ -21,3 +21,5 @@ struct socketaddr_un
 
 应该把UNIX domain socket绑定到一个公共的有安全保护措施的绝对路径上
 
+##### UNIX socket中的流socket
+
