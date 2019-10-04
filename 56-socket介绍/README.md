@@ -140,3 +140,13 @@ nt shutdown(int sockfd, int how);
 close可以关闭一个套接字，但是只有最后一个活动引用关闭时，close才会释放网络端点，而shutdown允许一个套接字处于不活动状态
 ```
 
+ ##### 数据报socket
+
+1. 首先双方都需要通过socket()创建，如同邮局收发信件
+2. 服务端调用bind将socket绑定到一个众所周知的地址，再调用listen通知内核它接受接入连接的意愿
+3. 通过sendto发送数据，同时需要指定需要发送的socket地址
+4. 通过recvfrom接收数据，没有数据时阻塞
+5. 调用close关闭socket
+
+![img](http://images2015.cnblogs.com/blog/1019006/201703/1019006-20170303103250782-1966231336.png)
+
