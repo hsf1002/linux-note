@@ -14,7 +14,19 @@
 
 /**
  * UNIX domain流socket服务端
- */
+ *
+    编译步骤：
+     gcc -E 5703.c -o stream_server.i
+     gcc -S stream_server.i -o stream_server.s
+     gcc -c stream_server.s -o stream_server.o
+     gcc stream_server.o -o stream_server
+
+    执行步骤：
+     ./stream_server > output.txt &
+     ./stream_client < input.txt
+     kill %1
+     diff input.txt output.txt     
+*/
 int 
 main(int argc, char **argv)
 {
