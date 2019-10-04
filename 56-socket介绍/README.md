@@ -163,3 +163,11 @@ int recvfrom(int sockfd, void *buf, size_t len，int flags, struct sockaddr *add
 // 通常用于无连接的套接字，否则，addr和addrlen置为NULL，等同于recv
 ```
 
+##### 数据报上使用connect()
+
+数据报上调用connect会导致内核记录这个socket的对等socket的地址，当一个数据报已经连接后：
+
+* 数据报的发送可以使用write或send
+* 在这个socket上只能读取对等socket发送的数据报
+
+connect的作用对数据报socket是不对等的，上面论断适用于调用了connect的数据报socket，并不适用于远程的对等的socket，除非它也调用了connect
