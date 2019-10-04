@@ -150,3 +150,16 @@ close可以关闭一个套接字，但是只有最后一个活动引用关闭时
 
 ![img](http://images2015.cnblogs.com/blog/1019006/201703/1019006-20170303103250782-1966231336.png)
 
+##### sendto()和recvfrom()：交换数据报
+
+```
+ssize_t sendto(int sock, const void *buf, size_t len, int flags, const struct sockaddr *to, socklen_t tolen);
+// 若成功，返回发送的字节数，若出错，返回-1
+// 对于面向连接的套接字，目标地址被忽略，因为连接中隐含了地址，对于无连接的套接字，除非先通过connect设置了目标地址，否则不能使用send。sendto提供了发送报文的另一种方案
+
+int recvfrom(int sockfd, void *buf, size_t len，int flags, struct sockaddr *addr, socklen_t *addrlen); 
+// 若成功，返回数据的字节数，若无可用数据或对方已经结束，返回0，若出错，返回-1
+// 如果addr非空，将包含数据发送者的套接字端点地址
+// 通常用于无连接的套接字，否则，addr和addrlen置为NULL，等同于recv
+```
+
