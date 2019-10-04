@@ -23,3 +23,13 @@ struct socketaddr_un
 
 ##### UNIX socket中的流socket
 
+-nothing-
+
+##### UNIX socket中的数据报
+
+对于UNIX domain socket来说，数据报的传输时在内核中发生，不仅是可靠的，而且会按顺序接收，不会重复
+
+##### UNIX domain socket权限
+
+socket文件的所有权和权限决定了哪些进程能够与这个socket进行通信，默认情况下，创建socket（通过bind）时会给所有者、组和other用户赋予所有的权限，要改变这种行为可以在调用bind前用umask禁用不希望赋予的权限
+
