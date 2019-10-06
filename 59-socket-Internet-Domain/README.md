@@ -186,3 +186,32 @@ NI_NUMERICHOST: 强制在host中返回一个数值地址字符串，在避免可
 NI_NUMEIRCSERV: 强制在service返回一个十进制端口号字符串，在避免不必要的搜索/etc/services的低效性时比较有用
 ```
 
+##### Internet domain socket库
+
+根据给定的socket type创建一个socket，并将其连接到通过host和service指定的地址：
+
+```
+int inetConnect(const char *host, const char *service, int type)
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+```
+
+创建一个监听流socket，该socket会绑定到由service指定的TCP端口的通配IP地址上：
+
+```
+int inetListen(const char *service, int backlog, socklen_t *addrlen)
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+```
+
+根据指定的type创建一个socket，并将其绑定到由service和type指定的端口的通配IP地址上：
+
+```
+int inetBind(const char *service, int type, socklen_t *addrlen)
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+```
+
+返回一个已null结尾的字符串，其包含了对应的主机名和端口号：
+
+```
+char *inetAddressStr(const struct sockaddr *addr, socklen_t addrlen, char *addrStr, int addrStrLen)
+```
+
