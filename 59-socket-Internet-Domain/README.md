@@ -83,7 +83,8 @@ inet_pton()和inet_ntop()：还可以处理IPV6地址
 
 ```
 gethostbyname()和getservbyname()：已经被废弃
-getaddrinfo()：上面两个函数的现代继任者，将主机名和服务名转换为IP地址和端口号，可以透明的处理IPv4和IPv6地址
+getserverbyname()和getserverbyport()：已经被废弃
+getaddrinfo()：上面函数的现代继任者，将主机名和服务名转换为IP地址和端口号，可以透明的处理IPv4和IPv6地址
 getnameinfo()：将一个IP地址和端口号转换为对应的主机名和服务名
 ```
 
@@ -214,4 +215,12 @@ int inetBind(const char *service, int type, socklen_t *addrlen)
 ```
 char *inetAddressStr(const struct sockaddr *addr, socklen_t addrlen, char *addrStr, int addrStrLen)
 ```
+
+##### UNIX和Internet domain socket比较
+
+Internet domain socket既可以运行在同一主机，又可以运行在不同主机上，通常是最简单的做法，然而UNIX domain socket存在的原有如下：
+
+* 在一些实现上，UNIX domain socket速度更快
+* 可以使用目录（Linux上是文件）权限控制对UNIX domain socket的访问，同时为验证客户端提供了最简单的方法
+* 使用UNIX domain socket可以传递打开的文件描述符和发送者的验证信息
 
