@@ -103,3 +103,9 @@ int inet_pton(int domain, const char *strptr, void *addrptr);
 // 返回值：若成功，返回1，若格式无效，返回0，若出错，返回-1
 ```
 
+##### 域名系统DNS
+
+DNS解析请求分为递归和迭代，当调用getaddrinfo时，该函数会向本地DNS服务器发起一个递归请求，如果本地DNS服务器没有相关信息完成解析，那么它就迭代的解析这个域名
+
+7个顶级域名：com、edu、net、org、int、mil、gov
+
