@@ -27,3 +27,41 @@ s: 短整型，2字节
 
 把数据变成一个标准格式以便在网络上传输的过程称为信号编集，存在多种标准，如XDR、ASN.1-BER、CORBA、XML等；更简单的方式是将所有传输的数据编码为文本形式，数据项之间使用特定字符如换行符分割，优点是可以使用telnet调试
 
+##### Internet socket地址
+
+```
+IPv4：
+struct int_addr
+{
+    in_addr_t s_addr;
+};
+struct socketaddr_in
+{
+    sa_family_t  sin_family: /* 地址协议族, AF_INET */
+    in_port_t  sin_port;     /* 端口号 */
+    struct int_addr  sin_addr; /* IPv4地址 */
+    unsigned char sin_zero[8];  /* 填充字段，应该全部置为0 */
+};
+
+IPv6：
+struct in6_addr
+{
+    uint8 s6_addr[16];
+};
+struct socketaddr_in6
+{
+    sa_family_t  sin6_family: /* 地址协议族, AF_INET6 */
+    in_port_t  sin6_port;     /* 端口号 */
+    struct in6_addr  sin6_addr; /* IPv6地址 */
+    unsigned char sin_zero[8];  /* 填充字段，应该全部置为0 */
+};
+
+通用的结构，可以存储任意socket地址，包括IPv4和IPv6
+struct sockaddr_storage
+{
+     sa_family_t ss_family;      /* 地址协议族 */
+     __ss_aligntype __ss_align;  /* Force desired alignment.  */
+     char __ss_padding[_SS_PADSIZE];
+};
+```
+
