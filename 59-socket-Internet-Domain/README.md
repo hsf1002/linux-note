@@ -122,3 +122,67 @@ ptp             15740/tcp   # Picture Transfer Protocol
 ptp             15740/udp   # Picture Transfer Protocol
 ```
 
+##### 独立于协议的主机和服务转换
+
+给定一个主机名和服务名，getaddrinfo返回一个socket地址的结构列表，每个结构包含一个地址和端口号：
+
+```
+#include <netdb.h>
+
+int getaddrinfo(const char *host, const char *service,
+                       const struct addrinfo *hints,
+                       struct addrinfo **result);
+// 若成功，返回0，若出错，返回非0错误码 
+// 可能需要向DNS服务器发送请求，可能要花费一段时间，getnameinfo也是类似
+// 需要提供主机名和服务名，如果提供一个，另一个必须是空指针
+// result返回的是一个结构列表，因为与host、service、hints指定的标准对应的主机和服务组合可能有多个
+       
+struct addrinfo 
+{
+       int              ai_flags;
+       int              ai_family;
+       int              ai_socktype;
+       int              ai_protocol;
+       socklen_t        ai_addrlen;
+       struct sockaddr *ai_addr;
+       char            *ai_canonname;
+       struct addrinfo *ai_next;
+};
+hints.ai_flags是一个位掩码，会改变getaddrinfo的行为，由如下值的0个或多个OR得到：
+AI_ADDRCONFIG: 在本地系统至少配置了一个IPv4/IPv6地址时返回IPv4/IPv6地址
+AI_ALL: 见AI_V4MAPPED的描述
+AI_CANONNAME: host不是NULL，返回一个包含主机的规范名的字符串
+AI_NUMERICHOST: 将host解释为一个数值地址字符串
+AI_NUMERICSERV: 将service解释为一个数值端口号
+AI_PASSIVE: 返回一个监听socket的地址结构，此时host是NULL，result返回的socket地址结构的IP部分将包含一个通配IP地址（INADDR_ANY或IN6ADDR_ANY_INIT）；如果没有此标记，result返回的结构将能用于connect或sendto；如果host是NULL，返回的socket地址的IP部分将会被设置为回环IP地址（INADDR_LOOPBACK或IN6ADDR_LOOPBACK_INIT）
+AI_V4MAPPED: 如果hints字段的ai_family指定了AF_INET6且没有找到匹配的IPv6地址，会在result返回的IPv4映射的IPv6地址结构
+```
+
+释放getaddrinfo动态为result分配的空间：
+
+```
+void freeaddrinfo(struct addrinfo *result);
+```
+
+如果getaddrinfo调用失败，不能使用perror或stderror生成错误信息，而要调用：
+
+```
+const char *gai_strerror(int error);
+// 返回值：指向描述错误的字符串的指针
+```
+
+getaddrinfo的逆函数，将一个地址转换为一个主机名和一个服务名：
+
+```
+int getnameinfo(const struct sockaddr *addr, socklen_t addrlen, char *host, size_t 	  hostlen, char *serv, size_t servlen, int flags);
+// 返回值：若成功返回0，若出错返回-1
+// 如果不想获取主机名，host指定为NULL，hostlen指定为0，host和serv至少一个不能是NULL
+// 套接字地址addr被翻译为一个主机名和一个服务名
+
+flags是一个位掩码，控制着getnameinfo的行为：
+NI_DGRAM: 默认getnameinfo返回与流socket（TCP）服务对应的名字，通常TCP与UDP端口对应的名字相同，在名字不同的场景下，该标记强制返回UDP对应的名字
+NI_NAMEREQD: 默认如果无法解析主机名，会返回一个数值地址字符串，如果指定此标记，返回一个错误EAI_NONAME
+NI_NUMERICHOST: 强制在host中返回一个数值地址字符串，在避免可能耗时较长的DNS服务时调用比较有用
+NI_NUMEIRCSERV: 强制在service返回一个十进制端口号字符串，在避免不必要的搜索/etc/services的低效性时比较有用
+```
+
