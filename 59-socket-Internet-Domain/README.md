@@ -65,3 +65,25 @@ struct sockaddr_storage
 };
 ```
 
+##### 主机和服务转换函数
+
+二进制和人类可读的形式之间转换IPv4地址：
+
+```
+inet_aton()和inet_ntoa()：已经被废弃
+```
+
+二进制和人类可读的形式之间转换IPv4和IPv6地址：
+
+```
+inet_pton()和inet_ntop()：还可以处理IPV6地址
+```
+
+主机和服务名与二进制形式之间的转换：
+
+```
+gethostbyname()和getservbyname()：已经被废弃
+getaddrinfo()：上面两个函数的现代继任者，将主机名和服务名转换为IP地址和端口号，可以透明的处理IPv4和IPv6地址
+getnameinfo()：将一个IP地址和端口号转换为对应的主机名和服务名
+```
+
