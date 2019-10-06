@@ -109,3 +109,16 @@ DNS解析请求分为递归和迭代，当调用getaddrinfo时，该函数会向
 
 7个顶级域名：com、edu、net、org、int、mil、gov
 
+##### /etc/services文件
+
+该文件会记录服务名和端口号，getaddrinfo和getnameinfo会使用这个文件的信息在服务名和端口号之间进行转换，即使服务只使用了一种协议，IANA的策略是将两个端口号都分配给服务，在/etc/services中存在一个端口号并不能保证在实际环境中特定的服务器就能绑定到该端口上
+
+```
+3link           15363/udp   # 3Link Negotiation
+3link           15363/tcp   # 3Link Negotiation
+cisco-snat      15555/tcp   # Cisco Stateful NAT
+cisco-snat      15555/udp   # Cisco Stateful NAT
+ptp             15740/tcp   # Picture Transfer Protocol
+ptp             15740/udp   # Picture Transfer Protocol
+```
+
