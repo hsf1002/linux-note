@@ -87,3 +87,19 @@ getaddrinfo()：上面两个函数的现代继任者，将主机名和服务名�
 getnameinfo()：将一个IP地址和端口号转换为对应的主机名和服务名
 ```
 
+##### inet_pton()和inet_pton()
+
+```
+#include <arpa/inet.h>
+
+将网络字节序的二进制地址转为文本字符串格式
+const char * inet_ntop(int domain, const void *addrptr, char *strptr, size_t len); 
+// 返回值：若成功，返回地址字符串指针，若出错，返回NULL
+// domain只支持AF_INET和AF_INET6
+// p表示presentation，n表示network
+
+将strptr展现的字符串转为网络字节序的二进制IP地址
+int inet_pton(int domain, const char *strptr, void *addrptr);
+// 返回值：若成功，返回1，若格式无效，返回0，若出错，返回-1
+```
+
