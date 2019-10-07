@@ -163,3 +163,52 @@ readelf -d libfoo.so | grep SONAME
 ln -s libfoo.so libbar.so
 ```
 
+##### 共享库的有用工具
+
+* ldd：显示一个程序运行时所需要的共享库
+* objdump： 从可执行文件、目标文件、共享库获取包括反汇编的二进制机器码，还能显示这些文件各个ELF头部信息
+* readelf：显示类似于objdump的信息，但格式不同
+* nm：列出目标库或可执行文件中定义的一组符号，如果要找出哪个库定义了crypt()函数：
+
+```
+nm -A /usr/lib/lib*.so 2> /dev/null |grep 'crypt$'
+```
+
+-A选项指定了在显示符号的每一行开头列出库的名称，此处还丢弃了标准错误输出
+
+##### 共享库的命名规则
+
+* 真实名称：libname.so.major-id.minor-id
+* soname：libname.so.major-id，一般情况下，每个库的主要版本的soname会指向主要版本最新的次要版本
+* 链接器名称：libname.so，是不包含主要版本和次要版本的符号链接
+
+链接器名称只存在一个实例，指向真实名称或者最新的soname符号链接；库的每个主要版本都存在一个soname，运行时用来找出指向相应的（最新的）真实名称的同名符号链接所引用的库
+
+1. 创建目标文件
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+```
+
+2. 创建共享库
+
+```
+gcc -g -shared -Wl, -soname, libdemo.so.1 -o libdemo.so.1.0.1 mod1.o mod2.o mod3.o
+```
+
+3. 创建符号链接
+
+```
+ln -s libdemo.so.1.0.1 libdemo.so.1
+ln -s libdemo.so.1 libdemo.so
+```
+
+4. 使用链接器名称构建可执行文件
+
+```
+gcc -g -Wall -o prog prog.c -L. -ldemo
+LD_LIBRARY_PATH=. ./prog
+```
+
+##### 安装共享库
+
