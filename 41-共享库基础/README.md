@@ -86,3 +86,41 @@ cc -g -o prog prog.o -Lmylibdir -ldemo
 * 比静态库更加复杂
 * 编译时必须使用位置独立的代码
 * 运行时必须要执行符号重定位
+
+##### 创建和使用共享库
+
+目前我们只关心ELF（Executable and Linking Format）共享库，现代版本的Linux和其他UNIX实现都采用了这种格式，取代了早期的a.out和COFF格式
+
+创建一个共享库：
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+gcc -g -shared -o libfoo.so mod1.o mod2.o mod3.o
+```
+
+共享库的前缀是lib，后缀是.so，可以使用一个命令：
+
+```
+gcc -g -fPIC -Wall mod1.c mod2.c mod3.c -shared -o libfoo.so
+```
+
+与普通的可执行文件一样，共享库的目标文件不再维护不同的身份
+
+-fPIC选项指定编译器应该生成位置独立的代码，这对于共享库来说是必须的，为了确定一个既有目标模块是否使用了该选项，可以使用下面两个命令之一查询：
+
+```
+nm mod1.o | grep _GLOBAL_OFFSET_TABLE_
+readelf -s mod1.o | grep _GLOBAL_OFFSET_TABLE_
+```
+
+如果下面两个命令之一产生了任何输出，说明共享库中至少一个目标模块编译时没有指定-fPIC选项：
+
+```
+objdump --all-headers libfoo.so | grep TEXTREL
+readelf -d libfoo.so | grep TEXTREL
+```
+
+TEXTREL表示存在一个目标模块，其文本段中包含需要运行时重定位的引用
+
+
+
