@@ -122,5 +122,22 @@ readelf -d libfoo.so | grep TEXTREL
 
 TEXTREL表示存在一个目标模块，其文本段中包含需要运行时重定位的引用
 
+为了使用一个共享库，需要做两件事情，而使用静态库无需：
 
+* 链接阶段将共享库的名称嵌入到可执行文件中
+* 运行时解析嵌入的库名，如果不在内存就要加载进来
+
+动态链接器本身是一个共享库，是/lib/ld-linux.so.2，所有使用共享库的ELF可执行文件都要用到它
+
+```
+gcc -g -Wall -o prog prog.c libfoo.so
+./prog
+No such file or directory
+```
+
+出现上述错误是因为库位于当前目录，而不是动态链接器搜索的标准目录清单，可以使用LD_LIBRARY_PATH设置目录，动态链接器在搜索标准目录之前会先查找该目录
+
+```
+LD_LIBRARY_PATH=. ./prog
+```
 
