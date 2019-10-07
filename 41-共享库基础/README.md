@@ -141,3 +141,25 @@ No such file or directory
 LD_LIBRARY_PATH=. ./prog
 ```
 
+##### 共享库别名soname
+
+引入soname的目的是为了提供一层间接，使得可执行程序能够在运行时与链接时使用的库不同的（兼容的）共享库
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+gcc -g -shared -Wl, -soname, libbar.so -o libfoo.so mod1.o mod2.o mod3.o
+```
+
+如果要确定一个既有共享库的soname，可以使用下面两个命令之一：
+
+```
+objdump -p libfoo.so | grep SONAME
+readelf -d libfoo.so | grep SONAME
+```
+
+当使用soname时必须要创建一个符号链接，将soname指向库的真实名称，而且将其放入动态链接库搜索的目录
+
+```
+ln -s libfoo.so libbar.so
+```
+
