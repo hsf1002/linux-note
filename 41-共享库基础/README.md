@@ -244,3 +244,31 @@ ldconfig命令可以执行两个任务：
 
 安装一个新库、更新或删除一个旧库，/etc/ld.so.conf列表被修改后，都应该执行此命令
 
+##### 升级共享库
+
+如果要创建共享库/usr/lib/libdemo.so.1.0.1的一个新的次要版本
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+gcc -g -shared -Wl, -soname, libdemo.so.1 -o libdemo.so.1.0.2 mod1.o mod2.o mod3.o
+mv libdemo.so.1.0.2 /usr/lib
+ldconfig -v | grep libdemo
+libdemo.so.1 -> libdemo.so.1.0.2
+```
+
+已经运行的程序要使用新的次要版本，只有当它们终止或重启后才会生效
+
+如果要创建共享库/usr/lib/libdemo.so.1.0.1的一个新的次要版本
+
+```
+gcc -g -c -fPIC -Wall mod1.c mod2.c mod3.c
+gcc -g -shared -Wl, -soname, libdemo.so.2 -o libdemo.so.2.0.0 mod1.o mod2.o mod3.o
+mv libdemo.so.2.0.0 /usr/lib
+ldconfig -v | grep libdemo
+libdemo.so.1 -> libdemo.so.1.0.2
+libdemo.so.2 -> libdemo.so.2.0.0
+cd /usr/lib
+ln -sf libdemo.so.2 libdemo.so
+```
+
+必须手动更新链接器名称的符号链接，最后一条命令
