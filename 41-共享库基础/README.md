@@ -272,3 +272,56 @@ ln -sf libdemo.so.2 libdemo.so
 ```
 
 必须手动更新链接器名称的符号链接，最后一条命令
+
+##### 在目标文件中指定库搜索目录
+
+通知动态链接库共享库目录的方式：
+
+* 使用环境变量LD_LIBRARY_PATH
+* 将共享库安装到标准目录
+* 使用-rpath选项在静态编译阶段在可执行文件中插入一个在运行时搜索共享库的目录列表
+
+-rpath选项的一个替代方案是环境变量LD_RUN_PATH，程序运行时会按照rpath指定的目录列表来搜索
+
+假如程序prog依赖共享库libx1.so，而libx1.so又依赖于libx2.so
+
+1. 构建libx2.so
+
+```
+cd /home/dir/d2
+gcc -g -c -fPIC -Wall modex2.c
+gcc -g -shared -o libx2.so modx2.o
+```
+
+2. 构建libx1.so
+
+```
+cd /home/dir/d1
+gcc -g -c -fPIC -Wall modex1.c
+gcc -g -shared -o libx1.so modx1.o -Wl, -rpath, /home/dir/d2 -L/home/dir/d2 -lx2
+```
+
+3. 构建主程序
+
+```
+cd /home/dir
+gcc -g -Wall -o prog prog.c -Wl, -rpath, /home/dir/d1 -L/home/dir/d1 -lx1
+```
+
+无需指定libx2.so，链接器能够分析libx1.so的rpath列表，能够找到libx2.so，同时在静态链接阶段解析出所有符号
+
+使用下面命令可以查看prog和libx1.so的rpath列表：
+
+```
+objdump -p prog | grep PATH
+objdump -p d1/libx1.so | grep PATH
+```
+
+使用ldd命令可以列出prog的完整的动态依赖列表：
+
+```
+ldd prog
+```
+
+
+
