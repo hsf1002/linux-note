@@ -323,5 +323,28 @@ objdump -p d1/libx1.so | grep PATH
 ldd prog
 ```
 
+`DT_RPATH和DT_RUNPATH`，两种rpath列表差别在于动态链接请在运行时搜索共享库时他们相对于LD_LIBRARY_PATH的优先级，DT_RPATH的优先级比DT_RUNPATH较高；默认情况下，链接器会将rpath列表创建为DT_RPATH标签，为了创建DT_RUNPATH条目，必须使用--enable-new-dtags选项
 
+```
+gcc -g -Wall -o prog prog.c -Wl, --enable-new-dtags -Wl, -rpath, /home/dir/d1 -L/home/dir/d1 -lx1
+objdump -p prog | grep PATH
+RPATH    /home/dir/d1
+RUNPATH  /home/dir/d1
+```
+
+为了使共享库位于包含应用程序的可执行文件的目录的子目录，即将共享库放在应用程序的子目录lib下：
+
+```
+gcc -Wl, -rpath, '$ORIGIN'/lib ...
+```
+
+##### 运行时找出共享库
+
+动态链接器搜索共享库的规则：
+
+1. 如果可执行文件的DT_RPATH列表包含目录且不包含DT_RUNPATH列表，搜索这些目录
+2. 如果定义了LD_LIBRARY_PATH环境变量，搜索其指定的目录
+3. 如果可执行文件的DT_RUNPATH列表包含目录，搜索这些目录
+4. 检查/etc/ld.so.cache文件以确认它是否包含了与库相关的条目
+5. 搜索/lib和/usr/lib目录
 
