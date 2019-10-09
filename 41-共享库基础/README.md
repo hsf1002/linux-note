@@ -348,3 +348,19 @@ gcc -Wl, -rpath, '$ORIGIN'/lib ...
 4. 检查/etc/ld.so.cache文件以确认它是否包含了与库相关的条目
 5. 搜索/lib和/usr/lib目录
 
+##### 运行时符号解析
+
+如果主程序和共享库中同时定义了同名的全局符号（全局变量或全局函数），那么：
+
+* 主程序的全局符号覆盖其他地方的定义
+* 如果一个全局符号在多个库由定义，对该符号的引用会绑定到在扫描库时找到的第一个定义
+
+如果要确保共享库中的定义为优先（即覆盖主程序的定义），构建共享库时需要使用-Bsymbolic选项
+
+```
+gcc -g -c -fPIC -Wall -c foo.c
+gcc -g -shared -Wl, Bsymbolic -o libfoo.so foo.o
+gcc -g -o prog prog.c libfoo.so
+LD_LIBRARY_PATH=. ./prog
+```
+
