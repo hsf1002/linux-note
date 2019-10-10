@@ -66,5 +66,31 @@ shutdown(sockfd, SHUT_RDWR);
 
 shutdown并不会关闭文件描述符，要关闭文件描述符，必须另外调用close
 
+##### 系统调用：sendfile()
 
+如果将磁盘上的文件内容，不做修改的传输到套接字上，可以：
 
+```
+while ((n = read(diskfilefd, buf, BUF_SIZE)) > 0)
+    write(sockfd, buf, n);
+```
+
+如果文件很大，可能需要多次调用这两个系统调用，很不高效，可以直接将磁盘文件拷贝到套接字上，而不经过用户空间（buf），这种技术称为零拷贝传输
+
+```
+#include <sys/sendfile.h>
+
+ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
+// 返回值：若成功，返回传输的字节，若出错，返回-1
+// out_fd指向套接字，in_fd指向的文件必须可以进行mmap()
+// 可以使用此接口将数据从文件传输到套接字上，但是反过来不行，也不能通过此接口在两个套接字之间传输数据
+```
+
+如果启用TCP_CORK选项，所有的输出（HTTP首部、页面数据）都会缓冲到一个单独的TCP报文段中，直到满足下面条件：
+
+* 达到报文段的大小上限
+* 取消了TCP_CORK选项
+* 套接字被关闭
+* 启动该选项后，从写入第一个字节开始经历了200毫秒
+
+可以通过setsockopt系统调用来启动或关闭该选项，如果希望将sendfile的零拷贝能力和传输文件时在第一个报文段中包含HTTP首部信息的能力结合起来，就需要启用该选项
