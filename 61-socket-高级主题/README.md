@@ -40,7 +40,31 @@ MSG_WAITALL： 等待所有数据
 MSG_TRUNC：   数据被截断，也返回实际长度  
 ```
 
+#####  系统调用：shutdown()
 
+```
+int shutdown(int sockfd, int how);
+// 若成功，返回0，若出错，返回-1
+// how的取值，SHUT_RD：关闭连接的读端，对于TCP套接字没意义；SHUT_WR：关闭连接的写端，最常见操作；SHUT_RDWR：连接的读端和写端都关闭
+
+close可以关闭一个套接字，但是只有最后一个活动引用关闭时，close才会释放网络端点，而shutdown允许一个套接字处于不活动状态，和引用它的文件描述符数目无关，还可以方便的关闭双向传输中的一个方向，如读或写
+```
+
+执行下面操作，连接依然会保持打开，仍然可以通过fd2在连接上做IO操作：
+
+```
+fd2 = dup(sockfd);
+close(sockfd);
+```
+
+执行下面操作，连接的双向通道都会关闭，通过fd2页无法执行IO操作了：
+
+```
+fd2 = dup(sockfd);
+shutdown(sockfd, SHUT_RDWR);
+```
+
+shutdown并不会关闭文件描述符，要关闭文件描述符，必须另外调用close
 
 
 
