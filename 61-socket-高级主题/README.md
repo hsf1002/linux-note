@@ -94,3 +94,32 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 * 启动该选项后，从写入第一个字节开始经历了200毫秒
 
 可以通过setsockopt系统调用来启动或关闭该选项，如果希望将sendfile的零拷贝能力和传输文件时在第一个报文段中包含HTTP首部信息的能力结合起来，就需要启用该选项
+
+##### 获取套接字地址
+
+发现绑定到套接字上的地址：
+
+```
+#include <sys/socket.h>
+
+int getsockname(int sockfd, struct sockaddr *localaddr, socklen_t *addrlen);  
+// 返回值：若成功，返回0，若出错，返回-1
+// 如果套接字绑定到了另一个程序，且套接字文件描述符在经过exec调用后仍然可保留，那么此时就能用该接口获取；如果隐式绑定到Internet域套接字，想获取内核分配的临时端口，此接口也可用
+```
+
+内核会在如下情况出现时执行一个隐式绑定：
+
+* TCP套接字执行了connect或listen，但没有bind
+* UDP套接字上首次调用sendto时，该套接字之前还没有绑定到地址
+* 调用bind时将端口号指定为0，此时bind会为套接字指定一个IP地址，但是内核会选择一个临时端口号
+
+如果套接字已经和对等方连接，可以找到对方的地址：
+
+```
+#include <sys/socket.h>
+
+int getpeername(int sockfd, struct sockaddr *peeraddr, socklen_t *addrlen); 
+// 返回值：若成功，返回0，若出错，返回-1
+// 如果服务器进程由另一个程序调用，而accept是由该程序所执行，那么服务器进程可以继承套接字文件描述符，但accept返回的地址信息不存在了
+```
+
