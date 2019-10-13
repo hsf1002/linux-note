@@ -165,3 +165,24 @@ TCP的序列号和确认机制：
 
 每个通过TCP连接传输的字节都由TCP协议分配了一个逻辑的序列号，报文的序列号字段设置为该传输方向上的数据段第一个字节的逻辑偏移，这样接收端就可以按照正确的顺序进行重组；为了实现可靠的通信，TCP采用主动确认的方式，TCP接收端收到报文后会发送一个ACK确认消息，该消息的确认序号设置为接收方所期望的下一个数据字节的逻辑序列号，也就是上一个接收字节的序列号加1；TCP发送端会设置一个定时器，超时没有收到确认报文，那么该报文会重新发送
 
+##### TCP协议状态机和状态迁移图
+
+TCP结点以状态机的方式来建模：
+
+![img](https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1570843894958&di=027618ae48b9ada1f3e6c818de18af5d&imgtype=0&src=http%3A%2F%2Fblog.chinaunix.net%2Fphoto%2F32588_101231174229.jpg)
+
+实线表示TCP客户端的状态迁移路径：CLOSED->SYN_SENT->ESTABLISHED->FIN_WAIT_1->FIN_WAIT_2->TIME_WAIT->CLOSED
+
+虚线表示TCP服务器的状态迁移路径：CLOSED->LISTEN->SYN_RECEIVED->ESTABLISHED->CLOSE_WAIT->LAST_ACK->CLOSE
+
+1. LISTEN：侦听并等待对端的TCP连接请求
+2. SYN-SENT：发送SYN连接请求后，等待对端回复SYN请求
+3. SYN-RECV：收到来自对端的SYN请求，并回复SYN请求后，等待对端响应SYN请求的ACK消息
+4. ESTABLISHED：代表连接建立，双方在这个状态下进行TCP数据交互
+5. FIN-WAIT-1：发送FIN关闭连接请求后，等待对方响应FIN的ACK消息或者对端的FIN关闭请求
+6. FIN-WAIT-2：等待对方FIN关闭请求
+7. CLOSE-WAIT：等待本地用户（进程）发送FIN关闭请求给对端
+8. CLOSING：当双方同时发送FIN关闭请求时，会进入CLOSING状态，等待对端发送FIN报文的响应ACK消息
+9. LAST-ACK：收到对端FIN请求后，回复ACK及FIN并等待对方回复FIN的响应ACK消息，此时进入此状态
+10. TIME-WAIT：该状态是为了确保对端收到了FIN请求的ACK响应，默认会等待两倍MSL时长（MSL：Maximum Segment Lifetime，即报文最大生存时间，超过这个时间的报文会被丢弃）
+
