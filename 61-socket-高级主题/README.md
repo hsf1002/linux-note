@@ -186,3 +186,15 @@ TCP结点以状态机的方式来建模：
 9. LAST-ACK：收到对端FIN请求后，回复ACK及FIN并等待对方回复FIN的响应ACK消息，此时进入此状态
 10. TIME-WAIT：该状态是为了确保对端收到了FIN请求的ACK响应，默认会等待两倍MSL时长（MSL：Maximum Segment Lifetime，即报文最大生存时间，超过这个时间的报文会被丢弃）
 
+##### TCP连接的建立
+
+![img](https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1570844883034&di=fc38048e6df49c15a056f978a1655de0&imgtype=jpg&src=http%3A%2F%2Fimg1.imgtn.bdimg.com%2Fit%2Fu%3D2327482896%2C3371288432%26fm%3D214%26gp%3D0.jpg)
+
+三次握手的步骤：
+
+1. connect调用导致客户端TCP结点发送一个SYN报文到服务器，告知服务器有关客户端的初始序列号
+2. 服务器TCP结点必须确认客户端发送的SYN报文，并告知客户端自己的初始序列号，服务器同时返回SYN和ACK控制位的报文
+3. 客户端TCP结点发送一个ACK报文来确认服务器TCP结点的SYN报文
+
+前两个步骤中交换的SYN报文可能包含TCP首部
+
