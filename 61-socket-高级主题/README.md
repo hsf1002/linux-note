@@ -198,3 +198,18 @@ TCP结点以状态机的方式来建模：
 
 前两个步骤中交换的SYN报文可能包含TCP首部
 
+##### TCP连接的终止
+
+![img](https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1571275733267&di=94e22101ce3a6d1b1347ee81ff70e4e2&imgtype=jpg&src=http%3A%2F%2Fimg2.imgtn.bdimg.com%2Fit%2Fu%3D1196104357%2C1513701754%26fm%3D214%26gp%3D0.jpg)
+
+一般由客户端发起执行close，稍后，服务器也执行一个close调用，TCP协议执行的步骤如下：
+
+1. 客户端主动关闭，发送一个FIN报文给服务器
+2. 接收到FIN后，服务器发出ACK报文作为回应；之后在服务器端，任何对read操作都会到文件尾
+3. 当服务器关闭自己的连接时，发送FIN报文到客户端
+4. 接收到FIN后，客户端发送ACK报文作为响应
+
+TCP连接建立到结束完整的流程图：
+
+![img](https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1571275663736&di=3118fc8cb8fe65edfe44903384e73d53&imgtype=0&src=http%3A%2F%2Fimg.dongcoder.com%2Fup%2Finfo%2F201807%2F20180709120439727521.png)
+
