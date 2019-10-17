@@ -219,3 +219,49 @@ TCP连接建立到结束完整的流程图：
 
 * 实现可靠的连接终止
 * 让老的重复的报文段在网络中过期失效，这样在连接新的连接时将不再接收它们
+
+##### 监视套接字：netstat
+
+可以显示系统中Internet和UNIX套接字的状态
+
+```
+-a或–all 显示所有连线中的Socket
+-A<网络类型>或–<网络类型> 列出该网络类型连线中的相关地址
+-c或–continuous 持续列出网络状态
+-C或–cache 显示路由器配置的快取信息
+-e或–extend 显示网络其他相关信息
+-i或–interfaces 显示网络界面信息表单
+-l或–listening 显示监控中的服务器的Socket
+-M或–masquerade 显示伪装的网络连线
+-n或–numeric 直接使用IP地址，而不通过域名服务器
+-N或–netlink或–symbolic 显示网络硬件外围设备的符号连接名称
+-o或–timers 显示计时器
+-p或–programs 显示正在使用Socket的程序识别码和程序名称
+-r或–route 显示Routing Table
+-s或–statistice 显示网络工作信息统计表
+-v或–verbose 显示指令执行过程
+-V或–version 显示版本信息
+-t或–tcp 显示TCP传输协议的连线状况
+-u或–udp 显示UDP传输协议的连线状况
+-w或–raw 显示RAW传输协议的连线状况
+-x或–unix 此参数的效果和指定”-A unix”参数相同
+–ip或–inet 此参数的效果和指定”-A inet”参数相同
+```
+
+```
+Active Internet connections
+Proto Recv-Q Send-Q  Local Address          Foreign Address        (state)    
+tcp4       0      0  192.168.3.35.61194     113.132.128.134.hp-pdl ESTABLISHED
+tcp4       0      0  192.168.3.35.61193     113.132.128.134.hp-pdl ESTABLISHED
+tcp4       0      0  localhost.ibprotocol   localhost.61192        CLOSE_WAIT 
+tcp4       0      0  localhost.61192        localhost.ibprotocol   FIN_WAIT_2 
+tcp4       0      0  localhost.ibprotocol   localhost.61191        CLOSE_WAIT
+```
+
+* Proto：套接字使用的协议
+* Recv-Q：套接字接收缓冲区中还未被本地应用读取的字节数
+* Send-Q ：套接字发送缓冲区中排队等待发送的字节数
+* Local Address：套接字绑定到的地址
+* Foreign Address：对端套接字绑定到的地址
+* State：当前套接字所处的状态
+
