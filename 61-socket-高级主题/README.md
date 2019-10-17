@@ -265,3 +265,136 @@ tcp4       0      0  localhost.ibprotocol   localhost.61191        CLOSE_WAIT
 * Foreign Address：对端套接字绑定到的地址
 * State：当前套接字所处的状态
 
+##### 使用tcpdump监视TCP流量
+
+可以监视所有的TCP/IP数据包流量（TCP报文、UDP报文、ICMP报文）
+
+`src > dst: flags data-seqno ack window urg <option>`
+
+```
+sudo tcpdump -t -N 'port 22264'
+
+IP .6030 > 192.168.3.35.22264: UDP, length 1397
+IP .beeyond-media > 192.168.3.35.22264: UDP, length 1397
+IP 120.244.156.226.21321 > 192.168.3.35.22264: UDP, length 1397
+```
+
+* src：源IP地址和端口号
+* dst：目的IP地址和端口号
+* fags：TCP控制位的组合，S（SYN）、F（FIN）、P（PSH）、R（RST）、E（ECE）、C（CWR）
+* data-seqno：数据包的序列号范围
+* ack：连接的另一端期望的下一个字节的序列号
+* window：这条连接相反方向用于传输的接收缓冲区大小
+* urg：报文段在指定的偏移上包含紧急数据
+* option：可能包含TCP任意选项
+
+其中，src、dst和flags总是显示，其他字段只在合适的时机显示
+
+```
+常见参数：
+-a：将网络地址和广播地址转换成名字
+-A：以ASCII格式打印出所有分组，并将链路层头最小化，方便去捕获web页面内容
+-c num：收到指定数量的分组后，tcpdmp就会停止
+-D：列出系统中所有可以用以tcpdump截包的网络接口。显示的接口序号或接口名称可以通过-i指定
+-q：快速输出，只输出较少的信息
+-w：将结果输出到文件中，输出的文件以.pcap作为后缀，可以在其他平台上用wireshark打开
+-r：从指定文件读取数据包，这个数据包一般是通过-w生成的
+-s snaplen
+从每个分组中读取最开始的snaplen个字节
+默认情况下是读取68个字节，对IP、ICMP、TCP和UDP而言已经足够，但是可能阶段名称服务器和NFS信息包的协议信息。
+-s 0表示不限制长度，输出整个包。
+应该将snaplen设置成到感兴趣的信息的最小长度。否则会增加获得快照的时间和减少缓存的数量
+-t：在每一行转储行上省略时间戳显示
+-tt：在每一行中输出非格式化的时间戳
+-ttt：在每一行输出date处理过后的时间戳
+-v
+-vv
+-vvv
+以上三点，输出的信息详细度递增
+-i
+指定抓取数据包的接口
+若未指定则会去抓取-D参数列出的网络接口所所截获的包（本地回环口除外）
+
+不常用参数：
+-C file_size:指定用-w参数写入文件的文件大小。
+-d：将匹配信息包的代码用汇编格式显示
+-dd：将匹配信息包的代码用C语言程序段格式显示
+-ddd：将匹配信息包的代码用十进制格式显示
+-e：在输出行打印数据链路层的头部信息
+-f：将外部internet地址以数字形式打印显示
+-F：从指定文件中读取表达式，忽略命令行中给出的表达式
+-l：使标准输出变成缓冲行形式，可以把数据导出到文件
+-L：列出网络接口的已知数据链路
+-m：从文件module导入SMI MIB模块定义
+-M：指定TCP-MD5选项的验证码
+-b：在数据链路层上选择协议，包括ip、arp、rarp、ipx等协议
+-n：不把网络地址换成名字（不进行域名解析，速度更快）
+-nn：直接以ip和端口显示
+-N：输出主机名中的域名部分
+-O：不允许分组匹配代码优化程序
+-p：不将网络接口设置为混杂模式
+-T：将监听到的包直接解析为指定的类型的报文，常见的类型有rpc、cnfp、snmp
+-u：输出未解码的NFS句柄
+-X：以十六进制与ASCII方式输出，用于抓取http等明文传输协议
+-XX：同上
+-B：buffer_size：设置系统捕获缓冲区大小
+-K：跳过TCP校验和验证
+```
+
+```
+抓取包含10.10.10.122的数据包
+tcpdump -i ens33 -vnn host 10.10.10.122
+抓取包含10.10.10.0/24网段的数据包
+tcpdump -i ens33 -vnn net 10.10.10.0/24
+tcpdump -i ens33 -vnn net 10.10.10.0 mask 255.255.255.0
+抓取包含端口22的数据包
+tcpdump -i ens33 -vnn port 22
+抓取udp协议的数据包
+tcpdump -i ens33 -vnn udp
+抓取icmp协议的数据包
+tcpdump -i ens33 -vnn icmp
+抓取arp协议的数据包
+tcpdump -i ens33 -vnn arp
+抓取ip协议的数据包
+tcpdump -i ens33 -vnn ip proto ip
+tcpdump -i ens33 -vnn ip
+抓取源ip是10.10.10.122的数据包
+tcpdump -i ens33 -vnn src host 10.10.10.122
+抓取目标ip是10.10.10.122的数据包
+tcpdump -i ens33 -vnn dst host 10.10.10.122
+抓取源端口是22的数据包
+tcpdump -i ens33 -vnn src port 22
+抓取源ip是10.10.10.253且目的端口是22的数据包
+tcpdump -i ens33 -vnn src host 10.10.10.122 and dst port 22
+抓取源ip是10.10.10.122或者端口是22的数据包
+tcpdump -i ens33 -vnn src host 10.10.10.122 or port 22
+抓取源ip是10.10.10.122且端口不是22的数据包
+tcpdump -i ens33 -vnn src host 10.10.10.122 and not port 22
+抓取源ip是10.10.10.2且端口是22，或源ip是10.10.10.65且目的端口是80的数据包。
+tcpdump -i ens33 -vnn \(src host 10.10.10.2 and port 22 \) or \(src ip host 10.10.10.65 and prot 80\)
+抓取源ip是10.10.10.59且目的端口是22，或者源ip是10.10.10.68且目的端口是80的数据包
+tcpdump -i ens33 -vnn '\(src host 10.10.10.59 and dst port 22\) 'or '\(src host 10.10.10.68 and dst prot 80\)'
+把抓取的数据包记录存到/tmp/fill文件中，当抓取100个数据包后就退出程序
+tcpdump -i ens33 -c 100 -w /tmp/fill
+从/tmp/fill记录中读取tcp协议的数据包。
+tcpdump -i ens33 -r /tmp/fill tcp
+从/tmp/fill记录中读取包含10.10.10.58的数据包。
+tcpdump -i ens33 -r /tmp/fill host 10.10.10.58
+过滤数据包类型是多播并且端口不是22、不是icmp协议的数据包。
+tcpdump -i ens33 ether multicast and not port 22 and 'not icmp'
+过滤协议类型是ip并且目标端口是22的数据包
+tcpdump -i ens33 -n ip and dst prot 22
+tcpdump可识别的关键字包括ip、igmp、tcp、udp、icmp、arp等
+过滤抓取mac地址是某个具体的mac地址、协议类型是arp的数据包
+tcpdump -i ens33 ether src host 00:0c:29:2f:a7:50 and arp
+过滤抓取协议类型是ospf的数据包
+tcpdump -i ens33 ip proto ospf
+直接在tcpdump中使用的协议关键字只有ip、igmp、tcp、udp、icmp、arp等，其他的传输层协议没有可直接识别的关键字
+可以使用关键字proto或者ip proto加上在/etc/protocols中能够找到的协议或者相应的协议编号进行过滤。
+更加高层的协议，例如http协议需要用端口号来过滤
+过滤长度大于200字节的报文
+tcpdump -i ens33 greater 200
+过滤协议类型为tcp的数据包
+tcpdump tcp
+```
+
