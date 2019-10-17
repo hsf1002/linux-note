@@ -213,3 +213,9 @@ TCP连接建立到结束完整的流程图：
 
 ![img](https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1571275663736&di=3118fc8cb8fe65edfe44903384e73d53&imgtype=0&src=http%3A%2F%2Fimg.dongcoder.com%2Fup%2Finfo%2F201807%2F20180709120439727521.png)
 
+##### TIME_WAIT状态
+
+此状态的两个目的：
+
+* 实现可靠的连接终止
+* 让老的重复的报文段在网络中过期失效，这样在连接新的连接时将不再接收它们
