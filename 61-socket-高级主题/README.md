@@ -398,3 +398,27 @@ tcpdump -i ens33 greater 200
 tcpdump tcp
 ```
 
+##### 套接字选项
+
+设置选项的值：
+
+```
+#include <sys/socket.h>
+
+int setsockopt(int sock, int level, int option, const void *val, socklen_t len);
+// 返回值：若成功，返回0，若出错，返回-1
+// level是选项应用的协议，如果选项是通用的套接字层次选项，level是SOL_SOCKET，否则level设置为协议编号，对于TCP，level是IPPROTO_TCP，对于IP，level是IPPROTO_IP
+// val根据选项的不同指向一个数据结构或一个整数
+// len指定了val指向对象的大小
+// option是选项名，通用选项、层次选项或某种协议特定选项的名字
+```
+
+查看选项的值：
+
+```
+int getsockopt(int sock, int level, int option, void *val, socklen_t *len);
+// 返回值：若成功，返回0，若出错，返回-1
+```
+
+在通过exec调用继承了套接字文件描述符的程序中，比如inetd调用的程序，这种情况下，该调用非常有用，因为程序可能并不知道它继承而来的套接字是什么类型
+
