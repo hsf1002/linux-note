@@ -431,3 +431,12 @@ int getsockopt(int sock, int level, int option, void *val, socklen_t *len);
 
 这两种情况下，剩余TCP结点无法接受新的连接，尽管如此，默认情况下大多数TCP实现会阻止新的监听套接字绑定到服务器的知名端口上；尽管有另一个TCP结点绑定到了同一个端口，通过设定SO_REUSEADDR标记选项允许我们将套接字绑定到这个本地端口上，大多数TCP服务器都应该开启这个选项
 
+##### 在accept()中继承标记和选项
+
+多种标记和设定都可以同打开的文件描述符和文件描述相关起来，为套接字设定的多个选项和标记，通过accept返回的新套接字会继承吗？在Linux上，如下属性不会继承：
+
+* 文件描述符相关的状态标记，即通过fcntl的F_SETFL操作的标记，包括O_NONBLOCK和O_ASYNC
+* 文件描述符标记，通过fcntl的F_SETFD操作的标记，仅一个FD_CLOEXEC
+* 与信号驱动IO相关的文件描述符属性，如fcntl的F_SETOWN以及F_SETSIG
+
+除此之外，其他属性都会继承
