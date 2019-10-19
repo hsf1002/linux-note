@@ -477,3 +477,44 @@ int sockatmark(int sockfd);
 // 返回值：若在标记处，返回1，若不在，返回0，若出错，返回-1
 // 当下一个要读取的字节在紧急标记处，返回1
 ```
+
+##### 高级功能：系统调用sendmsg()和recvmsg()
+
+sendmsg能做到write、send、sendto所做的事情：
+
+```
+ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
+// 若成功，返回发送的字节数，若出错，返回-1
+
+struct msghdr 
+{
+    void          *msg_name;        // protocol address
+    socklen_t      msg_namelen;     // size of protocol address
+    struct iovec  *msg_iov;         // scatter/gather array
+    int            msg_iovlen;      // elements in msg_iov
+    void          *msg_control;     // ancillary data (cmsghdr struct)
+    socklen_t      msg_controllen;  // length of ancillary data
+    int            msg_flags;       // flags returned by recvmsg()
+};
+```
+
+recvmsg可以做read、recv和recvfrom所做的事情：
+
+```
+ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
+// 若成功，返回数据的字节数，若无可用数据或对方已经结束，返回0，若出错，返回-1
+
+// flags的含义：       
+MSG_CTRUNC:   控制数据被截断
+MSG_ERRQUEUE: 接收错误信息作为辅助数据
+MSG_EOR:      接收记录结束符
+MSG_OOB:      接收带外信息
+MSG_TRUNC:    一般数据被截断
+```
+
+这两个系统调用主要：
+
+* 可以实现分散-聚合IO的功能，recvmsg可以将接收到的数据放入多个缓冲区，而sendmsg可以调用带有msghdr结构的sendmsg来指定多重缓冲区传输数据
+
+* 可以传送包含特定于域的辅助数据
+
