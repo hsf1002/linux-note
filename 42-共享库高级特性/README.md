@@ -34,3 +34,14 @@ RTLD_NOLOAD：不加载库
 RTLD_DEEPBIND：在解析这个库中的符号引用时优先搜索库中的定义，再搜索已加载的库中的定义，-Bsymbolic含义类似
 ```
 
+##### 错误诊断：dlerror
+
+如果调用dlopen或其他API出现错误，可以通过dlerror获取错误原因的指针：
+
+```
+#include <dlfcn.h>
+
+const char *dlerror(void);
+// 返回值，若成功，返回错误提示字符串，若从上次调用dlerror到现在没有发生错误，返回NULL
+```
+
