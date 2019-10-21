@@ -39,9 +39,31 @@ RTLD_DEEPBIND：在解析这个库中的符号引用时优先搜索库中的定�
 如果调用dlopen或其他API出现错误，可以通过dlerror获取错误原因的指针：
 
 ```
-#include <dlfcn.h>
-
 const char *dlerror(void);
 // 返回值，若成功，返回错误提示字符串，若从上次调用dlerror到现在没有发生错误，返回NULL
+```
+
+##### 获取符号地址：dlsym
+
+在handle指向的库以及该库的依赖树的库中搜索名字为symbol的符号（函数或变量）：
+
+```
+void *dlsym(void *handle, char *symbol);
+// 返回值：若成功，返回符号地址，若未找到，返回NULL
+// handle可以取值如下伪句柄
+RTLD_DEFAULT：从主程序开始查找symbol，接着按序在所有已加载的共享库中查找
+RTLD_NEXT：在调用dlsym之后加载的共享库中搜索symbol，适用于需要创建与在其他地方定义的函数同名的包装函数的情况
+```
+
+C99禁止函数指针与void*之间的赋值操作：
+
+```
+funcp = dlsym(handle, symbol);
+```
+
+应该改为如下的类型转换：
+
+```
+*(void **)(&funcp) = dlsym(handle, symbol);
 ```
 
