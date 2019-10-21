@@ -78,3 +78,20 @@ int dlclose(void *handle);
 
 可以使用atexit或on_exit来设置一个在库被卸载时自动调用的函数
 
+##### 获取与加载的符号相关的信息：dladdr
+
+```
+int dladdr(void *address, Dl_info *dlip);
+// 返回值：如果地址在库中存在，返回非0值，否则返回0
+
+struct {
+const char *dli_fname; // 执行包含address的加载模块的文件名
+void *dli_fbase;  // 加载模块的句柄，用作dlsym的第一个参数
+const char *dli_sname; // 指向与指定的address最接近的符号的名称
+void *dli_saddr;  // 最接近符号的实际地址
+size_t dli_size; /* ELF only */ 最接近符号的大小
+int dli_bind; /* ELF only */ 最接近符号的绑定属性
+int dli_type;    // 最接近符号的类型
+};
+```
+
