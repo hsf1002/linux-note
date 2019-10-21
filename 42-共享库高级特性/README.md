@@ -67,3 +67,14 @@ funcp = dlsym(handle, symbol);
 *(void **)(&funcp) = dlsym(handle, symbol);
 ```
 
+##### 关闭共享库：dlclose
+
+会减小handle引用的库的系统计数，如果是0则卸载这个库，同时在依赖树中的库递归执行此过程，当进程终止时会隐式的对所有库执行dlclose：
+
+```
+int dlclose(void *handle);
+// 返回值：若成功，返回0，若出错，返回-1
+```
+
+可以使用atexit或on_exit来设置一个在库被卸载时自动调用的函数
+
