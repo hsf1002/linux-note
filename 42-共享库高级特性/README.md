@@ -10,3 +10,27 @@
 * dlerror：调用上述函数时返回一个错误消息字符串
 
 Linux上使用dlopen API必须指定-ldl选项以便与libdl库链接起来
+
+##### 打开共享库：dlopen
+
+将名字为libfilename的共享库加载到调用进程的虚拟地址空间并增加该库的打开引用计数：
+
+```
+#include <dlfcn.h>
+
+void *dlopen(const char *libfilename, int flags);
+// 返回值：若成功，返回库的句柄，若出错，返回NULL
+// 如果libfilename包含斜线/，将被解析为绝对或相对路径名
+// 如果libfilename依赖其他库，则自动加载那些库
+// 同一个库文件中可以多次调用dlopen，只会加载进内存一次，但是引用计数会增加
+
+flags是位掩码，取值如下：
+RTLD_LAZY：只有当代码被执行的时候才解析库中未定义的函数符号，延迟加载只适用于函数引用，变量引用会立刻解析
+RTLD_NOW：在dlopen结束之前立刻加载库中所有的未定义引用，打开库变慢，但能检测潜在错误，一般调试时使用
+RTLD_GLOBAL：这个库及其依赖树中的符号在解析由这个进程加载的其他库中的引用和通过dlsym查找时可用
+RTLD_LOCAL：默认值，与RTLD_GLOBAL含义相反
+RTLD_NODELETE：在dlclose中不要卸载库，即使引用计数是0，后续dlopen时不会重新初始化库中的静态变量，gcc -Wl, -znodelete含义类似
+RTLD_NOLOAD：不加载库
+RTLD_DEEPBIND：在解析这个库中的符号引用时优先搜索库中的定义，再搜索已加载的库中的定义，-Bsymbolic含义类似
+```
+
