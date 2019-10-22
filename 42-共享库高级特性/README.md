@@ -107,3 +107,18 @@ gcc --export-dynamic main.c
 gcc -rdynamic main.c
 ```
 
+##### 控制符号的可见性
+
+如static使得一个符号私有于一个代码模块，gcc提供了一个特有的特性声明：
+
+```
+void
+__attribute__ ((visibility("hidden")))
+func(void)
+{
+	// code
+}
+```
+
+hidden使得一个符号对构成共享库的所有源代码文件都可见，对库之外的文件都不可见
+
