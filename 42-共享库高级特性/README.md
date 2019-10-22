@@ -278,3 +278,21 @@ gcc -Wl, --version-script, myscriptfile.map
 
   使用`objdump -t p1|grep xyz`可以打印出每个可执行文件的符号表，从而显示出两个程序使用了不同的版本标签
 
+##### 初始化和终止函数
+
+可以定义一个或多个在共享库被加载和卸载时自动执行的函数，不管库时自动被加载还是被dlopen接口显式加载，初始化和终止函数都会被执行，gcc的constructor和descontructor特性还能创建主程序的初始化和终止函数
+
+```
+void __attribute__ ((constructor))  some_name_load(void)
+{
+	// initialization
+}
+
+void __attribute__ ((destructor))  some_name_unload(void)
+{
+	// finalization
+}
+```
+
+早期是通过`_init`和`_fini`函数实现的，但是只能定义一个，目前已经不建议使用了
+
