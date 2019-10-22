@@ -95,3 +95,15 @@ int dli_type;    // 最接近符号的类型
 };
 ```
 
+##### 在主程序中访问符号
+
+如果使用dlopen动态加载了一个共享库，然后使用dlsym获取共享库的x函数，接着x又调用y函数；而有时候需要让x调用主程序的y实现，可以使用链接器选项--export-dynamic
+
+```
+gcc -Wl, --export-dynamic main.c
+或
+gcc --export-dynamic main.c
+或
+gcc -rdynamic main.c
+```
+
