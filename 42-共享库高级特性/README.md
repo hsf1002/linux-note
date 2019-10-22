@@ -163,5 +163,118 @@ gcc -Wl, --version-script, myscriptfile.map
 
   再次`readelf --sym --use-dynamic vis.so|grep vis_`查看会发现二个符号vis_f1、vis_f2
 
+* 符号的版本化：允许一个共享库提供同一个函数的多个版本，每个程序会使用它与共享库进行（静态）链接时函数的当前版本，符号版本化可以取代传统的共享库主要和次要版本化模型；
+
+  除了xyz之外，其他符号都隐藏
+
+  ```
+  vim sv_lib_v1.c
+  #include <stdio.h>
   
+  void xyz()
+  {
+  	printf("v1");
+  }
+  
+  vim sv_v1.map
+  VER_1
+  {
+      global:
+      	xyz;
+      local:
+      	*
+  }
+  
+  gcc -g -c fPIC -Wall sv_lib_v1.c
+  gcc -g -shared -o libsv.so sv_lib_v1.o -Wl, --version-script, sv_v1.map
+  ```
+
+  接着创建一个程序使用这个库：
+
+  ```
+  vim sv_prog.c
+  #include <stdlib.h>
+  
+  int main(void)
+  {
+  	void xyz(void);
+  	
+  	xyz();
+  	
+  	exit(EXIT_SUCCESS);
+  }
+  ```
+
+  编译运行程序:
+
+  ```
+  gcc -g -o p1 sv_prog.c libsv.so
+  LD_LIBRARY_PATH=. ./p1
+  v1
+  ```
+
+  现在修改库中xyz的定义，但是需要确保p1仍然能够使用老版本的函数，为此，必须定义两个版本的xyz：
+
+  ```
+  vim sv_lib_v2.c
+  #include <stdio.h>
+  
+  __asm__(".symver xyz_old, xyz@VER_1");
+  __asm__(".symver xyz_new, xyz@@VER_2");
+  
+  void xzy_old(void)
+  {
+  	printf("v1");
+  }
+  
+  void xyz_new(void)
+  {
+  	printf("v2");
+  }
+  
+  void pqr(void)
+  {
+  	printf("v2 pqr")
+  }
+  ```
+
+  两个.symver的汇编指令将两个函数绑定到了两个不同的版本标签上，第二个.symver使用两个@表示当应用程序与这个共享库进行静态链接时应该使用xyz的默认定义，一个符号的.symver定义中只能有一个@@标记
+
+  ```
+  vim sv_v2.map
+  VER_1
+  {
+      global:
+      	xyz;
+      local:
+      	*
+  };
+  
+  VER_2
+  {
+  	global:
+  		pqr;
+  }VER_1;
+  ```
+
+  新的版本脚本提供了新的版本标签，它依赖于VER_1，接着构建共享库的新版本：
+
+  ```
+  gcc -g -c fPIC -Wall sv_lib_v2.c
+  gcc -g -shared -o libsv.so sv_lib_v2.o -Wl, --version-script, sv_v2.map
+  ```
+
+  现在创建一个新程序p2，它使用xyz的新定义，同时程序p1使用xyz的旧定义
+
+  编译运行程序：
+
+  ```
+  gcc -g -o p2 sv_prog.c libsv.so
+  LD_LIBRARY_PATH=. ./p2
+  v2
+  LD_LIBRARY_PATH=. ./p1
+  v1
+  ```
+
+  使用`objdump -t p1|grep xyz`可以打印出每个可执行文件的符号表，从而显示出两个程序使用了不同的版本标签
 
