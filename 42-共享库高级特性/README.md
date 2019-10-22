@@ -122,3 +122,46 @@ func(void)
 
 hidden使得一个符号对构成共享库的所有源代码文件都可见，对库之外的文件都不可见
 
+##### 链接器版本脚本
+
+版本脚本是一个包含链接器ld执行的指令的文本文件，要使用版本脚本必须要指定链接器选项--version-script
+
+```
+gcc -Wl, --version-script, myscriptfile.map
+```
+
+版本脚本通常是map后缀，其主要作用是控制符号的可见性和符号的版本化
+
+* 控制符号的可见性：可以控制可能在无意中变成全局变量的符号的可见性，假设三个源文件，vis_common.c、vis_f1.c、vis_f2.c分别定义了函数vis_common、vis_f1、vis_f2且vis_common由另两个函数调用
+
+  ```
+  gcc -g -c -fPIC -Wall vis_common.c vis_f1.c vis_f2.c
+  gcc -g -shared -o vis.so vis_common.o vis_f1.o vis_f2.o
+  ```
+
+  通过命令`readelf --sym --use-dynamic vis.so|grep vis_`查看会发现三个符号vis_common、vis_f1、vis_f2，如果要隐藏vis_common，可以定义版本脚本：
+
+  ```
+  vim vis.map
+  VER_1
+  {
+  global:
+      vis_f1;
+      vis_f2;
+  local:
+      *
+  }
+  ```
+
+  golobal表示对库之外的程序可见，而local表示对库之外的程序不可见，默认情况下C全局符号对共享库之外的程序是可见的，接着可以构建共享库：
+
+  ```
+  gcc -g -c -fPIC -Wall vis_common.c vis_f1.c vis_f2.c
+  gcc -g -shared -o vis.so vis_common.o vis_f1.o vis_f2.o \
+  -Wl, --version-script, vis.map
+  ```
+
+  再次`readelf --sym --use-dynamic vis.so|grep vis_`查看会发现二个符号vis_f1、vis_f2
+
+  
+
