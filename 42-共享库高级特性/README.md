@@ -296,3 +296,13 @@ void __attribute__ ((destructor))  some_name_unload(void)
 
 早期是通过`_init`和`_fini`函数实现的，但是只能定义一个，目前已经不建议使用了
 
+##### 预加载共享库
+
+通过环境变量LD_PRELOAD来实现，首先会加载这些库，可执行文件会自动使用这些库中文件，并覆盖动态链接器在其他情况下搜索到的同名函数；假如libdemo中存在两个函数x1和x2，而另一个共享库libalt中也存在x1的定义，如果想要覆盖前面的定义：
+
+```
+LD_PRELOAD=libalt.so ./prog
+```
+
+LD_PRELOAD控制着进程级别的预加载行为，/etc/ld.so.preload控制着系统层面的预加载行为
+
