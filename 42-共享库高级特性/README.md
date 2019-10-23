@@ -306,3 +306,7 @@ LD_PRELOAD=libalt.so ./prog
 
 LD_PRELOAD控制着进程级别的预加载行为，/etc/ld.so.preload控制着系统层面的预加载行为
 
+##### 监控动态链接器：LD_DEBUG
+
+监控动态链接器可以知道它在搜索哪些库，可以通过LD_DEBUG知道，对于由动态链接器隐式加载和使用dlopen动态加载的库都有效，默认情况下它会输出到标准错误上，可以将一个路径名赋值给环境变量LD_DEBUG_OUTPUT将输出重定向
+
