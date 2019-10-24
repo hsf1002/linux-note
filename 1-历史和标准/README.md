@@ -1,0 +1,19 @@
+### 第1章 历史和标准
+
+##### UNIX和C语言简史
+
+1969：AT&T的贝尔实验室，Ken Thompson使用Digital PDP-7小型机的汇编语言开发了首个UNIX实现
+
+1970：AT&T的工程师们，使用Digital PDP-11以汇编语言重写了UNIX
+
+1972：D.M.Ritchie 在B语言的基础上最终设计出了C语言，取了BCPL的第二个字母作为这种语言的名字
+
+1973：C语言进入成熟期，使用它重写了几乎整个UNIX内核
+
+1979：UNIX发布了第七个版本，从此分裂成了两大分支
+
+* BSD：Berkeley Software Distribution
+* System V：AT&T的UNIX团队支持，1989年发布System V Release 4，SVR4
+
+
+
