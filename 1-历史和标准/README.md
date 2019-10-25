@@ -15,5 +15,15 @@
 * BSD：Berkeley Software Distribution
 * System V：AT&T的UNIX团队支持，1989年发布System V Release 4，SVR4
 
+##### Linux简史
 
+1984：Richard Smallman创建了自由的UNIX实现，发起GNU（GNU's not UNIX）项目
+
+1985：Richard Smallman创建了自由软件基金会（FSF），指定了GNU GPL（通用公共许可协议）
+
+90年代早期：GNU已经开发出了GCC、Emacs、bash shell、glibc，几乎是一套完整的操作系统，却缺少UNIX内核
+
+1991：Linux Torvalds为自己的Intel80386PC开发了一个操作系统，开始Linux的使用许可协议非常严格，但很快归于GNU GPL的阵营
+
+2003：发布Linux内核2.6
 
