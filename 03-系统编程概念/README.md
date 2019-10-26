@@ -74,3 +74,69 @@ ldd prog | grep libc
 * 某些库函数出错会返回-1之外的其他值，仍会设置errno标识具体错误，如fopen，此类可用perror和stderr诊断
 * 还有些库函数根本不使用errno，此类不可用perror和stderr诊断
 
+##### 可移植性问题
+
+系统调用和库函数的受限，被各种标准制约，一部分是SUS制定，一部分是BSD和System V Release 4定义
+
+* 特性测试宏
+
+_POSIX_SOURCE：定义后会符合POSIX.1-1990和ISO C-1990标准的定义，已经被 _POSX_C_SOURCE取代
+
+_POSX_C_SOURCE：同 _POSIX_SOURCE
+
+_XOPEN_SOURCE：定义后，会符合POSIX.1、POSIX.2和XPG4标准
+
+_BSD_SOURCE：开启BSD定义的支持
+
+_SVID_SOURCE：符合System V接口规范
+
+_GNU_SOURCE，定义后，会符合前述所有标准的定义，同时开启对各种GNU扩展定义的支持
+
+* 系统数据类型
+
+系统数据类型大多定义在<sys/types.h>，少量在其他文件，使用这些变量，才能保证可移植性
+
+```
+caddr_t	核心地址
+clock_t	时钟滴答计数器（进程时间）
+comp_t	压缩的时钟滴答
+dev_t	设备号（主和次）
+fd_set	文件描述符集
+fpos_t	文件位置
+gid_t	数值组ID
+ino_t	i节点编号
+mode_t	文件类型，文件创建模式
+nlink_t	目录项的链接计数
+off_t	文件大小和偏移量（带符号的）
+pid_t	进程ID和进程组ID（带符号的）
+ptrdiff_t	两个指针相减的结果（带符号的）
+rlim_t	资源限制
+sig_atomic_t	能原子地访问的数据类型
+sigset_t	信号集
+size_t	对象（例如字符串）大小（不带符号的）
+ssize_t	返回字节数的函数（带符号的）（read、write）
+time_t	日历时间的秒计数器
+uid_t	数值用户ID
+wchar_t	能表示所有不同的字符码
+```
+
+C99为printf定义了名字为z的长度修饰符，表明紧随其后的整型转换是与size_t或ssize_t类型相对应，可以使用%zd来取代%ld外加类型转换了
+
+* 初始化操作与使用结构
+
+SUSv3虽然定义了诸如sembuf之类的类的结构，但是未对字段顺序做出规范，且某些实现会增加额外字段
+
+* 使用并非所有实现都定义的宏
+
+并非所有的UNIX实现都对某个宏做了定义，如WCOREDUMP，用于检测子进程是否生成了coredump核心转储文件，应用非常广泛，某些UNIX实现可能并没有定义，因为SUSv3未对其进行规范
+
+```
+#ifdef WCOREDUMP
+	//
+#endif
+```
+
+* 不同实现所需头文件的变化
+
+有些情况下，包含各种系统实现和库函数原型的头文件，在不同实现之间会有所不同
+
