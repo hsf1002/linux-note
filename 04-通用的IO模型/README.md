@@ -11,5 +11,16 @@
 2         标准错误  STDERR_FILENO   stderr
 ```
 
+##### 通用IO
+
+IO模型的特点是其输入输出的通用性，4个系统调用open、read、write、close可以对所有类型的文件执行IO操作
+
+```
+./copy oldfile newfile	// 拷贝普通文件
+./copy a.txt /dev/tty   // 拷贝普通文件到当前terminal
+./copy /dev/tty b.txt   // 拷贝当前terminal到普通文件
+./copy /dev/pts/16 /dev/tty // 从另一个terminal拷贝到当前terminal
+```
+
 
 
