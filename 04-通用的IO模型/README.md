@@ -79,3 +79,17 @@ int create(const char *pathname, mode_t mode);
 open（path, O_WRONLY|O_CREAT|O_TRUNC, mode);
 ```
 
+##### 读文件：read
+
+```
+// 返回已经读到的字节数，若到文件尾，返回0，出错返回-1
+ssize_t read(int fd, void * buf, size_t count);		
+```
+
+有多种情况可能导致实际读到的字节数小于要求读的字节数：
+
+- 普通文件：读到要求的字节数前到达文件尾
+- 从终端设备读取：通常一次只能读一行
+- 从网络读取：网络的缓冲机制可能造成返回值小于要求读的
+- 从管道或FIFO读取：若管道包含的字节小于要求读的
+- 当一个信号造成中断，而已经读了部分数据量时
