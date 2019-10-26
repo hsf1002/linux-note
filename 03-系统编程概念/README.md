@@ -38,3 +38,39 @@
 ldd prog | grep libc
 ```
 
+##### 处理系统调用和库函数的错误
+
+不检查状态值，少敲几个字，听起来很诱人，却得不偿失，除了少数几个系统调用从不失败，如getpid总能返回进程id，_exit总能终止进程，绝大多数系统调用和库函数都应该检查返回值以确认是否调用成功
+
+* 系统调用失败时，会将errno设置为一个正值，以标识具体的错误
+
+* 进行错误检查时，应该首先检查函数的返回值是否调用出错，再检查errno确定错误原因
+
+* 少数系统调用即使成功，也返回-1如getpriority，要判断此类系统调用，应在调用前将errno设置为0，并在调用后对其检查
+
+* perror会打印msg所指向的字符串，紧跟一条与当前errno值相对应的消息
+
+  ```
+  #include <stdio.h>
+  void perror(const char *msg);
+  
+  if (-1 == (fd = (open(pathname, flags, mode))))
+  {
+  	perror("open");
+  	exit(EXIT_FAILURE);
+  } 
+  ```
+
+* strerror会针对errnum指定的错误号，返回相应的字符串
+
+  ```
+  #include <string.h>
+  char *strerror(int errnum);
+  ```
+
+处理库函数的错误：
+
+* 某些库函数返回错误信息的方式与系统调用完全相同，返回值为-1，以errno标识具体错误，如remove
+* 某些库函数出错会返回-1之外的其他值，仍会设置errno标识具体错误，如fopen，此类可用perror和stderr诊断
+* 还有些库函数根本不使用errno，此类不可用perror和stderr诊断
+
