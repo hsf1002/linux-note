@@ -73,3 +73,38 @@ if (-1 == fcntl(fd, F_SETFL, flags))
 * 获取和修改打开的文件标志（如O_APPEND、O_NONBLOCK）可执行fcntl的F_GETFL和G_SETFL，作用域类似上面
 * 而文件描述符标志close-on-exec为进程和文件描述符私有，对其修改不会影响同一或不同进程的其他文件描述符
 
+##### 复制文件描述符
+
+```
+#include <unistd.h>
+
+int dup(int oldfd);
+// 返回值：若成功返回新的文件描述符，系统保证是未使用的编号最小的，若出错，返回-1
+```
+
+```
+#include <unistd.h>
+
+int dup2(int oldfd, int newfd);
+// 返回值：若成功返回新的文件描述符，编号为newfd，若出错，返回-1
+// 如果newfd之前已经打开，会先将其关闭，若知道其已经打开，最好显式关闭
+// 如果oldfd无效，则dup2调用失败返回错误EBADF，且不关闭newfd
+// 如果oldfd有效，且与newfd相同，那么dup2什么也不做，不关闭newfd，将其返回
+```
+
+fcntl的F_DUPFD是复制文件描述符的另一接口，更具灵活性：
+
+```
+newfd = fcntl(oldfd, F_DUPFD, startfd)
+// 为oldfd创建一个副本，且将大于等于startfd的最小未用值作为描述符编号
+```
+
+dup3完成的工作与dup2相同，只是增加了一个flag，只支持一个标记O_CLOEXEC：
+
+```
+#include <unistd.h>
+
+int dup3(int oldfd, int newfd, int flags);
+// 返回值，若成功返回新的文件描述符，编号为newfd，若出错，返回-1
+```
+
