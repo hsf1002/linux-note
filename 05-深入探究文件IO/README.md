@@ -108,3 +108,27 @@ int dup3(int oldfd, int newfd, int flags);
 // 返回值，若成功返回新的文件描述符，编号为newfd，若出错，返回-1
 ```
 
+##### 文件特定偏移量处的IO：pread和pwrite
+
+类似于read和write，只是会在offset指定的位置进行IO操作，而不是当前偏移量处，而且不会改变文件的当前偏移量
+
+```
+#include <unistd.h>
+
+ssize_t pread(int fd, void *buf, size_t count, off_t offset);
+// 返回值：若成功，返回读取的字节数，若到文件尾，返回0，若出错，返回-1
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+// 返回值：若成功，返回写入的字节数，若出错，返回-1
+```
+
+pread功能等同于如下，但是可以保证原子性：
+
+```
+off_t orig;
+
+orig = lseek(fd, 0, SEEK_CUR);
+lseek(fd, offset, SEEK_SET);
+s = read(fd, buf, len);
+lseek(fd, orig, SEEK_SET);
+```
+
