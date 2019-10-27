@@ -159,3 +159,17 @@ ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ```
 
+##### 截断文件：truncate和ftruncate
+
+```
+#include<unistd.h>
+
+int truncate(const char *path, off_t length);
+int ftruncate(int fd, off_t length);
+// 返回值：若成功，返回0，若出错，返回-1
+// 若当前长度大于length，调用将丢弃超出部分，若小于length，将在文件尾添加一系列空字节或文件空洞
+// 如果是符号链接，会进行解引用
+// 该系统调用不会修改文件偏移量
+// 调用truncate时无需用open打开文件
+```
+
