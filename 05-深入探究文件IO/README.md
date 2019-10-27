@@ -132,3 +132,30 @@ s = read(fd, buf, len);
 lseek(fd, orig, SEEK_SET);
 ```
 
+##### 分散输入和集中输出：readv和writev
+
+原子性时readv和writev的重要属性
+
+```
+#include <sys/uio.h>
+
+ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
+// 从fd从读取连续的字节，将其分散填入iov指定的缓冲区
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
+// 将iov指定的所有缓冲区的数据拼接起来，然后以连续的字节序列写入fd中
+
+struct iovec {
+    void      *iov_base;      /* starting address of buffer */
+    size_t    iov_len;        /* size of buffer */
+};
+```
+
+Linux2.6.30新增了两个系统调用，preadv和pwritev，将分散输入/集中输出和指定文件偏移量的IO集于一身，它们并非标准的系统调用，但是获得了现代BSD的支持：
+
+```
+#include <sys/uio.h>
+
+ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+```
+
