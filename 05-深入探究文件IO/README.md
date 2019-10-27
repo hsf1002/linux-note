@@ -173,3 +173,16 @@ int ftruncate(int fd, off_t length);
 // 调用truncate时无需用open打开文件
 ```
 
+##### 非阻塞IO
+
+打开文件时指定O_NONBLOCK目的有二：
+
+1. 若open未能立即打开文件，返回错误，而非陷入阻塞，有一种情况下例外，调用open操作FIFO
+2. 调用open成功后，后续的IO操作也是非阻塞的
+
+管道、FIFO、套接字、设备（终端和伪终端）都支持非阻塞模式
+
+内核保证了普通文件IO不会陷入阻塞，故而打开普通文件一般会忽略O_NONBLOCK标志，当使用强制文件锁时，该标志对普通文件也是起作用的
+
+Linux定义了O_NDELAY，但含义与O_NONBLOCK一样
+
