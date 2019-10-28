@@ -186,3 +186,12 @@ int ftruncate(int fd, off_t length);
 
 Linux定义了O_NDELAY，但含义与O_NONBLOCK一样
 
+##### 大文件IO
+
+32位中，文件偏移量的数据类型off_t的大小是2GB的限制，应用程序可用两种方式获得LFS功能（Large File Summit）
+
+1. 使用支持大文件操作的备选API，这些过渡性扩展，已经过时（如open64、lseek64、stat64等）
+2. 编译程序时将宏_FILE_OFFSET_BITS定义为64，这一方法更为可取，有两种做法：
+   * 编译选项：cc -D_FILE_OFFSET_BITS=64 prog.c
+   * 源文件所有头文件之前添加定义：#define _FILE_OFFSET_BITS 64
+
