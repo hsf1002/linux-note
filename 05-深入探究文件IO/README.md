@@ -195,3 +195,6 @@ Linux定义了O_NDELAY，但含义与O_NONBLOCK一样
    * 编译选项：cc -D_FILE_OFFSET_BITS=64 prog.c
    * 源文件所有头文件之前添加定义：#define _FILE_OFFSET_BITS 64
 
+##### /dev/fd目录
+
+对于每个进程，内核都提供一个特殊的虚拟目录/dev/fd，包含如/dev/fd/n的文件名，n是与文件描述符对应的编号，如/dev/fd/0即标准输入；/dev/fd实际是符号链接，链接到/proc/self/fd目录，程序中很少使用/dev/fd，主要用途在shell
