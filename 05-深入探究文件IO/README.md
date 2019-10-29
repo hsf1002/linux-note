@@ -198,3 +198,42 @@ Linux定义了O_NDELAY，但含义与O_NONBLOCK一样
 ##### /dev/fd目录
 
 对于每个进程，内核都提供一个特殊的虚拟目录/dev/fd，包含如/dev/fd/n的文件名，n是与文件描述符对应的编号，如/dev/fd/0即标准输入；/dev/fd实际是符号链接，链接到/proc/self/fd目录，程序中很少使用/dev/fd，主要用途在shell
+
+##### 创建临时文件
+
+生成唯一的文件名并打开文件，返回可用于IO的文件描述符：
+
+```
+#include <stdlib.h>
+
+int mkstemp(char *template);
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+// 模板参数是路径名形式，最后6个字符必须是XXXXXX，这6个字符会被替换以保证文件名的唯一性
+```
+
+一般如下使用：
+
+```
+int fd;
+char template[] = "/tmp/somestringXXXXXX";
+
+if (-1 == (fd = mkstemp(template)))
+	perror("mkstemp error");
+printf("file name is %s\n", template);
+unlink(template);
+
+if (-1 == close(fd))
+	perror("close error");
+```
+
+使用tmpnam、tempnam、mktemp也能生成唯一的文件名，但是会导致程序出现安全漏洞，应避免使用
+
+tmpfile会创建名称唯一的临时文件，并以读写方式打开（使用了O_EXCL标志，防止其他进程已经创建同名文件）：
+
+```
+#include <stdio.h>
+
+FILE *tmpfile(void);
+// 返回值：若成功，返回文件流，若出错，返回NULL
+// 文件流关闭时将自动删除文件，而tmpfile会在打开文件后，从内部立即调用unlink删除该文件名
+```
