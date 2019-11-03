@@ -69,3 +69,10 @@ Linux像多数现代内核一样，采用虚拟内存管理技术，该技术利
 * 函数实参和局部变量
 * 函数调用的链接信息，如CPU寄存器
 
+##### 命令行参数
+
+要从程序的任意位置访问argc、argv，有两个方法，但是会破坏移植性：
+
+1. 通过Linux专有的/proc/PID/cmdline文件可以读取任意进程的命令行参数，每个参数以null字节终止，可以通过/proc/self/cmdline文件访问自己进程的命令行参数
+2. GNU C语言提供了两个全局变量，可在程序任意位置获取调用该程序的程序名称，第一个是program_invocation_name，提取程序完整路径名，program_invocation_short_name提取不含目录的程序名称
+
