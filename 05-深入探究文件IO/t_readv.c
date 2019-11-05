@@ -51,12 +51,18 @@ main(int argc, char *argv[])
         perror("readv error");
     if (num_read < required)
         printf("read fewer than required");
+   
+    printf("third_buf_len = %d \n", strlen(third_buf));
+    ((char *)iov[1].iov_base)[iov[1].iov_len] = '\0';
+    ((char *)iov[2].iov_base)[strlen(third_buf)] = '\0';
     
     printf("total bytes requsted: %ld, bytes read: %ld \n", (long)required, (long)num_read);
 
     printf("iov[0].base = %c\n", *(char* )iov[0].iov_base);
-    printf("iov[1].base = %d\n", *(int *)iov[1].iov_base);
+    printf("iov[1].base = %s\n", (char *)iov[1].iov_base);
+    printf("iov[1].base = %d\n", atoi((char *)iov[1].iov_base));
     printf("iov[2].base = %s\n", (char *)iov[2].iov_base);
 
     exit(EXIT_SUCCESS);
 }
+
