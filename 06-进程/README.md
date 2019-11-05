@@ -99,3 +99,60 @@ env命令在运行程序时使用了一份经过修改的shell环境列表副本
 
 Linux专有的/proc/PID/environ文件可查看任意进程的环境列表，每个“NAME=value”都以空字节结束
 
+从程序中访问环境有两个方法：
+
+1. 使用全局变量char **environ访问环境列表
+2. 通过声明main函数的第三个参数来访问环境列表，要避免使用，因为作用域仅在main函数
+
+```
+int main(int argc, cha *argv[], char *envp[]);
+```
+
+getenv可以从进程环境中检索单个值：
+
+```
+#include <stdlib.h>
+
+char *getenv(const char *name);
+// 返回值：若成功，返回value字符串，若出错，返回NULL
+// 如name是SHELL，则返回/bin/bash
+// 程序不应该修改函数返回的字符串，且实现使用静态分配的缓冲区执行返回结果，后续getenv、setenv、putenv、unsetenv等都可以重写该缓冲区
+```
+
+修改进程环境变量主要用途：
+
+1. 对该进程后续创建的所有子进程都可见
+2. 对将要载入进程内存的新程序可见
+
+```
+int putenv(char *string);
+// 返回值：若成功，返回0，若出错，返回非0
+// string是name=value形式的字符串，string参数不应该为自动变量，即在栈中分配的字符数组
+```
+
+setenv可以代替putenv，向环境添加一个变量：
+
+```
+int setenv(const char *name, const char *value, int override);
+// 返回值：若成功，返回0，若出错，返回-1
+// 不要在name的结尾或value的开始添加=字符
+// 若name存在，且override为0，则不改变环境，若override为非0，则改变环境
+// setenv会复制参数到环境中，所以name和value使用自动变量不会有任何问题
+```
+
+unsetenv用来移除由name标识的变量：
+
+```
+int unsetenv(const char *name);
+// 返回值：若成功，返回0，若出错，返回-1
+// 参数name不需要添加=字符
+```
+
+有时需要清除整个环境：
+
+```
+int clearenv(void);
+// 返回值：若成功，返回0，若出错，返回非0
+// 也可通过将environ变量赋值为NULL来清除环境
+```
+
