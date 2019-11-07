@@ -84,3 +84,16 @@ int posix_memalign(void **memptr, size_t alignment, size_t size);
 // 返回值：若成功，返回0，若出错，返回一个正数
 ```
 
+##### 在堆栈上分配内存：alloca
+
+alloca是通过增加栈帧的大小从堆栈上分配内存：
+
+```
+#include <alloca.h>
+
+void *alloca(size_t size);
+// 总是返回分配的内存地址
+// 不需要也不能调用free释放由alloca分配的内存，也不能调用realloc调整由alloca分配的内存大小
+// 优点是分配内存的速度快于malloc，且其内存会随着栈帧的移除自动释放，在longjmp和siglongjm执行非局部跳转时其作用尤其突出
+```
+
