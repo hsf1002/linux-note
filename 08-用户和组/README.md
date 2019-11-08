@@ -43,3 +43,45 @@ void setspent(void);
 void endspent(void);
 ```
 
+##### 组文件：/etc/group
+
+系统中每个组在组文件中对应一条记录，包含四个字段：
+
+* 组名
+* 经过加密的密码，现代UNIX系统很少使用，存放于/etc/gshadow中，仅供由特权的用户和程序访问
+* 组ID
+* 用户列表
+
+为了证明用户avr是users、staff、teach三个组的成员，首先在口令文件中有记录：
+
+```
+avr:x:1001:100:Anthony Robins:/home/avr:/bin/bash
+```
+
+其中组ID是100，用户名是avr，则在组文件中应有如下记录：
+
+```
+users:x:100:
+staff:x:101:mtk,avr,martinl
+teach:x:104:avr,alc
+```
+
+查看组名或组ID：
+
+```
+#include<grp.h>
+struct group *getgrpid(gid_t gid);
+struct group *getgrnam(const char *name);
+// 两个函数，若成功，返回指针，若出错，返回NULL
+```
+
+如果要搜索整个组文件：
+
+```
+#include<grp.h>
+struct group *getgrent();
+// 若成功，返回指针，若出错或到达文件尾，返回NULL
+void setgrent();
+void endgrent();
+```
+
