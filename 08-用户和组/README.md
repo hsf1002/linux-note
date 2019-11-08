@@ -12,6 +12,68 @@
 - 使用nobody用户名的目的使任何人都可以登陆，只能访问人人皆可读写的文件
 - 使用finger指令支持注释字段的附加信息
 
+```
+struct passwd 
+{ 
+    char * pw_name; /* Username */ 
+    char * pw_passwd; /* Password */ 
+    __uid_t pw_uid; /* User ID */ 
+    __gid_t pw_gid; /* Group ID */ 
+    char * pw_gecos; /* Real Name or Comment field */ 
+    char * pw_dir; /* Home directory */ 
+    char * pw_shell; /* Shell Program */ 
+}; 
+```
+
+从口令文件中获取记录：
+
+```
+#include <pwd.h>
+
+struct passwd *getpwnam(const char *name);
+struct passwd *getpwuid(uid_t uid);
+// 返回值：若成功，返回一个指向一条记录的指针，若出错，返回NULL
+// 当未启用shadow密码的情况下，pw_passwd才会包含有效信息
+```
+
+对于出错和“未发现匹配记录”需要加以区分：
+
+```
+struct passwd *pwd;
+
+errno = 0;
+pwd = getpwnam(name);
+
+if (NULL == pwd)
+{
+	if (0 == errno)
+		// not found;
+	else
+		// error
+}
+```
+
+按顺序扫描口令文件中的记录：
+
+```
+#include <pwd.h>
+struct passwd getpwdent(void);
+// 两个函数，若成功，返回指针，若出错或到达文件尾，返回NULL
+
+void setpwent(void);	// 重返文件的起始处
+void endpwent(void);
+```
+
+如下代码遍历整个密码文件，打印出登录名和用户ID：
+
+```
+struct passwd *pwd;
+
+while ((pwd = getpwent()) != NULL)
+	printf(""%-8s %5ld\n", pwd->pw_name, (long)pwd->pw_uid);
+endpwent();
+```
+
 ##### 阴影文件：/etc/shadow
 
 包含登录名、经过加密的密码、若干与安全性相关的字段，仅有几个用户ID为root的程序如login和passwd才可以访问
@@ -64,6 +126,16 @@ avr:x:1001:100:Anthony Robins:/home/avr:/bin/bash
 users:x:100:
 staff:x:101:mtk,avr,martinl
 teach:x:104:avr,alc
+```
+
+```
+struct group
+{
+		char *gr_name;		/* group name */
+		char *gr_passwd;  /* encrypted password if not password shadowing */
+		gid_t gr_gid;     /* group id */
+		char ** gr_mem;   /* NULL-terminated array of pointers to names of members listed in /etc/group */
+}
 ```
 
 查看组名或组ID：
