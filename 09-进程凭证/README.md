@@ -81,3 +81,62 @@ real=1000 effective=0 saved=0
 ##### 辅助组ID
 
 用于标识进程所属的若干附加的组，新进程从其父进程继承这些ID，登录shell从系统组文件中获取其辅助组ID
+
+##### 获取和修改进程凭证
+
+可以利用Linux特有的proc/PID/status文件，通过对其UID、GID和Groups各行信息的检查来获取任何进程的凭证
+
+1. 获取实际和有效ID
+
+```
+#include <unistd.h>
+
+pid_t getuid(void);  // 返回实际用户id
+pid_t geteuid(void); // 返回有效用户id
+pid_t getgid(void);  // 返回实际组id
+pid_t getegid(void); // 返回有效组id
+```
+
+2. 修改有效ID
+
+```
+int setuid(uid_t uid);
+int setgid(gid_t gid);
+// 两个函数返回值，若成功，返回0，若出错，返回-1
+```
+
+不仅可以修改进程的有效ID，还可能修改实际用户ID和保存ID，取决于进程是否拥有特权（即root）：
+
+* 非特权进程调用setuid，仅能修改进程的有效用户ID，且其值只能与相应的实际用户ID或保存ID相等，这意味着，仅当执行set-user-ID程序时，setuid才会起作用
+* 特权进程以非0参数调用setuid，其实际用户ID、有效用户ID、保存ID都被修改为指定的值，这个操作是单向的，一旦修改所有特权将丢失，之后也不能使用setuid将有效用户ID重置为0
+
+对set-user-ID-root程序而言（其有效用户ID是0），以不可逆方式放弃进程所有特权的首选方法是使用如下系统调用：（以实际用户ID设置有效用户ID和保存ID）
+
+```
+if (-1 == setuid(getuid()))
+	perror("setuid err");
+```
+
+如果set-user-ID程序的属主不是root用户，使用setuid将有效用户ID在实际用户ID和保存ID之前切换
+
+修改有效ID的另一种方式：
+
+```
+int seteuid(uid_t uid);
+int setegid(gid_t gid);
+// 两个函数返回值，若成功，返回0，若出错，返回-1
+```
+
+* 非特权进程仅能将其有效用户ID修改为相应的实际ID或保存ID
+* 特权进程能够将其有效用户ID修改为任意值，若将有效用户ID设置为非0值，则进程不再具有特权，但可以恢复
+
+对于需要对特权收放自如的set-user-ID和set-group-ID程序而言，更推荐seteuid：
+
+```
+euid = geteuid(); // 先保存
+
+if (-1 == seteuid(getuid())) // 再设置，放弃特权
+	perror("seteuid error");
+if (-1 == seteuid(euid))		 // 再恢复，重获特权
+	perror("seteuid error");
+```
