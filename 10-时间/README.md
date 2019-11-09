@@ -202,5 +202,7 @@ int adjtime(struct timeval *delta, struct timeval *olddelta);
 // 在adjtime执行的时间里，可能无法完成时钟调整，剩余未经调整的时间会保存在olddelta，如不关心，指定为NULL
 ```
 
+##### 软件时钟
 
+时间相关的各种系统调用的精度是受限于系统软件时钟的分辨率，它的度量单位是jiffies，内核源码中是常量HZ，这是内核按照round-robin的分时调度算法分配CPU进程的单位，如软件时钟速度是100赫兹，一个jiffies是10毫秒，Linux x86-32 2.6.0内核的软件时钟速度已经提高到了1000赫兹
 
