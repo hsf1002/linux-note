@@ -27,6 +27,8 @@ typedef long     time_t;    /* 时间值time_t 为长整型的别名*/
 
 ##### 时间转换函数
 
+![image-20191110065537667](/Users/sky/Library/Application Support/typora-user-images/image-20191110065537667.png)
+
 -----将time_t转换为可打印格式-----
 
 ```
@@ -205,4 +207,38 @@ int adjtime(struct timeval *delta, struct timeval *olddelta);
 ##### 软件时钟
 
 时间相关的各种系统调用的精度是受限于系统软件时钟的分辨率，它的度量单位是jiffies，内核源码中是常量HZ，这是内核按照round-robin的分时调度算法分配CPU进程的单位，如软件时钟速度是100赫兹，一个jiffies是10毫秒，Linux x86-32 2.6.0内核的软件时钟速度已经提高到了1000赫兹
+
+##### 进程时间
+
+可分为两部分：
+
+* 用户CPU时间，也称虚拟时间
+* 系统CPU时间
+
+系统调用times，检索进程时间信息：
+
+```
+#include <sys/time.h>
+clock_t times(struct tms *buf);
+// 返回值，若成功，返回自过去的任意点流逝的以时钟计时单元为单位的时间，若出错，返回-1
+// Linux上，buf可以为NULL，但是返回值将没有意义
+// 数据类型clock_t是用时钟计时单元clock tick为单位度量时间的整数值，可以使用sysconf(_SC_CLK_TCK)来获取每秒包含的时钟计时单元数，再除以clock_t转换为秒
+
+struct tms
+{
+	clock_t tms_utime;	// user CPU time by the caller
+	clock_t tms_stime;  // system CPU time by the caller
+	clock_t tms_cutime; // user CPU time of all (waited for) children
+	clock_t tms_cstime; // system CPU time of all (waited for) children
+}
+```
+
+函数clock提供了一个简单的接口用于获取进程时间：
+
+```
+include <time.h>
+
+clock_t clock(void);
+// 返回值：若成功，返回进程总CPU时间，若出错，返回-1
+```
 
