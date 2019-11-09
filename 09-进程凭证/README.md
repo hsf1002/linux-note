@@ -58,3 +58,17 @@ successfully authenticated: UID=1001
 ```
 
 set-user-ID和set-group-ID技术集实用性和强大功能于一身，但一旦涉及欠佳可能造成安全隐患
+
+##### 保存set-user-ID和保存set-group-ID
+
+当执行程序时，依次发生如下事件：
+
+1. 若可执行文件的set-user-ID权限位开启，则将进程的有效用户（组）ID设置为可执行文件的属主，若未开启此权限位，则进程的有效用户（组）ID保持不变
+2. 保持set-user-ID和保存set-group-ID的值由对应的有效ID复制而来，无论是否开启了set-user-ID和set-group-ID权限位
+
+假如某程序的实际用户ID、有效用户ID、保存set-user-ID都是1000，当其执行了root用户拥有的set-user-ID程序后，进程的用户ID将发生变化：
+
+```
+real=1000 effective=0 saved=0
+```
+
