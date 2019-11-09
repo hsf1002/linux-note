@@ -189,3 +189,43 @@ int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 * 特权进程能够对其实际用户ID、有效用户ID和保存ID做任意修改
 * 不管系统调用是否对其他ID做了任何改动，总是将文件系统用户ID设置为与有效用户ID相同
 
+##### 获取和修改文件系统ID
+
+前述所有修改进程有效用户ID和组ID的系统调用都会修改相应的文件系统ID，要想文件系统ID独立于有效用户ID：
+
+```
+#include <sys/fsuid.h>
+
+int setfsuid(uid_t fsuid);
+// 总是返回先前的文件系统用户ID
+int setfsgid(gid_t fsgid);
+// 总是返回先前的文件系统组ID
+```
+
+Linux中，使用这两个调用已非必要，要保证移植性，应避免使用
+
+##### 获取和修改辅助组ID
+
+```
+int getgroups(int gidsetsize, gid_t grouplist[]);
+// 返回值：若成功，返回grouplist中的group id的个数，若出错，返回-1
+// 若进程辅助组的数量超出gidsetsize，则将返回错误号设置为EINVAL
+// 调用程序要给grouplist分配空间
+// 若将gidsetsize设置为0，调用的返回值是进程辅助组的数量
+```
+
+数组大小常量NGROUPS_MAX可通过sysconf(_SC_NGROUPS_MAX)或Linux特有的/proc/sys/kernel/ngroups_max读取
+
+特权进程能够使用如下调用修改其辅助组ID集合：
+
+```
+#define _BSD_SOURCE
+#include <grp.h>
+
+int setgroups(size_t gidsetsize, const gid_t *grouplist);
+int initgroups(const char *user, gid_t group);
+// 两个函数返回值，若成功，返回0，若出错，返回-1
+// initgroups扫描/etc/groups文件，为user创建属组列表，以此来初始化进程的辅助组ID，参数group指定的组ID追加到辅助组ID的集合中，其主要用途是创建登录会话的程序如login
+```
+
+![image-20191109115019752](/Users/sky/Library/Application Support/typora-user-images/image-20191109115019752.png)
