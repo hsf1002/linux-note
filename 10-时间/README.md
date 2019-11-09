@@ -176,3 +176,31 @@ LC_MESSAGES: 该文件包含针对肯定和否定响应，就格式及数值做�
 // LANG的优先级最低，通常使用LANG为所有内容设置默认值，再用单独的LC*变量设置
 ```
 
+##### 更新系统时钟
+
+settimeofday和adjtime这两个接口通常由工具软件维护，应用程序很少用到，其中settimeofday是gettimeofday的逆函数：
+
+```
+#define _BSD_SOURCE
+#include <sys/time.h>
+
+int settimeofday(const struct timeval *tv, const struct timezone *tz);
+// 返回值：若成功，返回0，若出错，返回-1
+// tz已被废弃，应该始终置为NULL
+// Linux还提供了stime设置系统时钟，它允许使用秒的精度表示新的日志时间
+```
+
+settimeofday可能造成系统时间的突然变化，可能对依赖系统时钟单调递增的应用造成有害影响，通常推荐使用库函数adjtime，它将系统时钟逐步调整到正确的时间：
+
+```
+#define _BSD_SOURCE
+#include <sys/time.h>
+
+int adjtime(struct timeval *delta, struct timeval *olddelta);
+// 返回值：若成功，返回0，若出错，返回-1
+// delta指定需要改变时间的秒和微秒，为正数表示系统时间会额外快一点点，直到增加完所需的时间，为负数则减慢
+// 在adjtime执行的时间里，可能无法完成时钟调整，剩余未经调整的时间会保存在olddelta，如不关心，指定为NULL
+```
+
+
+
