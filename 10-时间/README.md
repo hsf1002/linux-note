@@ -134,3 +134,13 @@ char *strptime(const char *str, const char *format, struct tm *timeptr);
 // 是strftime的逆函数
 ```
 
+##### 时区
+
+位于/usr/share/zoneinfo中，系统的本地时间由时区文件/etc/localtime定义，通常链接到/usr/share/zoneinfo下的一个文件，为运行中的程序指定时区，需要将TZ环境变量设置为由一冒号：和时区名称组成的字符串，另一种方法是将一个格式字符串赋值给TZ，如：
+
+```
+TZ="CET-1:00:00CEST-2:00:00,M3.5.0,M10.5.0"
+但其缺乏可读性，在Linux下可以如下设置：
+TZ=":Europe/Berlin"
+```
+
