@@ -144,3 +144,35 @@ TZ="CET-1:00:00CEST-2:00:00,M3.5.0,M10.5.0"
 TZ=":Europe/Berlin"
 ```
 
+##### 地区
+
+locale包括语言、数字、货币、日期和时间之类的信息，维护在文件/usr/share/local，其下每个子目录都包含一特定地区的信息：
+
+```
+language[_territory[.condeset]][@modifier]
+```
+
+language是双字母的ISO语言代码，territory是双字母的ISO国家代码，codeset表示字符编码集，modifier提供了一种方法，用以区分多个目录下的language、territory、codeset相同的情况
+
+```
+de_DE.uft-8@euro表示德语、德国、UTF-8编码，欧元为货币
+```
+
+locale -a列出系统上定义的整套地区，函数setlocale既可以查询又可以设置当前地区：
+
+```
+#include <locale.h>
+
+char *setlocale(int category, const char *locale);
+// 返回值：若成功，返回一个指针指向标识这个地区设置的字符串，如果只是查而不该，则把locale设置为NULL，若出错，返回NULL
+category的取值（可以使用LC_ALL设置所有的值）：
+LC_CTYPE: 该文件包含字符分类
+LC_COLLATE: 该文件包含字符集的排序规则
+LC_MONETARY: 该文件包含币值的格式化规则
+LC_NUMERIC: 该文件包含对币值以外数字的格式化规则
+LC_TIME: 该文件包含对日期和时间的格式化规则
+LC_MESSAGES: 该文件包含针对肯定和否定响应，就格式及数值做了规定
+// locale若是字符串，可能是en_US或de_DE，若是空字符串，则从环境变量中取得地区的设置
+// LANG的优先级最低，通常使用LANG为所有内容设置默认值，再用单独的LC*变量设置
+```
+
