@@ -173,3 +173,13 @@ char *crypt(const char *key, const char *salt);
 // 解密后的明文在使用后应立即从内存删除，防止恶意之徒读取内核转储文件以获取密码
 ```
 
+getpass首先屏蔽回显功能，并停止对终端特殊字符的处理（一般是CTRL+C），然后打印出prompt所指向的字符串，读取一行输入，返回以NULL结尾的输入字符串（剥离尾部的换行符）：
+
+```
+#define _BSD_SOURCE
+#include <unistd.h>
+
+char *getpass(const char *prompt);
+// 返回值：若成功，返回输入密码的静态字符串，若出错，返回NULL
+```
+
