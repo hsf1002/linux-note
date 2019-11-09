@@ -140,3 +140,52 @@ if (-1 == seteuid(getuid())) // 再设置，放弃特权
 if (-1 == seteuid(euid))		 // 再恢复，重获特权
 	perror("seteuid error");
 ```
+
+3. 修改实际和有效ID
+
+```
+int setreuid(uid_t ruid, uid_t euid);
+int setregid(gid_t rgid, gid_t egid);
+// 两个函数返回值，若成功，返回0，若出错，返回-1
+// 第一个参数是新的实际ID，第二个参数是新的有效ID
+```
+
+* 非特权进程只能将其实际用户ID设置为当前实际用户ID值或有效用户ID值，且只能将有效用户ID设置为当前实际用户ID、有效用户ID或保存ID
+* 特权进程能够设置其实际用户ID和有效用户ID为任意值
+* 不管进程是否拥有特权，只要如下条件之一成立，就能将保存ID设置为（新的）有效用户ID：
+  * ruid不是-1（即设置实际用户ID，即便是当前值）
+  * 对有效用户ID所设置的值不同于系统调用之前的实际用户ID
+
+这为set-user-ID程序提供了一个永久放弃特权的方法：
+
+```
+setreuid(getuid(), getuid());
+```
+
+set-user-ID-root进程若有意将用户凭证和组凭证改变为任意值，应首先调用setregid，再调用setreuid，顺序不能颠倒
+
+4. 获取实际、有效和保存ID
+
+```
+#define _GNU_SOURCE
+#include <unistd.h>
+
+int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
+int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
+// 两个函数返回值，若成功，返回0，若出错，返回-1
+```
+
+5. 修改实际、有效和保存ID
+
+```
+int setresuid(uid_t ruid, uid_t euid, uid_t suid);
+int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
+// 两个函数返回值，若成功，返回0，若出错，返回-1
+// 若不想同时修改，将无需修改的ID设置为-1
+// 两个函数都具有原子性，要么全部修改，要么全部不修改
+```
+
+* 非特权进程能够将实际用户ID、有效用户ID和保存ID的任一ID设置为实际用户ID、有效用户ID和保存ID中的任一当前值
+* 特权进程能够对其实际用户ID、有效用户ID和保存ID做任意修改
+* 不管系统调用是否对其他ID做了任何改动，总是将文件系统用户ID设置为与有效用户ID相同
+
