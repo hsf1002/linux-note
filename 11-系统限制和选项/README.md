@@ -49,3 +49,11 @@ long fpathconf(int fd, int name);
 * 自行编写程序或函数，以估算或推断
 * 编写可移植性程序时，选择所规定的最低限制值如 _POSIX_PATH_MAX，但有时不可行
 * 利用诸如GNU Autoconf之类的扩展工具，它能确定各种系统的限制是否存在，如何设置
+
+##### 系统选项
+
+支持的选项主要包括：实时信号、POSIX共享内存、POSIX线程、任务控制之类的功能，在unistd.h中定义，这些常量前面都以   _POSIX_   或 _XOPEN_  为前缀，其值必为如下之一：
+
+* -1：表示实现不支持
+* 0：表示实现可能支持，需要sysconf、pathconf或fpathconf进行运行时检查
+* 大于0：表示实现支持
