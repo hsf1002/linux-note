@@ -32,5 +32,23 @@ task: 为进程中每个线程包含一个子目录（/proc/PID/task/TID子目�
 /proc/sysvipc: System V IPC对象的信息
 ```
 
+##### 系统表示：uname
 
+```
+#include <sys/utsname.h>
 
+int uname(struct utname *utsbuf);
+// 返回值：若成功，返回0，若出错，返回-1
+
+struct utsname
+{ 
+	 char sysname[_UTSNAME_LENGTH];//当前操作系统名，内核自动设置
+   char nodename[_UTSNAME_LENGTH];//网络上的名称，由sethostname设置
+   char release[_UTSNAME_LENGTH];//当前发布级别，内核自动设置
+   char version[_UTSNAME_LENGTH];//当前发布版本，内核自动设置
+   char machine[_UTSNAME_LENGTH];//当前硬件体系类型，内核自动设置
+#ifdef _GNU_SOURCE
+	 char domainname[_UTSNAME_LENGTH];//当前域名，由setdomainname设置
+#endif
+};
+```
