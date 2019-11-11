@@ -23,9 +23,20 @@ getconf NAME_MAX /bin/
 #include <unistd.h>
 
 long sysconf(int name);
-// 返回值：若成功，返回对应的限制值，若无法确定某限制或发生其他错误，返回-1
+// 返回值：若成功，返回name所对应的限制值，若无法确定某限制或发生其他错误，返回-1
 // name定义在unistd.h中的常量 _SC_XXX
 ```
 
 根据要求，针对特定限制，调用sysconf获取的值在进程的生命周期内应保持不变；进程可以通过setrlimit修改进程的各种资源限制，这会影响到由sysconf返回的限制值
 
+##### 在运行时获取与文件相关的限制和选项
+
+```
+#include <unistd.h>
+
+long pathconf(const char *pathname, int name);
+long fpathconf(int fd, int name);
+// 两个函数的返回值：若成功，返回name所对应的限制值，若无法确定某限制或发生其他错误，返回-1
+```
+
+与sysconf不同，并不要求这两个函数的返回值在进程的生命周期内保持恒定，这是因为，在进程的运行期间，可能会卸载再重新加载文件系统
