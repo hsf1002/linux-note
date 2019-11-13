@@ -114,3 +114,9 @@ fd = open(pathname, O_WRONLY | O_SYNC);
 
 打开文件时，同时指定O_RSYNC | O_DSYNC，则按照同步IO数据完整性的要求执行，若同时指定O_RSYNC | O_SYNC，则按照同步IO文件完整性的要求执行
 
+##### IO缓冲小结
+
+首先是通过stdio库将用户数据传递到stdio缓冲区，该缓冲区位于用户态内存区，当缓冲区填满时，stdio库会调用write系统调用，将数据传递到内核高速缓冲区，该缓冲区位于内核态内存区，最终，内核发起磁盘操作，将数据传递到磁盘
+
+![image-20191113065350117](/Users/sky/Library/Application Support/typora-user-images/image-20191113065350117.png)
+
