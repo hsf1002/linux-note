@@ -154,3 +154,23 @@ Linux允许在执行磁盘IO时从用户空间直接将数据传递到文件或�
 
 块大小指的是设备的物理块大小，通常是512字节
 
+##### 混合使用库函数和系统调用执行文件IO
+
+```
+#include <stdio.h>
+
+int fileno(FILE *fp);
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+FILE *fdopen(int fd, const char *mode);
+// 返回值：若成功，返回文件指针，若出错，返回NULL
+// mode与fopen时fd对应的mode参数应该一致，否则调用失败
+```
+
+一般情况下，printf的输出将在write的后面
+
+```
+printf("To man the world is twofold, ");
+write(STDOUT_FILENO, "In accordance with his twofold attitude \n", 41);
+```
+
+将IO系统调用和库函数混合使用时，使用fflush可以规避此问题，也可以使用setbuf和setvbuf使缓冲区失效，但这样会影响IO性能，因为每个输入输出操作将引起一次write系统调用
