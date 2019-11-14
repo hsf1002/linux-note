@@ -120,3 +120,25 @@ fd = open(pathname, O_WRONLY | O_SYNC);
 
 ![image-20191113065350117](/Users/sky/Library/Application Support/typora-user-images/image-20191113065350117.png)
 
+##### 就IO模式向内核提出建议
+
+posix_fadvise系统调用允许进程就自身访问文件数据时可能采取的模式通知内核：
+
+```
+#define _XOPEN_SOURCE 600
+#include <fcntl.h>
+
+int posix_fadvise(int fd, off_t offset, off_t len, int advice);
+// 返回值：若成功，返回0，若出错，返回一个正值
+// offset和len确定了建议所适用的文件区域
+```
+
+内核可以（但不是必须）根据所提供的信息来优化对缓冲区高速缓存的使用，进而提高进程和整个系统的性能
+
+- POSIX_FADV_NORMAL：进程对访问模式无建议，默认值
+- POSIX_FADV_SEQUENTIAL：进程预计会从低偏移量到高偏移量顺序读取数据
+- POSIX_FADV_RANDOM：进程预计以随机顺序访问数据，Linux禁用此选项
+- POSIX_FADV_WILLNEED：进程预计会在不久访问指定的文件区域，内核将指定数据填充到缓冲区，后续read将不会阻塞，直接从缓冲区抓取
+- POSIX_FADV_DONTNEED：进程预计会在不久不会访问指定的文件区域
+- POSIX_FADV_NOREUSE：进程预计会一次性的访问指定文件区域，不再复用，Linux中不起作用
+
