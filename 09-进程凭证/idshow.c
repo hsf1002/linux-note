@@ -11,11 +11,17 @@
 #include <ctype.h>
 #include "ugid.h"
 
-#define SG_SIZE (NGGROUPS_MAX + 1)
+#define SG_SIZE (NGROUPS_MAX + 1)
 
 /**
  *   显示进程的所有用户ID和组ID
- */
+
+UID: real id = hefeng (1000); effe id = hefeng (1000); save id = hefeng (1000); file id = hefeng (1000) 
+GID: real id = hefeng (1000); effe id = hefeng (1000); save id = hefeng (1000); file id = hefeng (1000) 
+supplementary groups 10 
+adm (4)cdrom (24)sudo (27)dip (30)plugdev (46)lpadmin (113)sambashare (128)vboxusers (129)hefeng (1000)usbfs (1001)
+
+*/
 int
 main(int argc, char *argv[])    
 {
