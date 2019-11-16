@@ -62,3 +62,18 @@ IN_ONLYDIR			pathname不为目录时会失败
 ......
 ```
 
+##### 读取inotify事件
+
+可用read读取事件，若未发生任何事件，则一直阻塞，直到有事件发生，事件发生后，read会返回一个缓冲区，内含一个或多个如下结构：
+
+```
+struct inotify_event
+{
+	int wd;					// 监控描述符
+	uint32_t mask;  // 掩码事件，移除监控项时，产生IN_IGNORED
+	uint32_t cookie:// 重命名时才用，待重命名文件所在目录产生IN_MOVED_FROM，命名后文件所在目录产生IN_MOVED_TO（若在同一目录重命名文件，则同时产生这两个事件），两个事件的cookie字段值相等
+	uint32_t len;   // name的长度，给read缓冲区的大小至少为sizeof(struct inotify_evnet) + NAME_MAX（文件名的最大长度） + 1
+	char name[];    // 可选的null结尾的字符串，以标识发生事件的文件
+}
+```
+
