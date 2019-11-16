@@ -85,3 +85,13 @@ struct inotify_event
 * max_user_instances：对由每个真实用户ID创建的inotify实例数的限制值
 * max_user_watches：对由每个真实用户ID创建的监控项数量的限制值
 
+##### 监控文件的旧有系统：dnotify
+
+问世于2.4，如今已落伍，有如下局限：
+
+1. dnotify通过向应用程序发送信号来通告事件
+2. dnotify的监控单元只能是目录
+3. dnotify需要应用程序为该目录打开文件描述符
+4. dnotify提供的与文件事件相关的信息不够准确
+5. 某些情况下，dnotify不支持可靠的文件事件通告机制
+
