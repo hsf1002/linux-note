@@ -41,3 +41,24 @@ int inotify_rm_watch(int fd, uint32_t wd);
 // wd是监控描述符
 ```
 
+##### inotify事件
+
+```
+IN_ACCESS				文件被访问
+IN_ATTRIB				文件元数据（权限、所有权、链接计数、扩展属性、用户ID或组ID）改变
+IN_CLOSE_WRITE	关闭为了写入而打开的文件
+IN_CREATE				在受监控目录下创建了文件或目录
+IN_DELETE				在受监控目录内删除了文件或目录
+IN_DELETE_SELF	删除了受监控目录/文件本身
+IN_MODIFY				文件被修改
+IN_MODIFY_SELF	移动受监控目录或文件本身
+IN_MOVED_FROM		文件移除受监控目录
+IN_MOVED_TO			将文件移到受监控目录
+IN_OPEN					文件被打开
+IN_ALL_EVENTS		以上所有输出事件的统称
+IN_MOVE				  IN_MOVED_FROM | IN_MOVED_TO事件的统称
+IN_ONESHOT			只监控pathname的一个事件
+IN_ONLYDIR			pathname不为目录时会失败
+......
+```
+
