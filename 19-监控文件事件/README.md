@@ -77,3 +77,11 @@ struct inotify_event
 }
 ```
 
+##### 队列限制和/proc文件
+
+对inotify事件排队，需要消耗内核内存，内核会对其限制，超级用户配置/proc/sys/fs/inotify路径下的三个文件可调整：
+
+* max_queued_events：调用inotify_init时，该值为新inotify实例队列的事件设置上限
+* max_user_instances：对由每个真实用户ID创建的inotify实例数的限制值
+* max_user_watches：对由每个真实用户ID创建的监控项数量的限制值
+
