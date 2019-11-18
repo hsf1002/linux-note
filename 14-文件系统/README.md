@@ -91,3 +91,27 @@ Linux支持的日志文件系统：
 * XFS：SGI开发
 * Ext4：ext3的接班人，可降低碎片化、纳秒级别时间戳的支持、更为快捷的文件系统检查
 * Btrfs：读作Butter FS，B树FS，一种自上而下进行设计的新型文件系统，提供了一系列现代化特性
+
+##### 单根目录层级和挂载点
+
+Linux上所有文件系统都挂载在根目录/下，超级用户可用如下命令在挂载文件系统：
+
+```
+mount device dir
+```
+
+将名为device的文件系统挂载到由dir所指定的目录，可使用unmount命令卸载文件系统，然后在另一个挂载点再次挂载，从而改变文件系统的挂载点，如今每个进程都有挂载命令空间，意味着每个进程都可能拥有属于自己的一组文件系统挂载点
+
+mount命令可以列出当前已经挂载的文件系统：
+
+```
+mount
+/dev/disk2 on / (hfs, local, journaled)
+devfs on /dev (devfs, local, nobrowse)
+map -hosts on /net (autofs, nosuid, automounted, nobrowse)
+map auto_home on /home (autofs, automounted, nobrowse)
+/dev/disk3s2 on /Volumes/人人影视 (hfs, local, nodev, nosuid, read-only, noowners, mounted by sky)
+/dev/disk4s2 on /Volumes/人人影视 1 (hfs, local, nodev, nosuid, read-only, noowners, mounted by sky)
+/dev/disk5s2 on /Volumes/QQMusic (hfs, local, nodev, nosuid, read-only, noowners, mounted by sky)
+```
+
