@@ -138,14 +138,15 @@ map auto_home on /home (autofs, automounted, nobrowse)
 5. 一个数字：dump用它控制对文件系统的备份操作，只有/etc/fstab会用到，其他两个文件该字段是0
 6. 一个数字：系统引导时，fsck用它来控制文件系统的检查顺序，只有/etc/fstab会用到，其他两个文件该字段是0
 
-##### 挂载文件系统：mount
+##### --->挂载文件系统：mount
+
+将source指定设备所包含的文件系统，挂载到target指定的目录：
 
 ```
 #include <sys/mount.h>
 
 int mount(const char *source, const char *target, const char *fstype, unsigned long mountflags, const void *data);
 // 返回值：若成功，返回0，若出错，返回-1
-// 将source指定设备所包含的文件系统，挂载到target指定的目录
 // fstype是文件系统类型，如ext4或btrfs
 // mountflags的取值：
 MS_BIND：执行bind挂载，使文件或者子目录树在文件系统内的另一个点上可视
@@ -164,3 +165,30 @@ MS_STIRCTATIME：总是更新最后访问时间
 MS_SYNCHRONOUS：同步文件的更新
 ```
 
+##### --->卸载文件系统：unmount
+
+target指定卸载文件系统的挂载点：
+
+```
+#include <sys/mount.h>
+
+int unmount(const char *target);
+// 返回值：若成功，返回0，若出错，返回-1
+// 无法卸载正在使用中的文件系统，即有文件被打开，或当前工作目录驻留在此文件系统下，返回EBUSY错误
+```
+
+unmount2是unmount的扩展版本，通过flags参数，可以有更精密的控制：
+
+```
+#include <sys/mount.h>
+
+int unmount2(const char *target, int flags);
+// 返回值：若成功，返回0，若出错，返回-1
+// flags的取值：
+MNT_DETACH：执行lazy卸载，当所有进程不再使用访问点时，系统会卸载相应的文件系统
+MNT_EXPIRE：将挂载点标记为到期，这提供了一种机制：卸载某段时间内未用的文件系统
+MNT_FORCE：强制卸载，即使文件系统处于忙状态
+UNMOUNT_NOFOLLOW：若target为符号链接，不进行解引用，专为set-user-ID-root程序设计，允许非特权用户执行卸载操作，意在避免安全性问题的发生
+```
+
+##### 
