@@ -115,3 +115,26 @@ map auto_home on /home (autofs, automounted, nobrowse)
 /dev/disk5s2 on /Volumes/QQMusic (hfs, local, nodev, nosuid, read-only, noowners, mounted by sky)
 ```
 
+##### 文件系统的挂载和卸载
+
+包含当前挂载文件系统信息的三个文件：
+
+* Linux专有的虚拟文件/proc/mounts：当前已挂载的文件系统列表，每个进程都拥有一个/proc/PID/mounts文件，列出了进程挂载空间的挂载点，/proc/mounts只是指向/proc/self/mounts的符号链接
+* mount和unmount自动维护/etc/mtab：包含的信息比/proc/mounts稍微详细
+* /etc/fstab：系统管理员手工维护，包含了对系统支持的所有文件系统的描述
+
+这三个文件的格式相同，如：
+
+```
+/dev/sda9 /boot ext3 rw 0
+```
+
+6个字段包括：
+
+1. 已挂载设备名
+2. 设备的挂载点
+3. 文件系统类型
+4. 挂载标志
+5. 一个数字：dump用它控制对文件系统的备份操作，只有/etc/fstab会用到，其他两个文件该字段是0
+6. 一个数字：系统引导时，fsck用它来控制文件系统的检查顺序，只有/etc/fstab会用到，其他两个文件该字段是0
+
