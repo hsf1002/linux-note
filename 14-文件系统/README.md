@@ -138,3 +138,29 @@ map auto_home on /home (autofs, automounted, nobrowse)
 5. 一个数字：dump用它控制对文件系统的备份操作，只有/etc/fstab会用到，其他两个文件该字段是0
 6. 一个数字：系统引导时，fsck用它来控制文件系统的检查顺序，只有/etc/fstab会用到，其他两个文件该字段是0
 
+##### 挂载文件系统：mount
+
+```
+#include <sys/mount.h>
+
+int mount(const char *source, const char *target, const char *fstype, unsigned long mountflags, const void *data);
+// 返回值：若成功，返回0，若出错，返回-1
+// 将source指定设备所包含的文件系统，挂载到target指定的目录
+// fstype是文件系统类型，如ext4或btrfs
+// mountflags的取值：
+MS_BIND：执行bind挂载，使文件或者子目录树在文件系统内的另一个点上可视
+MS_DIRSYNC：同步目录的更新
+MS_MANDLOCK：允许在文件上执行强制锁
+MS_MOVE：移动子目录树
+MS_NOATIME：不要更新文件上的访问时间
+MS_NODEV：不允许访问设备文件
+MS_NODIRATIME：不允许更新目录上的访问时间
+MS_NOEXEC：不允许在挂上的文件系统上执行程序
+MS_NOSUID：执行程序时，不遵照set-user-ID和set-group-ID位
+MS_RDONLY：指定文件系统为只读
+MS_REMOUNT：重新加载文件系统，允许改变现存文件系统的mountflag和数据，而无需使用先卸载，再挂上文件系统的方式
+MS_REALTIME：只有当最后访问时间早于最后修改时间或最后状态变更时间，才对前者进行更新
+MS_STIRCTATIME：总是更新最后访问时间
+MS_SYNCHRONOUS：同步文件的更新
+```
+
