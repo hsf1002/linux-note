@@ -191,4 +191,24 @@ MNT_FORCE：强制卸载，即使文件系统处于忙状态
 UNMOUNT_NOFOLLOW：若target为符号链接，不进行解引用，专为set-user-ID-root程序设计，允许非特权用户执行卸载操作，意在避免安全性问题的发生
 ```
 
-##### 
+##### 高级挂载特性
+
+##### --->在多个挂载点挂载文件系统
+
+可以将同一个文件系统挂载于文件系统内的多个位置，由于每个挂载点下的目录子树内容都相同，在一个挂载点下对目录子树做的改变，其他挂载点也会改变
+
+```
+su
+Password:
+mkdir /testfs
+mkdir /demo
+mount /dev/sda12 /testfs
+mount /dev/sda12 /demo
+mount | grep sda12
+/dev/sda12 on /testfs type ext3(rw)
+/dev/sda12 on /demo type ext3(rw)
+touch /testfs/myfile
+ls /demo
+lost+found  myfile
+```
+
