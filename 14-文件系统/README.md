@@ -254,3 +254,31 @@ Art is something which is well done
 bash: /demo/echo: Permission denied
 ```
 
+##### 绑定挂载
+
+
+
+
+
+##### 虚拟内存文件系统：tmpfs
+
+Linux支持驻留于内存的虚拟文件系统，和其他文件系统并无二致，由于不涉及磁盘访问，操作速度极快，最为复杂的莫过于tmpfs，不但使用RAM，在RAM耗尽的情况下，还会利用交换空间，它是可选组件，通过CONFIG_TEPFS选项配置，要创建tmpfs文件系统：
+
+```
+mount -t tmpfs source target
+// source是任意名称，只在/proc/mounts中出现，target是文件系统的挂载点
+// 可以使用堆叠挂载
+```
+
+可以采用如下命令改善程序性能，此类程序因创建临时文件而频繁使用/tmp目录：
+
+```
+mount -t tmpfs newtmp /tmp
+cat /proc/mounts | grep tmp
+newtmp /tmp tmpfs rw 0 0
+```
+
+一旦卸载tmpfs或遭遇系统奔溃，那么该文件系统中所有数据将丢失，tmpfs因此得名，tmpfs还有两个用途：
+
+* 内核挂载的隐形tmpfs文件系统，用于实现System V共享内存和共享匿名内存映射
+* 挂载于/dev/shm的tmpfs文件系统，为glibc用以实现POSIX共享内存和POSIX信号量
