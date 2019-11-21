@@ -235,3 +235,22 @@ ls /testfs	// 在sda12上文件显现
 lost+found  myfile
 ```
 
+##### 基于每次挂载的挂载标志
+
+从内核2.4开始，文件系统和挂载点之间不是一一对应的关系，如下所示，同一文件系统对应两个挂载点，MS_NOEXEC标志的影响，mount的其他标志也类似：
+
+```
+su
+Password:
+mount /dev/sda12 /testfs	  // 同一设备挂载到testfs
+mount -o -noexec /dev/sda12 /demo	 // 同一设备挂载到demo，但不允许执行程序
+cat /proc/mounts | grep sda12
+/dev/sda12 /testfs ext3 rw 0 0
+/dev/sda12 /demo ext3 rw,noexec 0 0
+cp /bin/echo /testfs
+/testfs/echo 'Art is something which is well done'	 // testfs下可以执行echo
+Art is something which is well done
+/demo/echo "Art is something which is well done"	   // demo下不可以执行echo
+bash: /demo/echo: Permission denied
+```
+
