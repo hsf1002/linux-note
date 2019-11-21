@@ -195,20 +195,43 @@ UNMOUNT_NOFOLLOW：若target为符号链接，不进行解引用，专为set-use
 
 ##### --->在多个挂载点挂载文件系统
 
-可以将同一个文件系统挂载于文件系统内的多个位置，由于每个挂载点下的目录子树内容都相同，在一个挂载点下对目录子树做的改变，其他挂载点也会改变
+可以将同一个文件系统挂载于文件系统内的多个位置，由于每个挂载点下的目录子树内容都相同，在一个挂载点下对目录子树做的改变，其他挂载点也会改变：
 
 ```
 su
 Password:
-mkdir /testfs
+mkdir /testfs			// 新建两个文件夹
 mkdir /demo
-mount /dev/sda12 /testfs
+mount /dev/sda12 /testfs    // 将一个设备挂载到两个不同的目录
 mount /dev/sda12 /demo
 mount | grep sda12
 /dev/sda12 on /testfs type ext3(rw)
 /dev/sda12 on /demo type ext3(rw)
-touch /testfs/myfile
-ls /demo
+touch /testfs/myfile  // 在一个目录下新建文件
+ls /demo    // 此文件在另一个目录也存在
+lost+found  myfile
+```
+
+##### --->多次挂载同一挂载点
+
+内核2.4之后，Linux允许针对同一个挂载点进行多次挂载，每次新挂载都会隐藏之前可见于挂载点下的目录子树，卸载最后一次挂载时，挂载点下上次挂载的内容会再次显示：
+
+```
+su
+Password:
+mount /dev/sda12 /testfs 
+touch /testfs/myfile	// 在sda12上新建文件
+mount /dev/sda13 /testfs	// 在同一个目录挂载第二次
+mount | grep testfs
+/dev/sda12 on /testfs type ext3(rw)
+/dev/sda13 on /testfs type reiserfs(rw)
+touch /testfs/newfile	 // 在sda13上新建文件
+ls /testfs
+newfile
+unmount /testfs	    // 卸载sda13，此时sda12处于栈顶
+mount | grep testfs
+/dev/sda12 on /testfs type ext3(rw)
+ls /testfs	// 在sda12上文件显现
 lost+found  myfile
 ```
 
