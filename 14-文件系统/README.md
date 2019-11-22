@@ -282,3 +282,34 @@ newtmp /tmp tmpfs rw 0 0
 
 * 内核挂载的隐形tmpfs文件系统，用于实现System V共享内存和共享匿名内存映射
 * 挂载于/dev/shm的tmpfs文件系统，为glibc用以实现POSIX共享内存和POSIX信号量
+
+##### 获取与文件系统有关的信息：statvfs
+
+```
+#include <sys/statvfs.h>
+
+int statvfs(const char *pathname, struct statvfs *statvfsbuf);
+int fstatvfs(int fd, struct statvfs *statvfsbuf);
+// 两个函数返回值：若成功，返回0，若出错，返回-1
+// 两个函数都是基于类似的statfs和fstatfs系统调用
+
+struct statvfs 
+{
+  unsigned long  f_bsize;    /* file system block size */
+  unsigned long  f_frsize;   /* fragment size */
+  fsblkcnt_t     f_blocks;   /* size of fs in f_frsize units */
+  fsblkcnt_t     f_bfree;    /* # free blocks */
+  fsblkcnt_t     f_bavail;   /* # free blocks for non-root */
+  fsfilcnt_t     f_files;    /* # inodes */
+  fsfilcnt_t     f_ffree;    /* # free inodes */
+  fsfilcnt_t     f_favail;   /* # free inodes for non-root */
+  unsigned long  f_fsid;     /* file system ID */
+  unsigned long  f_flag;     /* mount flags */
+  unsigned long  f_namemax;  /* maximum filename length */
+};
+// 对于大多数Linux而言，f_bsize和f_rsize取值一样
+// Linux为超级用户预留了一部分文件系统块，即便在文件系统空间耗尽的情况下，超级用户仍然可以登录系统解决故障
+// f_flag字段是位掩码标志，用于挂载文件系统
+// 某些UNIX使用f_fsid来返回文件系统的唯一标识符
+```
+
