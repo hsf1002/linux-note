@@ -291,3 +291,58 @@ umask值	 文件权限	  文件夹权限
 7		no permission allowed
 ```
 
+修改文件权限：
+
+```
+#include <sys/stat.h>
+
+int chmod(const char *path, mode_t mode);
+#define _XOPEN_SOURCE 500 // or #define _BSD_SOURCE
+int fchmod(int fd, mode_t mode);
+int fchmodat(int fd, const char *pathname, mode_t mode, int flag);
+// 三个函数返回值：成功返回0，出错返回-1
+// fchmodat：当pathname为绝对路径时，或者fd参数取值为AT_FDCWD而pathname为相对路径时，等同于chmod。否则，计算相对于由fd指向的打开目录的pathname，当flag设置为AT_SYMLINK_NOFOLLOW时，fchmodat不会跟随符号链接
+// 为了改变一个文件的权限位，进程的有效用户ID必须等于文件的所有者ID，或者该进程必须具有超级用户权限
+
+mode 			说明
+--------------------------------
+S_ISUID			执行时设置用户ID
+S_ISGID			执行时设置组ID
+S_ISVTX			保存正文（粘着位）
+
+S_IRWXU			用户（所有者）读写执行
+	S_IRUSR		用户（所有者）读
+	S_IWUSR		用户（所有者）写
+	S_IXUSR		用户（所有者）执行
+
+S_IRWXG			组读写执行
+	S_IRGRP		组读
+	S_IWGRP		组写
+	S_IXGRP		组执行
+
+S_IRWXO			其他读写执行
+	S_IROTH		其他读
+	S_IWOTH		其他写
+	S_IXOTH		其他执行
+```
+
+若要修改某个权限位：
+
+```
+struct stat sb;
+mode_t mode;
+
+if (-1 == stat("myfile", &sb))
+    perror("stat error");
+// user打开写权限，other关闭读权限
+mode = (sb.st_mode | S_IWUSR) & ~S_IROTH;
+if (-1 == chmod("myfile", mode))
+    perror("chmode error");
+```
+
+等同于：
+
+```
+chmod u+w,o-r myfile
+```
+
