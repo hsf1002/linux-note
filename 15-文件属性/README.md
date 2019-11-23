@@ -164,3 +164,28 @@ int lchown(const char *pathname, uid_t owner, gid_t group);
 // 如果文件组的属主或属组发生了改变，那么set-user-ID和set-group-ID权限位也会关闭
 ```
 
+##### 文件权限
+
+stat结构的st_mod字段的低12位定义了文件权限，前三位是set-user-ID、set-group-ID和sticky位，后9位是权限掩码
+
+```
+常量      其他值      权限位
+S_ISUID  04000     set-user-ID
+S_ISGID  02000     set-group-ID
+S_ISVTX  01000     sticky
+
+S_IRUSR  0400      user-read
+S_IWUSR  0200      user-wriet
+S_IXUSR  0100      user-execute
+
+S_IRGRP   040       group-read
+S_IWGRP   020       group-wriet
+S_IXGRP   010       group-execute
+
+S_IROTH   04       other-read
+S_IWOTH   02       other-wriet
+S_IXOTH   01       other-execute
+```
+
+通常将各类掩码定义为常量如：S_IRWXU(0700)、S_IRWXG(070)、S_IRWXO(07)
+
