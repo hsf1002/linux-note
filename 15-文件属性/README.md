@@ -51,3 +51,45 @@ S_TYPEISSEM()	信号量
 S_TYPEISSHM()	共享存储对象
 ```
 
+##### 文件时间戳
+
+大多数情况下，系统调用会将相关时间戳设置为当前时间，如mkdir会影响到当前文件或目录的atime、ctime和mtime以及父目录ctime和mtime，write会影响当前文件和目录的ctime和mtime，rmdir会影响到父目录的ctime和mtime，但是utime及类似调用会将文件上次访问时间和上次修改时间设置为任意值；其中open的O_NOATIME可降低对磁盘的操作次数，提示某些应用的文件访问性能
+
+使用utime和utimes来改变文件时间戳：
+
+```
+#include <utime.h>
+
+int utime(const char *pathname, const truct utimbuf *buf);
+// 返回值：若成功，返回0，若出错，返回-1
+// 若pathname是符号链接，会解引用
+// buf若为NULL，将文件的atime和mtime修改为当前时间
+// buf若不是NULL，则将文件的atime和mtime修改为其指定的时间
+
+struct utimbuf
+{
+	  time_t actime;	// access time
+	  time_t modtime; // modify time
+}
+```
+
+utimes可以提供微秒级别的精度：
+
+```
+#include <sys/times.h>
+
+int utimes(const char *pathname, const truct timeval tv[2]);
+// 返回值：若成功，返回0，若出错，返回-1
+```
+
+futimes和lutimes功能与utimes类似：
+
+```
+#include <sys/times.h>
+
+int futimes(int fd, const truct timeval tv[2]);
+int lutimes(const char *pathname, const truct timeval tv[2]);
+// 两个函数返回值：若成功，返回0，若出错，返回-1
+// 若pathname是符号链接，lutimes不会进行解引用
+```
+
