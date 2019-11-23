@@ -346,3 +346,26 @@ if (-1 == chmod("myfile", mode))
 chmod u+w,o-r myfile
 ```
 
+##### i节点标志
+
+某些Linux文件系统允许为文件和目录设置各种各样的标志，如ext2，程序中利用ioctl系统调用，shell中利用chattr和lsattr命令来设置和查看i节点标志：
+
+```
+lsattr myfile
+--------- myfile
+chattr +ai myfile  // 打开append和immutable标志
+----ia-- myfile
+```
+
+```
+int attr;
+
+if (-1 == ioctl(fd, FS_IOC_GETFALGS, &attr))
+	perror("ioctl get error");
+
+attr |= FS_NOATIME_FL;
+
+if (-1 == ioctl(fd, FS_IOC_SETFLAGS, &attr))
+	perror("ioctl set error")
+```
+
