@@ -93,3 +93,52 @@ int lutimes(const char *pathname, const truct timeval tv[2]);
 // 若pathname是符号链接，lutimes不会进行解引用
 ```
 
+使用utimensat和futimens改变文件时间戳：
+
+utimensat系统调用和futimens库函数对修改文件的上次访问时间和上次修改时间提供了扩展功能：
+
+* 可以精确到纳秒级别
+* 可独立设置某一时间戳
+* 可独立将任意时间设置为当前时间
+
+```
+#define _XOPEN_SOURCE 700  // or define _POSIX_C_SOURCE >= 200809
+#include<sys/stat.h>
+
+int utimensat(int dirfd, const char *path, const struct timespec times[2], int flag);
+// 返回值：若成功，返回0，若出错，返回-1
+// 若将某一时间戳设置为当前时间，将tv_nsec指定为UTIME_NOW，且忽略tv_sec字段
+// 若将某一时间戳保持不变，将tv_nsec指定为UTIME_OMIT，且忽略tv_sec字段
+// 若dirfd指定为AT_FDCWD，对pathname的解读与times类似
+// 也可将dirfd指定为某目录的文件描述符，目的如18.11节描述
+// flag可是0或AT_SYMLINK_NOFOLLOW，表示当pathname是符号链接时不进行解引用
+
+struct timespec
+{
+	  time_t tv_sec;
+	  long   tv_nsec;
+}
+```
+
+如下代码将文件atime设置为当前时间，同时mtime保持不变：
+
+```
+struct timespec t[2];
+
+t[0].tv_sec = 0;
+t[0].tv_nsec = UTIME_NOW;
+t[1].tv_sec = 0;
+t[1].tv_nsec = UTIME_OMIT;
+if (-1 == utimensat(AT_FDCWD, "file", t, 0))
+	perror("utimeensat error");
+```
+
+使用futimens可更新打开文件描述符fd所指代的atime和mtime：
+
+```
+#include<sys/stat.h>
+
+int futimens(int fd, const struct timespec times[2]);
+// 返回值：若成功，返回0，若出错，返回-1
+```
+
