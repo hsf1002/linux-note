@@ -39,3 +39,62 @@ sky@sky-VirtualBox:~$ getfattr -d tfile
 user.x
 ```
 
+##### 扩展属性的系统调用
+
+创建和修改：
+
+```
+#include <sys/types.h>
+#include <sys/xattr.h>
+
+int setxattr(const char *path, const char *name, const void *value, size_t size, int flags);
+int lsetxattr(const char *path, const char *name, const void *value, size_t size, int flags);
+int fsetxattr(int fd, const char *name, const void *value, size_t size, int flags);
+// 三个函数的返回值：若成功，返回0，若出错，返回-1
+// flag的取值：
+XATTR_CREATE: 若给定的name已经存在，则失败
+XATTR_REPLACE: 若给定的name不存在，则失败
+
+char *value = "the past is not dead";
+
+if (-1 == setxattr(pathname, "user.x", value, strlen(value), 0))
+	perror("setxattr error");
+```
+
+获取：
+
+```
+#include <sys/types.h>
+#include <sys/xattr.h>
+
+ssize_t getxattr(const char *path, const char *name, void *value, size_t size);
+ssize_t lgetxattr(const char *path, const char *name, void *value, size_t size);
+ssize_t fgetxattr(int fd, const char *name, void *value, size_t size);
+// 三个函数的返回值：若成功，返回EA个数，若出错，返回-1
+```
+
+删除：
+
+```
+#include <sys/types.h>
+#include <sys/xattr.h>
+
+int removexattr(const char *path, const char *name);
+int lremovexattr(const char *path, const char *name);
+int fremovexattr(int fd, const char *name);
+// 三个函数的返回值：若成功，返回0，若出错，返回-1
+```
+
+获取与文件相关的所有EA名称：
+
+```
+#include <sys/types.h>
+#include <sys/xattr.h>
+
+ssize_t listxattr(const char *path, char *list, size_t size);
+ssize_t llistxattr(const char *path, char *list, size_t size);
+ssize_t flistxattr(int fd, char *list, size_t size);
+// 三个函数的返回值：若成功，返回复制到list中的字节数，若出错，返回-1
+// 出于安全考虑，list中返回的EA可能不包含进程无权访问的属性名
+```
+
