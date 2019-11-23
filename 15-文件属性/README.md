@@ -160,7 +160,7 @@ int fchownat(int fd,const char *pathname,uid_t owner,gid_t group,int flag)
 int lchown(const char *pathname, uid_t owner, gid_t group);     
 // 4个函数的返回值：若成功，返回0；若出错，返回-1 
 // 如果两个参数owner或group任意一个是-1，则对应的ID不变
-// 只有特权进程才能改变文件的用户ID，非特权进程可使用chown将文件组ID修改为其附属组任意组ID
+// 只有特权进程才能改变文件的用户ID，非特权进程可使用chown将文件组ID修改为其附属组任意组ID，前提是进程的有效用户ID与文件的用户ID匹配
 // 如果文件组的属主或属组发生了改变，那么set-user-ID和set-group-ID权限位也会关闭
 ```
 

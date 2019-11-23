@@ -22,6 +22,8 @@ gcc能够确保使用正确的选项来调用ld（链接器程序）并将程序
 
 ```
 cc prog.c -o prog
+如果要加载库：
+cc -g -Wall -o prog prog.c libgetnum.so
 ```
 
 共享库是一种比静态库更加现代化的对象库
