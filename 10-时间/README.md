@@ -34,7 +34,7 @@ typedef long     time_t;    /* 时间值time_t 为长整型的别名*/
 ```
 #include <time.h>
 
-char *ctime(const time_t timep);
+char *ctime(const time_t *timep);
 // 返回一个长达26个字符的字符串，内含标准格式的日期和时间，如 Wed Jun 8 14:22:34 2011
 // 会自动考虑本地时区和DST设置
 ```
