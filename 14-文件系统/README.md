@@ -235,7 +235,7 @@ ls /testfs	// 在sda12上文件显现
 lost+found  myfile
 ```
 
-##### 基于每次挂载的挂载标志
+##### --->基于每次挂载的挂载标志
 
 从内核2.4开始，文件系统和挂载点之间不是一一对应的关系，如下所示，同一文件系统对应两个挂载点，MS_NOEXEC标志的影响，mount的其他标志也类似：
 
@@ -254,7 +254,7 @@ Art is something which is well done
 bash: /demo/echo: Permission denied
 ```
 
-##### 绑定挂载
+##### --->绑定挂载
 
 是指在文件系统目录层级的另一处挂载目录或文件，导致文件或目录在两处同时可见，类似于硬链接，区别如下：
 
@@ -295,6 +295,53 @@ rm f2
 ```
 
 绑定挂载的应用场景之一是创建chroot监禁区
+
+##### --->递归绑定挂载
+
+默认情况下，MS_BIND为某个目录创建绑定挂载，不会将其子目录也挂载，如果需要递归绑定挂载，需要用MS_BIND与MS_REC相与，mount的--rbind提供类似功能
+
+首先创建一个目录树src1，将其挂载到top下，而top下包括字挂在src2：
+
+```
+su
+Password:
+mkdir top
+mkdir src1
+touch src1/aaa
+mount --bind sr1 top	// 创建绑定挂载，src1挂载在top下
+mkdir top/sub
+mkdir src2
+touch src2/bbb
+mount --bind src2 top/sub	// 创建绑定挂载，src2挂载在top/sub下
+find top
+top
+top/aaa
+top/sub
+top/sub/bbb
+```
+
+以top作为源目录，另行创建绑定挂载，属于非递归操作，新挂载不会复制子挂载：
+
+```
+mkdir dir1
+mount --bind top dir1
+find dir1
+dir1
+dir1/aaa
+dir1/sub
+```
+
+再以top作为源目录创建递归绑定挂载：
+
+```
+mkdir dir2
+mount --rbind top dir2
+find dir2
+dir2
+dir2/aaa
+dir2/sub
+dir2/sub/bbb
+```
 
 ##### 虚拟内存文件系统：tmpfs
 
