@@ -27,7 +27,7 @@ typedef long     time_t;    /* 时间值time_t 为长整型的别名*/
 
 ##### 时间转换函数
 
-![image-20191110065537667](/Users/sky/Library/Application Support/typora-user-images/image-20191110065537667.png)
+![WechatIMG11.jpeg](https://i.loli.net/2019/11/23/CbN6gFySUkQ85dx.jpg)
 
 -----将time_t转换为可打印格式-----
 

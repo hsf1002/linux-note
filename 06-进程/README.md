@@ -24,7 +24,7 @@ pid_t getppid(void);
 
 图中的读写段包括：初始化数据段和非初始化数据段
 
-![image-20191107062918969](/Users/sky/Library/Application Support/typora-user-images/image-20191107062918969.png)
+![WechatIMG9.jpeg](https://i.loli.net/2019/11/23/qs1wrYnS6N2exgV.jpg)
 
 * 文本段包含了进程运行的程序机器语言指令
 * 初始化数据段包含显式初始化的全局变量和静态变量

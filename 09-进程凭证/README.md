@@ -228,4 +228,4 @@ int initgroups(const char *user, gid_t group);
 // initgroups扫描/etc/groups文件，为user创建属组列表，以此来初始化进程的辅助组ID，参数group指定的组ID追加到辅助组ID的集合中，其主要用途是创建登录会话的程序如login
 ```
 
-![image-20191109115019752](/Users/sky/Library/Application Support/typora-user-images/image-20191109115019752.png)
+![WechatIMG10.jpeg](https://i.loli.net/2019/11/23/mIJoWcVshtET3AB.jpg)
