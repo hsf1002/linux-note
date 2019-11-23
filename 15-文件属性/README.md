@@ -142,3 +142,25 @@ int futimens(int fd, const struct timespec times[2]);
 // 返回值：若成功，返回0，若出错，返回-1
 ```
 
+##### 文件属主
+
+装配ext2文件系统时，mount命令选项如果是：
+
+* -o grpid或-o bsdgroups：新建文件总是继承父目录的组ID，忽略父目录的set-group-ID位
+* -o nogrpid或-o sysvgroups：新建文件的组ID取自进程的有效组ID，如果父目录设置了set-g位，则组ID继承自父目录
+
+改变文件属主的方法：
+
+```
+#include <unistd.h>
+
+int chown(const char *pathname,uid_t owner,gid_t group);
+int fchown(int fd,uid_t owner,gid_t group);
+int fchownat(int fd,const char *pathname,uid_t owner,gid_t group,int flag)
+int lchown(const char *pathname, uid_t owner, gid_t group);     
+// 4个函数的返回值：若成功，返回0；若出错，返回-1 
+// 如果两个参数owner或group任意一个是-1，则对应的ID不变
+// 只有特权进程才能改变文件的用户ID，非特权进程可使用chown将文件组ID修改为其附属组任意组ID
+// 如果文件组的属主或属组发生了改变，那么set-user-ID和set-group-ID权限位也会关闭
+```
+
