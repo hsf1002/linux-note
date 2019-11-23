@@ -255,3 +255,39 @@ ll a.txt
 ----r--r-t  1 sky  staff  6 11 23 16:48 a.txt*
 ```
 
+umask是一种进程属性，通常继承自父shell，用于指明屏蔽哪些权限位，大多数默认值是八进制的022（---w--w--），如果open中的mode是0666（rw-rw-rw），则新建文件实际权限是rw-r--r--，如果mode是0777（rwxrwxrwx），则新建文件的实际权限是rwxr-xr-x
+
+```
+#include <sys/stat.h>
+
+mode_t umask(mode_t cmask);	
+// 返回值：之前的文件模式屏蔽字
+
+屏蔽位		含义
+------------------------------
+0400		用户读
+0200		用户写
+0100		用户执行
+0040		组读
+0020		组写
+0010		组执行
+0004		其他读
+0002		其他写
+0001		其他执行
+
+read: 4
+write: 2
+execute: 1
+
+umask值	 文件权限	  文件夹权限
+--------------------------------
+0			rw			rwx
+1			rw			rw
+2			r			rx
+3			r			r
+4			w			wx
+5			w			w
+6			x			x
+7		no permission allowed
+```
+
