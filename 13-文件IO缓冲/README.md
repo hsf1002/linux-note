@@ -118,7 +118,7 @@ fd = open(pathname, O_WRONLY | O_SYNC);
 
 首先是通过stdio库将用户数据传递到stdio缓冲区，该缓冲区位于用户态内存区，当缓冲区填满时，stdio库会调用write系统调用，将数据传递到内核高速缓冲区，该缓冲区位于内核态内存区，最终，内核发起磁盘操作，将数据传递到磁盘
 
-![image-20191117034713169](/Users/sky/Library/Application Support/typora-user-images/image-20191117034713169.png)
+![WechatIMG12.jpeg](https://i.loli.net/2019/11/23/fk8r7twjmgQVubP.jpg)
 
 ##### 就IO模式向内核提出建议
 
