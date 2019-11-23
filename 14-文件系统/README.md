@@ -62,7 +62,7 @@ i节点主要维护如下信息：
 * 实际分配给文件的块数量，512字节为单位，不会简单的等于文件大小，因为要考虑文件中可能包含空洞
 * 指向文件数据块的指针
 
-![image-20191117083853328](/Users/sky/Library/Application Support/typora-user-images/image-20191117083853328.png)
+![WechatIMG13.jpeg](https://i.loli.net/2019/11/23/daInAxYjDJpZfTX.jpg)
 
 无需连续存储文件块，使得文件系统对磁盘空间利用更为高效，当然导致文件碎片化比较严重
 
