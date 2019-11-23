@@ -226,3 +226,17 @@ cat a.txt
 hello
 ```
 
+系统调用access是根据进程的真实用户ID和组ID取检查对文件的访问权限，对于set-user-ID或set-group-ID程序就是这样的：
+
+```
+#include <unistd.h>
+
+int access(const char *pathname, int mode);		
+int faccessat(int fd, const char *pathname, int mode, int flag);	
+// 两个函数的返回值：若成功，返回0；若出错，返回-1 
+// 若pathname是符号链接，则进行解引用
+// mode值可以为：F_OK（存在） R_OK（具有读权限） W_OK（具有写权限） X_OK（具有执行权限）
+// flag参数设置为AT_EACCESS，则访问检查的是进程的有效用户ID和有效组ID
+// 出于安全考虑，建议杜绝使用此调用，当文件是符号链接时有漏洞
+```
+
