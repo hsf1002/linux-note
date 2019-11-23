@@ -256,9 +256,45 @@ bash: /demo/echo: Permission denied
 
 ##### 绑定挂载
 
+是指在文件系统目录层级的另一处挂载目录或文件，导致文件或目录在两处同时可见，类似于硬链接，区别如下：
 
+* 绑定挂载可以跨越多个文件系统挂载点，甚至不拘于chroot监禁区
+* 可针对目录执行绑定挂载
 
+```
+su
+Password:
+pwd:
+/testfs
+mkdir d1
+touch d1/x
+mount --bind d1 d2	// 创建绑定挂载目录
+ls d2	 // d2可以看见d1的内容
+x
+touch d2/y
+ls d1	 // d1可以看见d2的内容
+y
+```
 
+```
+cat > f1		// 创建文件并写入内容
+Chance is powerful,
+touch f2
+mount --bind f1 f2	// 创建绑定挂载文件
+mount | egrep '(d1|d2)'
+/testfs/d1 on /testfs/d2 type none (rw, bind)
+/testfs/f1 on /testfs/f2 type none (rw, bind)
+cat >> f2	// 给f2写入内容
+can you grab it?
+cat f1	  // 查看f1的内容
+Chance is powerful, can you grab it?
+rm f2
+rm: cannot unlink 'f2': Device or resource busy
+unmount f2  // 先要卸载才能删除
+rm f2
+```
+
+绑定挂载的应用场景之一是创建chroot监禁区
 
 ##### 虚拟内存文件系统：tmpfs
 
