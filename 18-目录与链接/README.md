@@ -77,3 +77,22 @@ int unlinkat (int fd,const char* pathname, int flag);
 - unlink的这种特性可以被用来确保即使程序奔溃时，所创建的临时文件也不会遗留下来
 - remove解除对一个文件或目录的链接。对于文件，remove与unlink相同，对于目录，remove与rmdir相同
 
+##### 更改文件名：rename
+
+既可以重命名文件，又可以将文件移到同一文件系统下的另一个目录：
+
+```
+#include <stdio.h>
+
+int rename(const char *oldname, const char*newname);
+int renameat(int oldfd, const char *oldname, int newfd, const char *newname);
+// 返回值：若成功，返回0，若失败，返回-1
+// 改名既不影响指向该文件的硬链接，也不影响持有该文件打开描述符的任何进程
+```
+
+- 如果oldname是一个文件，为该文件或链接文件重命名。如果newname已存在，不能引用一个目录，如果newname已存在且不是一个目录，则先删除该目录项再将oldname重命名为newname，对于包含oldname和newname的目录，调用进程必须具有写权限
+- 如果oldname是一个目录，为该目录重命名。如果newname已存在，则必须引用一个空目录（只有.和..），先将其删除，再将oldname重命名为newname。newname不能包含oldname作为其路径前缀
+- 如果oldname或newname引用符号链接，则处理符号链接本身
+- 不能对.和..重命名
+- 如果oldname和newname引用同一个文件，不做任何修改返回
+
