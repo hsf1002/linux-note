@@ -15,7 +15,18 @@
 /**
  *   
  *  获取文件stat信息
- */
+
+cc -g -Wall -o t_chown t_chown.c libugid.so
+sudo LD_LIBRARY_PATH=. ./t_chown FENG FENG hi
+uid = 1001, gid = 1002 
+ll hi
+-rwxrwxr-x 1 FENG FENG 20272 11月 25 10:26 hi*
+sudo LD_LIBRARY_PATH=. ./t_chown hefeng hefeng hi
+uid = 1000, gid = 1000 
+ll hi
+-rwxrwxr-x 1 hefeng hefeng 20272 11月 25 10:26 hi*
+
+*/
 int
 main(int argc, char *argv[])    
 {
@@ -37,7 +48,7 @@ main(int argc, char *argv[])
     if (0 == strcmp(argv[2], "-"))
         gid = -1;
     else
-        if (-1 == (uid = groupname_from_id(argv[2])))
+        if (-1 == (gid = groupid_from_name(argv[2])))
             perror("no such group");
 
     printf("uid = %ld, gid = %ld \n", (long int)uid, (long int)gid);

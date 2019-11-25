@@ -24,10 +24,12 @@ usage_error(const char *name)
  *   
  *  获取文件的扩展属性EA
  * 
-setfattr -n user.x -v 'the past is past' tfile 
-setfattr -n user.y -v 'in fact, the past is not past' tfile 
-./xattr_view tfile
-
+setfattr -n user.x -v 'the past is past' hi
+setfattr -n user.y -v 'the past is not the past' hi
+./a.out hi
+hi: 
+    name = user.x; value = the past is past
+    name = user.y; value = the past is not the past
 
  */
 int
@@ -57,11 +59,11 @@ main(int argc, char *argv[])
         }
     }
 
-    if (optind >= argc + 2)
+    if (optind >= argc)
         usage_error(argv[0]);
     
     // 对所有文件进行获取EA的操作
-    for (int i=optind; i<argc; +i)
+    for (int i=optind; i<argc; ++i)
     {
         if (-1 == (list_len = listxattr(argv[i], list, XATTR_SIZE)))
             perror("listxattr error");

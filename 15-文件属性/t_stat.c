@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
+#include <time.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <sys/types.h>
@@ -116,15 +117,30 @@ display_stat_info(const struct stat *sb)
     printf("file size:                 %lld bytes\n", (long long)sb->st_size);
     printf("optical IO block size:     %ld bytes\n", (long)sb->st_blksize);
     printf("512B blocks allocated:     %lld\n", (long long)sb->st_blocks);
-    printf("last file access:          %s\n", ctime(&(sb->st_atime)));
-    printf("last file modified:        %s\n", ctime(&(sb->st_mtime)));
-    printf("last status changed:       %s\n", ctime(&(sb->st_ctime)));
+    printf("last file access:          %s", ctime(&sb->st_atime));
+    printf("last file modified:        %s", ctime(&sb->st_mtime));
+    printf("last status changed:       %s", ctime(&sb->st_ctime));
 }
 
 /**
  *   
  *  获取文件stat信息
- */
+
+./a.out README.md 
+file type:                regular file
+device containing i-node: major=1, minor=8
+i-node number:            7274847
+mode:                     100644 (rw-r--r--)
+number of (hard) links:    1
+ownership:                 UID=501, GID=20
+file size:                 12896 bytes
+optical IO block size:     4096 bytes
+512B blocks allocated:     32
+last file access:          Sat Nov 23 21:04:12 2019
+last file modified:        Sat Nov 23 21:04:12 2019
+last status changed:       Sat Nov 23 21:04:12 2019
+
+*/
 int
 main(int argc, char *argv[])    
 {
