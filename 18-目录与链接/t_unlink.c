@@ -35,7 +35,7 @@ main(int argc, char *argv[])
     num_blocks = (argc > 2) ? getInt(argv[2], GN_GT_0, "num-1kb-block") : 100000;
 
     // 创建一个文件
-    if (-1 == (fd = fopen(argv[1], O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)))
+    if (-1 == (fd = open(argv[1], O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)))
         perror("fopen error");
 
     // 将其文件名删除（文件本身存在）

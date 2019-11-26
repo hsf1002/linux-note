@@ -42,7 +42,13 @@ ls -li xyz
 
 ![WechatIMG22.jpeg](https://i.loli.net/2019/11/24/jBuU7qh5bpwft4m.jpg)
 
-是否对系统调用的路径名进行解引用，有一点是约定俗成，总是会对路径中的目录部分的符号链接进行解引用，而是否对文件名本身进行解引用，取决于系统调用，大部分操作会无视符号链接的所有权和权限，是否允许操作是由其所指代的文件的所有权和权限决定，仅当带有sticky权限位的目录对符号链接进行移除或改名时，才会考虑符号链接自身的所有权
+是否对系统调用的路径名进行解引用，有一点是约定俗成，总是会对路径中的目录部分的符号链接进行解引用，而是否对文件名本身进行解引用，取决于系统调用，大部分操作会无视符号链接的所有权和权限，是否允许操作是由其所指代的文件的所有权和权限决定，仅当带有sticky权限位的目录对符号链接进行移除或改名时，才会考虑符号链接自身的所有权；符号链接可以指向不存在的文件，用 ls -l 可以查看，但是无法cat
+
+```
+如果是符号链接：
+解引用：access、chdir、chmod、chown、create、exec、link、open、opendir、pathconf、stat、truncate
+不解引用：lchown、lstat、readlink、remove、rename、unlink
+```
 
 ##### 创建和移除硬链接：link和unlink
 
@@ -95,4 +101,26 @@ int renameat(int oldfd, const char *oldname, int newfd, const char *newname);
 - 如果oldname或newname引用符号链接，则处理符号链接本身
 - 不能对.和..重命名
 - 如果oldname和newname引用同一个文件，不做任何修改返回
+
+##### 创建并读取符号链接：symlink和readlink
+
+symlink会针对由actualpath指定的路径名创建一个新的符号链接sympath：
+
+```
+#include <unistd.h>
+
+int symlink(const char*actualpath, const char *sympath);
+int symlinkat(const char *actualpath, int fd, const char *sympath);
+// 两个函数返回值：若成功，返回0，若出错，返回-1
+// 创建符号链接，并不要求actualpath已经存在，actualpath和sympath也无需位于同一文件系统
+```
+
+因为open跟随符号链接（即解引用），需要一种方式打开符号链接本身：
+
+```
+ssize_t readlink(const char* restrict pathname, char *restrict buf, size_t bufsize);  
+ssize_t readlinkat(int fd, const char* restrict pathname, char *restrict buf, size_t bufsize);
+// 两个函数返回值：若成功，返回读取的字节数（不以null字节终止），若出错，返回-1  
+// 这两个函数组合了open、read和close的所有操作
+```
 
