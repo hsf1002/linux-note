@@ -158,3 +158,54 @@ int remove(const char *pathname);
 // 如果pathname是符号链接，不进行解引用
 ```
 
+##### 读取目录：opendir和readdir
+
+对某个目录具有访问权限的任意用户都可以读该目录，但只有内核才能写目录，一个目录的写/执行权限位决定了在该目录能否创建新文件以及删除文件，不代表能否写目录本身
+
+```
+#include<dirent.h>
+
+DIR* opendir(constchar * path );
+DIR* fdopendir(int fd);
+// 两个函数返回值，若成功，返回DIR指针指向目录列表的首条记录，若出错，返回NULL
+// opendir会为与目录流相关的文件描述符自动设置close-on-exec标志（FD_CLOEXEC），确保执行exec时自动关闭该文件描述符
+```
+
+```
+struct dirent *readdir(DIR *dp);	
+// 返回值：若成功，返回目录流中下一个目录条目的指针，若出错或在目录尾返回NULL
+// 返回时并未对文件名进行排序，使用scandir可以获得经过排序后的文件列表
+
+struct direct
+{
+    ino_t d_ino;    // i-node编号
+    char d_name[];  // NULL字节结尾的文件名
+}
+
+int *readdir_r(DIR *dp, struct direct entry, struct dirent **result);	
+// 返回值：若成功，返回0，若出错，返回负数
+// 是readdir的可重入版本
+```
+
+```
+void rewinddir(DIR *dp);
+// 将目录流回到起点
+
+long telldir(DIR *dp);				
+// 返回值与dp关联的目录中的当前位置有关，允许随机访问资源
+void seekdir(DIR *dp, long loc);
+// 允许随机访问资源
+```
+
+```
+int closedir(DIR *dp);				
+// 返回值：若成功，返回0，若出错，返回-1 
+// 关闭由dp指代处于打开状态的目录流，同时释放流所使用的资源
+```
+
+```
+int dirfd(DIR *dp);
+// 返回值：若成功，返回文件描述符，若出错，返回-1 
+```
+
+宏__offsetof接受两个参数：结构类型和该结构中某一字段，返回size_t类型的值表示该字段距离该结构起点的字节偏移量，这个宏之所以必要，由于编译器为满足诸如int类型的对齐要求，可能在结构中插入填充字节，这导致结构中某一字段的偏移量可能要大于该属性之前所有字段的长度总和
