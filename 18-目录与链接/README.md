@@ -147,3 +147,14 @@ int rmdir(const char *pathname);
 // 如果调用此函数使目录的链接计数成为0，并且也没有其他进程打开此目录，则释放由此目录占用的空间
 ```
 
+##### 移除一个文件或目录：remove
+
+```
+#include <stdio.h>
+
+int remove(const char *pathname);
+// 返回值：若成功，返回0，若出错，返回-1 
+// 如果pathname是文件，则remove调用unlink，如果pathname是目录，则remove调用rmdir
+// 如果pathname是符号链接，不进行解引用
+```
+
