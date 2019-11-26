@@ -124,3 +124,26 @@ ssize_t readlinkat(int fd, const char* restrict pathname, char *restrict buf, si
 // 这两个函数组合了open、read和close的所有操作
 ```
 
+##### 创建和移除目录：mkdir和rmdir
+
+```
+#include <sys/stat.h>     
+
+int mkdir(const char *pathname, mode_t mode);     
+int mkdirat(int fd, const char *pathname, mode_t mode);     
+// 两个函数返回值：若成功，返回0，若出错，返回-1 
+// 创建一个新的空目录，其中.和..自动创建，所指定的文件访问权限mode由进程的文件模式屏蔽字修改
+// pathname可以是绝对路径也可以是相对路径，若已经存在，则调用失败并将errno置为EEXIST
+// 创建的只是路径名的最后一部分，mkdir("aaa/bbb/ccc", mode)，仅当aaa和bbb已经存在时才会成功
+```
+
+```
+#include <unistd.h>     
+
+int rmdir(const char *pathname);     
+// 返回值：若成功，返回0，若出错，返回-1 
+// 要使调用成功，必须是空目录
+// 如果pathname的最后一部分是符号链接，不对其进行解引用，调用失败并将errno置为ENOTDIR
+// 如果调用此函数使目录的链接计数成为0，并且也没有其他进程打开此目录，则释放由此目录占用的空间
+```
+
