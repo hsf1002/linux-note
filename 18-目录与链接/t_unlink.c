@@ -18,7 +18,11 @@
 /**
  *   
  * 
-
+cc -g -Wall -o t_unlink t_unlink.c libgetnum.so 
+LD_LIBRAY_PATH=:. ./t_unlink hello
+df: dirname hello: No such file or directory
+************ close file descriptor 
+df: dirname hello: No such file or directory
 
  */
 int
