@@ -209,3 +209,35 @@ int dirfd(DIR *dp);
 ```
 
 宏__offsetof接受两个参数：结构类型和该结构中某一字段，返回size_t类型的值表示该字段距离该结构起点的字节偏移量，这个宏之所以必要，由于编译器为满足诸如int类型的对齐要求，可能在结构中插入填充字节，这导致结构中某一字段的偏移量可能要大于该属性之前所有字段的长度总和
+
+##### 文件树遍历：nftw
+
+遍历位于文件夹*dirpath*下面的目录树，为每个树的节点调用一次*fn()* ，默认情况下，当前目录总是先于其包含的文件和子目录被处理（先序遍历）；为了避免调用进程的文件描述符被用尽，*nopenfd*指定了 **nftw()** 能够同时打开目录的最大数量。当搜索深度超过这个值，**nftw()** 将会变慢，因为目录必须被关掉和重新打开。**nftw()** 为目录树中的每一层至多使用一个文件描述符
+
+```
+#include <ftw.h>
+
+int nftw(const char *dirpath, int (*fn) (const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf),int nopenfd, int flags);
+// 
+// typeflag的取值如下：
+FTW_F：fpath是一个普通文件
+FTW_D：fpath是一个目录
+FTW_DNR：fpath是一个不能被读的目录
+FTW_DP：正在进行后序遍历，fpath是一个目录，并且 flag参数被指定为FTW_DEPTH。（如果flags没有被指定为FTW_DEPTH，那么访问目录时使用的typeflag总会是FTW_D。）路径fpath下的所有文件和子目录已经被处理过了
+FTW_NS：在不是符号链接的fpath上调用stat失败，可能的原因是权限问题
+FTW_SL：fpath是一个符号链接，flags被设置为FTW_PHYS有效
+FTW_SLN：fpath是一个指向不存在的文件的符号链接（只在FTW_PHYS未被设置的时候才会发生）
+
+// flag的取值如下：
+FTW_CHDIR：在处理目录内容前先调用chdir进入每个目录，如果func要执行，应该使用这个标志
+FTW_DEPTH：进行后序遍历，也就是在处理完当前目录的内容和它的所有子目录之后才会调用fn()
+FTW_MOUNT：停留在同一个文件系统中（也就是不会跨越挂载点）
+FTW_PHYS：不会跟随符号链接，如果不设置这个flag，就会跟随符号链接，但是没有文件会被报告两次，如果FTW_PHYS没有被设置，但是设置了FTW_DEPTH，那么函数fn() 就永远不会被自己是自己子孙的目录调用到
+
+// func的返回值如下：
+FTW_CONTINUE：继续正常进行
+FTW_SKIP_SIBLINGS：当前节点的兄弟节点会被跳过，处理从父节点继续进行
+FTW_SKIP_SUBTREE：如果pathname是目录，就不对该目录下条目调用func，恢复进行对该目录的下一个同级目录的处理
+FTW_STOP：不再进一步处理目录树下任何条目，立即返回FTW_STOP
+```
+
