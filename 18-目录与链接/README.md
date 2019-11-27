@@ -241,3 +241,24 @@ FTW_SKIP_SUBTREE：如果pathname是目录，就不对该目录下条目调用fu
 FTW_STOP：不再进一步处理目录树下任何条目，立即返回FTW_STOP
 ```
 
+##### 进程的当前工作目录
+
+每个进程都有一个当前工作目录，新进程的当前工作目录继承自其父进程，此目录是搜索所有相对路径名的起点。当前工作目录是进程的一个属性，起始目录则是登录名的一个属性。因为当前工作目录是进程的一个属性，所以它只影响调用chdir的进程本身，而不影响其他进程：
+
+```
+#include <unistd.h>
+
+char *getcwd( char *buf, szie_t size );
+// 返回值：若成功，返回buf（绝对路径），若出错则返回NULL
+// 如果buf是NULL，getcwd将分配一个大小为size的缓冲区，用于向调用者返回结果
+// Linux专有符号链接/proc/PID/cwd的内容可以确定任何进程的当前目录
+```
+
+```
+#include <unistd.h>
+
+int chdir( const char *pathname );
+int fchdir( int filedes );
+// 两个函数的返回值：若成功，返回0，若出错，返回-1
+```
+
