@@ -262,3 +262,41 @@ int fchdir( int filedes );
 // 两个函数的返回值：若成功，返回0，若出错，返回-1
 ```
 
+##### 针对目录文件描述符的相关操作
+
+Linux内核提供了一系列新的系统调用，以及一些附加功能，对某些程序非常有用：
+
+```
+类似的传统接口       新接口          备注
+access          faccessat        支持AT_EACCESS和AT_SYMLINK_NOFOLLOW标志
+chmod            fchmodat        
+chown            fchownat        支持AT_SYMLINK_NOFOLLOW标志			
+stat              fstatat        支持AT_SYMLINK_NOFOLLOW标志
+link              linkat         支持AT_SYMLINK_NOFOLLOW标志
+mkdir             mkdirat
+mkfifo            mkfifoat       基于mknodat库函数
+mknod             mknodat
+open              openat
+readlink         readlinkat
+rename            renamtat
+symlink           symlinkat
+unlink           unlinkat         支持AT_REMOVEDDIR标志
+utimes           utimesat         支持AT_SYMLINK_NOFOLLOW标志
+
+以open为例：
+#define _XOPEN_SOURCE 700
+#include <fcntl.h>
+
+int openat(int dirfd, const char *pathname, int flags, .../* mode_t */);
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+// 若dirfd是相对路径名，以其作为参照点
+// 若pathname是相对路径名，且dirfd是AT_FDCWD，那么pathname是以进程当前工作目录为参照点
+// 若pathname是绝对路径名，忽略dirfd
+// 若pathname是符号链接，支持AT_SYMLINK_NOFOLLOW标志表示不进行解引用
+```
+
+使用新接口的原有有二（以open为例）：
+
+1. 当调用open打开位于当前工作目录之外的文件时，可能发生某些竞争条件
+2. 需要针对不同线程拥有不同的“虚拟”目录，将openat与应用维护的目录文件描述符结合，可以模拟这个功能
+
