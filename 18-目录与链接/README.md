@@ -343,5 +343,15 @@ char *realpath(const char *pathname, char *resolved_path);
 // 返回值：若成功，返回空字符结尾的字符串，包含符号链接的绝对路径名，若出错，返回NULL
 ```
 
+##### 解析路径名字符串：dirname和basename
 
+```
+#include <libgen.h>
+
+char *dirname(char *pathname);
+char *basename(char *pathname);
+// 若pathname是/home/mtk/prog.c，dirname返回/home/mtk，basename返回prog.c，若出错，返回NULL
+```
+
+![WechatIMG27.jpeg](https://i.loli.net/2019/11/30/gHFOw1SdG7VkxU5.jpg)
 
