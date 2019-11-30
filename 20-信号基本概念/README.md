@@ -124,3 +124,27 @@ kill(getpid(), signo);
 * 如果发送者的实际或有效用户ID匹配于接收者的实际用户ID或保存设置用户ID，非特权进程也可以向另一进程发送信号
 * SIGCONT信号而言，无论对用户ID检查如何，非特权进程可以向同一会话中的任何其他进程发送这一信号
 
+##### 发送信号的其他方式：raise和killpg
+
+```
+#include <signal.h>
+
+int raise(int signo);
+// 返回值：若成功，返回0，若出错，返回非0值，唯一可能出错的地方是signo无效而返回EINVAL
+
+单线程中:
+raise(signo)相当于kill(getpid(), signo);
+多线程中：
+raise(signo)相当于pthread_kill(pthread_self(), signo);
+```
+
+```
+#include <signal.h>
+
+int killgg(pid_t pgrp, int signo);
+// 返回值：若成功，返回0，若出错，返回-1
+
+killpg(pgrp, signo)相当于kill(-pgrp, signo)
+如果指定pgrp为0，那么会向调用者所属进程组的所有进程发送此信号
+```
+
