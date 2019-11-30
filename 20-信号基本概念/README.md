@@ -63,5 +63,32 @@ Linux标准信号编号是1-31，实际却超出，为了与其他UNIX实现兼�
 
 term表示终止进程，core表示产生核心转储文件，ignore表示忽略此信号，stop表示停止进程，cont表示信号恢复了一个已停止的进程
 
+##### 改变信号处置：signal
 
+signal的行为在不同UNIX实现有差别，sigaction应该是建立信号处理函数的首选API，在Linux中，signal是基于sigaction实现的glibc库函数
+
+```
+#include <signal.h>
+void (signal(int signo, void (*handler)(int)))(int);
+// 若成功，返回以前的信号处理配置，若出错，返回SIG_ERR
+// handler可以指定为SIG_DFL(默认值),SIG_IGN(忽略)
+
+typedef void Sigfunc(int);
+Sigfunc *signal(int, Sigfunc *);
+```
+
+```
+void (*old_handler)(int);
+// switch to new
+if (SIG_ERR == (old_handler = signal(SIGINT, new_handler)))
+    perror("signal error");
+
+/** do somthing with new_handler */
+
+// retrieve to old
+if (SIG_ERR == (signal(SIGINT, old_handler)))
+    perror("signal error");
+```
+
+使用signal，无法在不改变信号处置的同时，还能获取当前的信号处置，即调用signal就会改变信号处置，sigaction可以做到这点
 
