@@ -16,3 +16,52 @@
 4. 停止进程：暂停进程的执行
 5. 于之前暂停后再恢复进程的执行
 
+##### 信号类型和默认行为
+
+Linux标准信号编号是1-31，实际却超出，为了与其他UNIX实现兼容，其他则并未使用
+
+* SIGALRM：alarm或settimer设置的定时器到期
+* SIGBUS：总线错误表示发生了某种内存访问错误
+* SIGCHILD：某一子进程终止，内核向父进程发生此信号，子进程因收到信号而停止或恢复时，也可能向父进程发生此信号
+* SIGCLD：同上
+* SIGCONT：将该信号发送给已经停止的进程，进程将恢复运行，当接收信号的进程当前不是停止状态，more忽略此信号
+* SIGEMT：标识一个依赖于实现的硬件错误
+* SIGFPE：特定类型的算术错误产生，如除0
+* SIGHUP：终端断开（挂机）时，发送此信号给终端控制进程
+* SIGILL：试图执行非法的机器语言指令
+* SIGINFO：Linux中，同SIGPWR
+* SIGINT：终端键入中断字符（Control+C），终端驱动程序发送此信号给前台进程组
+* SIGIO：Linux中，同SIGABRT
+* SIGKILL：处理器程序无法将其阻塞、忽略或捕获，总能终止进程
+* SIGLOST：Linux中，未使用
+* SIGPIPE：试图向管道、FIFO、套接字写入信息时，如果设备并没有相应的读进程，系统将产生此信号
+* SIGPOLL：Linux中，同SIGIO
+* SIGPROF：setitimer调用所设置的性能分析器（记录进程使用的CPU时间）一过期，内核就产生此信号
+* SIGPWR：电源故障
+* SIGQUIT：终端键入退出字符（Control+\），信号发给前台进程组，默认终止进程并产生核心转储文件
+* SIGSEGV：引用无效内存
+* SIGSTKFLT：Linux中，未使用
+* SIGSTOP：处理器程序无法将其阻塞、忽略或捕获，总能停止进程
+* SIGSYS：如果进程发起的系统调用有误就产生此信号
+* SIGTERM：用来终止进程的标准信号，也是kill和killall命令发送的默认信号，用户有时候会用kill -KILL或kill -9显式的发送SIGKILL信号，通常是错误的，精心设计的程序应当为SIGTERM信号设置处理器程序，以便于预先清除临时文件和释放资源，发送SIGKILL信号可以杀掉进程，但是绕开了SIGTERM的信号处理程序，总是应该首先尝试SIGERM终止进程，SIGKILL是最后手段，去对付那些不响应SIGTERM信号的失控进程
+* SIGTRAP：断点调试功能和strace命令
+* SIGSTP：作业控制的停止信号，键盘输入挂起字符（Control+Z），发送此信号给前台进程组
+* SIGTTIN：作业控制shell下后台进程组试图对终端进行read时
+* SIGTTOU：类似SIGTTIN，针对的是后台作业的终端输出
+* SIGUNUSED：顾名思义，未使用
+* SIGURG：套接字上存在带外（紧急）数据
+* SIGUSR1：供程序员使用，内核绝不会产生此信号
+* SIGUSR2：同上
+* SIGVTALRM：setitimer调用所设置的虚拟定时器（记录进程用户态使用的CPU时间）一过期，内核就产生此信号
+* SIGWINCH：窗口环境中，终端窗口尺寸大小改变时
+* SIGXCPU：进程的CPU时间超出对应的资源限制时
+* SIGXFSZ：进程试图增大文件突破对进程文件大小的资源限制时
+
+![WechatIMG29.jpeg](https://i.loli.net/2019/11/30/X573jq2OCE6orGb.jpg)
+
+![WechatIMG30.jpeg](https://i.loli.net/2019/11/30/gK84VBfirdEwIHQ.jpg)
+
+term表示终止进程，core表示产生核心转储文件，ignore表示忽略此信号，stop表示停止进程，cont表示信号恢复了一个已停止的进程
+
+
+
