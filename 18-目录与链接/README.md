@@ -334,5 +334,14 @@ int chroot(const char *pathname);
 
 * 即使针对上述可能采取了防范措施，仍然可以利用UNIX域套接字传递监禁区之外的文件描述符来越狱
 
+##### 解析路径名：realpath
+
+```
+#incude <stdlib.h>
+
+char *realpath(const char *pathname, char *resolved_path);
+// 返回值：若成功，返回空字符结尾的字符串，包含符号链接的绝对路径名，若出错，返回NULL
+```
+
 
 
