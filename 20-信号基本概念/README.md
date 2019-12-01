@@ -186,10 +186,11 @@ void psignal(int signo, char *msg);
 #include <signal.h>
 
 int sigemptyset(sigset_t *set);
-// 将信号集初始化为set指向的信号集，清除其中所有信号
+// 将信号集初始化为set指向的信号集，清除所有信号
 
 int sigfillset(sigset_t *set);
-// 将信号集初始化为set指向的信号集中的信号，sigfillset或sigemptyset必须只能执行一次
+// 将信号集初始化为set指向的信号集，包含所有信号
+// sigfillset或sigemptyset必须只能执行一次
 
 int sigaddset(sigset_t *set, int signo);
 // 把信号signo添加到信号集set中
@@ -215,5 +216,38 @@ int sigorset(sigset_t *dest, sigset_t *left, sigset_t *right);
 // 将left和right的并集置于dest
 int sigisemptyset(const sigset_t *set);
 // 若set集未包含信号，则返回true
+```
+
+##### 信号掩码（阻塞信号传递）
+
+内核会为每个进程维护一个信号掩码，即一组信号，将阻塞其针对该进程的传递，信号掩码属于线程属性，多线程中，每个线程都可以使用pthread_sigmask独立检查和修改其信号掩码
+
+```
+#include <signal.h>
+
+int sigpromask(int how, const sigset_t *restrict set, sigset_t *restrict oset);
+// 返回值：若成功，返回0，若出错，返回-1
+```
+
+- 若oset是非空指针，那么进程的当前信号屏蔽字通过oset返回
+
+- 若set是非空指针，那么参数how指示如何修改当前信号屏蔽字
+
+  ```
+  SIG_BLOCK：将set指向的包含了希望阻塞的信号集，与当前信号屏蔽字，相并，或操作
+  SIG_UNBLOCK：将set指向的包含了希望阻塞的信号集的补集，与当前信号屏蔽字，相交，与操作
+  SIG_SETMASK：将当前的信号集合设置为set指向的信号集，赋值操作
+  ```
+
+- 如果set是空指针，那么不改变进程的信号屏蔽字，how无意义
+
+如果解除了对某个信号的锁定，那么会立刻将该信号传递给进程，系统将忽略试图阻塞SIGKILL和SIGSTOP信号的请求，如果试图阻塞，sigprocmask既不会处理，也不会产生错误，这意味着，可以使用如下方式阻塞除了SIGKILL和SIGSTOP之外的所有信号：
+
+```
+// 使用blockset(包含所有信号)初始化信号集
+sigfillset(&blockset);
+// 将所有信号阻塞，但实际无法阻塞SIGKILL和SIGSTOP
+if (-1 == sigprocmask(SIG_BLOCK, &blockset, NULL))
+    perror("sigprocmask error");
 ```
 
