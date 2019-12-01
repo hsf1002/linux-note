@@ -350,3 +350,17 @@ union sigval {
 若信号是SIGCHLD，则设置si_pid, si_status和si_uid字段，若信号时SIGBUS、SIGILL、SIGFPE或SIGSEGV，则si_addr包含造成故障的根源地址，该地址可能并不准确
 
 context是无类型参数，可被强制转为ucontext_t结构类型，用于标识信号传递时进程上下文
+
+##### 等待信号：pause
+
+将暂停进程的执行，直到捕捉一个信号，即信号处理器函数中断该调用为止（或一个未处理信号终止进程为止）
+
+```
+#include <unistd.h>
+
+int pause(void);
+// 返回值：-1， errno设置为EINTR
+```
+
+只有执行了一个信号处理函数并从其返回时，pause才返回
+
