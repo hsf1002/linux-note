@@ -157,3 +157,24 @@ kill的signo指定为0，可以发送空信号，以此可以检查目标进程�
 * 管道和FIFO：对监控目标进程进行设置，令其在自身生命周期内持有对通道进行写操作的打开文件描述符，而监控进程则持有对通道进行读操作的打开文件描述符，且通道写入端关闭，即可获知监控目标进程已终止
 * /proc/PID接口：如/proc/PID/12345，对其进行stat检查
 
+##### 显示信号描述
+
+每个信号与之相关的描述位于数组sys_siglist中，如sys_siglist[SIGPIPE]获取SIGPIPE信号（管道断开）的描述，相对比直接使用数组，更推荐调用strsignal函数：
+
+```
+#define _BSD_SOURCE
+#include <signal.h>
+
+extern const char *const sys_siglist[];
+
+#define _GNU_SOURCE
+#include <string.h>
+
+char *strsignal(int sig);
+// 返回信号对应的描述字符串，如果sig无效，返回错误字符串
+// 相较于sys_siglist，strsignal会进行边界检查，而且对本地（local）设置敏感
+
+void psignal(int sig, char *msg);
+// msg后加冒号，再显示信号描述
+```
+
