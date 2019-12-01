@@ -170,11 +170,50 @@ extern const char *const sys_siglist[];
 #define _GNU_SOURCE
 #include <string.h>
 
-char *strsignal(int sig);
-// 返回信号对应的描述字符串，如果sig无效，返回错误字符串
+char *strsignal(int signo);
+// 返回信号对应的描述字符串，如果signo无效，返回错误字符串
 // 相较于sys_siglist，strsignal会进行边界检查，而且对本地（local）设置敏感
 
-void psignal(int sig, char *msg);
+void psignal(int signo, char *msg);
 // msg后加冒号，再显示信号描述
+```
+
+##### 信号集
+
+数据类型是sigset_t
+
+```
+#include <signal.h>
+
+int sigemptyset(sigset_t *set);
+// 将信号集初始化为set指向的信号集，清除其中所有信号
+
+int sigfillset(sigset_t *set);
+// 将信号集初始化为set指向的信号集中的信号，sigfillset或sigemptyset必须只能执行一次
+
+int sigaddset(sigset_t *set, int signo);
+// 把信号signo添加到信号集set中
+
+int sigdelset(sigset_t *set, int signo);
+// 把信号signo从信号集set中删除
+
+这四个函数，若成功，返回0，若出错，返回-1
+
+int sigismember(sigset_t *set, int signo);
+// 如果是返回1，如果不是，返回0，如果给定的信号无效，返回-1；
+```
+
+GNU C实现了3个非标准函数，是对上述信号集标准函数的补充：
+
+```
+#define _GNU_SOURCE
+#include <signal.h>
+
+int sigandset(sigset_t *dest, sigset_t *left, sigset_t *right);
+// 将left和right的交集置于dest
+int sigorset(sigset_t *dest, sigset_t *left, sigset_t *right);
+// 将left和right的并集置于dest
+int sigisemptyset(const sigset_t *set);
+// 若set集未包含信号，则返回true
 ```
 
