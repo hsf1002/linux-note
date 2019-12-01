@@ -265,3 +265,88 @@ int sigpending(sigset_t *set);
 ##### 不对信号进行排队处理
 
 如果同一信号在阻塞状态下产生多次，那么会将该信号记录在等待信号集中，稍后仅传递一次；即使进程没有阻塞信号，其收到的信号可能比发送给它的要少得多，如果信号发送速度如此之快，以至于内核考虑将执行权调度给接收进程前，这些信号已经到达，就会发生这种情况
+
+##### 改变信号处置：sigaction
+
+sigaction较之于signal，允许在获取信号处置的同时无需将其改变，还可以设置各种属性对调用信号处理程序时的行为控制的更加精确，可移植性也更加：
+
+```
+#include <signal.h>
+
+int sigaction(int signo, conststruct sigaction*restrict act, struct sigaction*restrict oact);
+// 若成功，返回0，若出错，返回-1
+// signo是除去SIGKILL和SIGSTOP之外的任何信号
+
+struct sigaction{
+  void (*sa_handler)(int);
+  sigset_t sa_mask;
+  int sa_flag;
+  void (*sa_sigaction)(int, siginfo_t*, void*);
+};
+// sa_handler对应于signal的handler参数，是信号处理函数的地址，或者是常量SIG_IGN、SIG_DFL之一
+// 仅当sa_handler是信号处理函数的地址，即SIG_IGN、SIG_DFL之外的取值，才会对sa_mask和sa_flag加以处理
+// sa_sigaction和sa_handler，在应用中只能一次使用其中之一
+
+sa_flag的选项：
+SA_INTERRUPT: 由此信号中断的系统调用不自动重启动
+SA_NOCLDSTOP: 若signo是SIGCHLD，当子进程停止，不产生此信号，当子进程终止，仍旧产生此信号，若已设置此标志，当停止的进程继续运行时，不产生SIGCHLD信号
+SA_NOCLDWAIT:若signo是SIGCHLD，当调用进程的子进程终止时，不创建僵死进程，当调用进程随后调用wait，则阻塞到它所有子进程都终止
+SA_NODEFER: 当捕捉到此信号执行其信号处理函数时，系统不自动阻塞此信号，应用于早期不可靠信号
+SA_ONSTACK: XSI
+SA_RESETHAND: ...
+SA_RESTART: 由此信号中断的系统调用自动重启动
+SA_SIGINFO: 对信号处理程序提供了附加信息：一个指向siginfo的指针以及指向上下文的context指针
+```
+
+- signo是要检测或修改的信号编号
+- 若act非空，则修改其动作，若oact非空，则系统经由oact返回该信号的上一个动作
+
+一般信号处理程序调用：
+
+```
+void handler(int signo);
+```
+
+如果设置sa_flag为SA_SIGINFO，则调用：
+
+```
+void handler(int signo, siginfo_t *info, void *context)
+```
+
+siginfo包含了信号产生原因有关信息：
+
+```
+typedef struct __siginfo {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	int	si_code;		/* signal code */
+	pid_t	si_pid;			/* sending process */
+	uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void	*si_addr;		/* faulting instruction */
+	union sigval si_value;		/* signal value */
+	long	si_band;		/* band event for SIGPOLL */
+	unsigned long	__pad[7];	/* Reserved for Future Use */
+} siginfo_t;
+
+union sigval {
+	/* Members as suggested by Annex C of POSIX 1003.1b. */
+	int	sival_int;
+	void	*sival_ptr;
+};
+```
+
+传递信号时，在si_value.sival_int传递一个整型或si_value.sival_ptr传递一个指针，SIGCHLD包含的si_code：
+
+```
+#define	CLD_EXITED	1	/* [XSI] child has exited */
+#define	CLD_KILLED	2	/* [XSI] terminated abnormally, no core file */
+#define	CLD_DUMPED	3	/* [XSI] terminated abnormally, core file */
+#define	CLD_TRAPPED	4	/* [XSI] traced child has trapped */
+#define	CLD_STOPPED	5	/* [XSI] child has stopped */
+#define	CLD_CONTINUED	6	/* [XSI] stopped child has continued */
+```
+
+若信号是SIGCHLD，则设置si_pid, si_status和si_uid字段，若信号时SIGBUS、SIGILL、SIGFPE或SIGSEGV，则si_addr包含造成故障的根源地址，该地址可能并不准确
+
+context是无类型参数，可被强制转为ucontext_t结构类型，用于标识信号传递时进程上下文
