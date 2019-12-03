@@ -32,3 +32,33 @@
 volatile sig_atomic_t flag;
 ```
 
+##### 终止信号处理函数的其他方法
+
+1. 使用_exit ，不要使用exit，因为不安全，它会刷新stdio缓冲区
+2. 使用kill发送信号杀掉进程
+3. 执行非本地跳转
+
+如果使用longjmp函数从信号处理函数中退出存在一个问题：BSD中，进入信号处理函数时，内核自动将引发调用的信号以及由act.sa_mask指定的任意信号添加到进程的信号掩码中，并在处理函数正常返回时再将它们从掩码中删除；System V以及Linux中，退出信号处理函数时longjmp不会将信号掩码恢复（通常这并不是希望的行为），鉴于此，POSIX定义了两个新函数，针对执行非本地跳转时对信号掩码进行显示控制：
+
+```
+#include <setjmp.h>
+
+int sigsetjmp(sigjmp_buf env, int savemask);
+// 若直接调用则返回0，若从siglongjmp调用返回则返回非0值
+
+void siglongjmp(sigjmp_buf env, int val);
+
+// 若savemask非0，则sigsetjmp在env中保存进程的当前信号屏蔽字，调用siglongjmp从其中恢复保存的信号屏蔽字
+// 若savemask是0，则不会保存和恢复进程的信号屏蔽字
+```
+
+4. 使用abort终止进程并产生核心转储文件
+
+```
+#include <stdlib.h>
+
+void abort(void);
+// 将SIGABRT信号发送给调用进程，进程不应忽略此信号，此信号的默认动作是终止进程并产生核心转储文件
+// 无论忽略或阻塞SIGABRT信号，abort调用都不受影响，除非进程捕获此信号后信号处理函数尚未返回，否则必须终止进程
+```
+
