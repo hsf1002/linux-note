@@ -84,3 +84,55 @@ SIGSEGV处理函数的工作不是在执行清理工作后终止进程，就是�
 
 * SS_ONSTACK：进程正在备选栈上运行，此时调用sigaltstack来创建将会产生一个错误EPERM
 * SS_DISABLE：在old_sigstack上返回，表示当前不存在已创建的备选信号栈，如果在sigstack指定，则会禁用当前以及创建的备选信号栈
+
+##### SA_SIGINFO标志
+
+如果在sigaction创建时设置了SA_SIGINFO标志，收到信号时处理函数可以获取该信号的一些附加信息，需要将处理器声明为：
+
+```
+void handler(int signo, siginfo_t *siginfo, void *context);
+// context是无类型参数，可被强制转为ucontext_t结构类型，用于描述信号处理函数前的进程状态，包括一个进程信号掩码以及寄存器保存值，如CP和SP
+
+typedef struct __siginfo 
+{
+	int	si_signo;		/* 信号编号 */
+	int	si_errno;		/* 错误码 */
+	int	si_code;		/* 信号来源的深入信息 */
+	pid_t	si_pid;			/* 发送进程的PID */
+	uid_t	si_uid;			/* 发送进程的真实用户ID */
+	int	si_status;		/* 子进程的退出状态 */
+	void	*si_addr;		/* 针对硬件产生的SIGBUS和SIGSEGV表示引发无效内存的地址，对于SIGILL和SIGFPE而言，表示信号产生的程序指令地址 */
+	union sigval si_value;		/* 伴随数据 */
+	long	si_band;		/* IO事件相关的“带事件“值 */
+	unsigned long	__pad[7];	/* Reserved for Future Use */
+} siginfo_t;
+
+union sigval {
+	/* Members as suggested by Annex C of POSIX 1003.1b. */
+	int	sival_int;
+	void	*sival_ptr;
+};
+
+struct sigaction{
+  union
+  {
+    void (*sa_handler)(int);
+    void (*sa_sigaction)(int, siginfo_t*, void*);
+  }
+  sigset_t sa_mask;
+  int sa_flag;
+  void (*sa_restorer)(void) 
+};
+// sa_handler和sa_sigaction只能设置其一
+
+sa_flag的选项：
+SA_INTERRUPT: 由此信号中断的系统调用不自动重启动
+SA_NOCLDSTOP: 若signo是SIGCHLD，当子进程停止，不产生此信号，当子进程终止，仍旧产生此信号，若已设置此标志，当停止的进程继续运行时，不产生SIGCHLD信号
+SA_NOCLDWAIT:若signo是SIGCHLD，当调用进程的子进程终止时，不创建僵死进程，当调用进程随后调用wait，则阻塞到它所有子进程都终止
+SA_NODEFER: 当捕捉到此信号执行其信号处理函数时，系统不自动阻塞此信号，应用于早期不可靠信号
+SA_ONSTACK: XSI
+SA_RESETHAND: ...
+SA_RESTART: 由此信号中断的系统调用自动重启动
+SA_SIGINFO: 对信号处理程序提供了附加信息：一个指向siginfo的指针以及指向上下文的context指针
+```
+
