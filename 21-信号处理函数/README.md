@@ -62,3 +62,25 @@ void abort(void);
 // 无论忽略或阻塞SIGABRT信号，abort调用都不受影响，除非进程捕获此信号后信号处理函数尚未返回，否则必须终止进程
 ```
 
+##### 在备选栈中处理信号：sigaltstack
+
+在调用信号处理函数时，内核通常会在进程栈中为其创建一帧，如果栈的大小到了RLIMIT_STACK，内核将为该进程产生SIGSEGV信号，而栈空间已经耗尽，内核无法再为进程已经安装的SIGSEGV处理函数创建帧，处理函数将得不到调用，进程就终止了；可以利用sigaltstack创建一个备选信号栈：
+
+```
+#include <signal.h>
+
+int sigaltstack(const stack_t *sigstack, stack_t *old_sigstack);
+// 返回值：若成功，返回0，若出错，返回-1
+
+typedef struct
+{
+    void *ss_sp;	// 备选栈的起始地址
+    int ss_flags; // SS_ONSTACK, SS_DISABLE
+    size_t ss_size; // 备选栈大小
+}stack_t;
+```
+
+SIGSEGV处理函数的工作不是在执行清理工作后终止进程，就是使用非本地跳转解开标准栈，ss_flags的取值：
+
+* SS_ONSTACK：进程正在备选栈上运行，此时调用sigaltstack来创建将会产生一个错误EPERM
+* SS_DISABLE：在old_sigstack上返回，表示当前不存在已创建的备选信号栈，如果在sigstack指定，则会禁用当前以及创建的备选信号栈
