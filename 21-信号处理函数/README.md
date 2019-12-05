@@ -136,3 +136,60 @@ SA_RESTART: 由此信号中断的系统调用自动重启动
 SA_SIGINFO: 对信号处理程序提供了附加信息：一个指向siginfo的指针以及指向上下文的context指针
 ```
 
+##### 系统调用的中断和重启
+
+系统调用阻塞如read时，如果进程接收到信号并调用信号处理函数，从信号处理返回，将导致系统调用失败，并将errno置为EINTR，可手动重启系统调用：
+
+```
+while ((cnt = read(fd, buf, BUF_SIZE)) == -1 && errno == EINTR)
+  continue;
+
+if (cnt == -1)
+  perror("read error");
+```
+
+但这种处理方式需要对每个阻塞的系统调用添加代码，很麻烦，可以调用指定了SA_RESTART标志的sigaction来创建信号处理函数，让内核代表进程自动重启系统调用，无需处理系统调用可能返回的EINTR错误，该标志针对信号而言，即允许某些信号的处理函数中断阻塞的系统调用，而其他系统调用则可以自动重启
+
+SA_RESTART标志对哪些系统调用（和库函数）有效：
+
+linux中以下阻塞的系统调用（以及在此基础上构建的库函数）遭到中断时可以自动重启：
+
+* 等待子进程的系统调用：wait、waitpid、wait3、wait4、waittid
+* 访问慢速设备时的IO系统调用：read、readv、write、writev、ioctl
+* 系统调用open
+* 套接字的各种系统调用：accept、accept4、connect、send、sendmsg、sendto、recv、recvfrom、recvmsg，如果使用setsockopt设置超时，这些系统调用不会自动重启
+* POSIX消息队列进行IO操作的系统调用：mq_receive、mq_timedreceive、mq_send、mq_timedsend
+* 用于设置文件锁的系统调用：flock、fcntl、lockf
+* Linux特有的系统调用futex的FUTEX_WAIT操作
+* 用于递减POSIX信号量的sem_wait和sem_timedwait
+* 用于同步POSIX线程的函数：pthread_mutex_lock、pthread_mutex_trylock、pthread_mutex_timedlock、pthread_cond_wait、pthread_cond_timedwait
+
+linux中以下阻塞的系统调用（以及在此基础上构建的库函数）遭到中断时不会自动重启：
+
+* poll、ppoll、select、pselect这些IO多路复用调用
+* Linux特有的epoll_wait和epoll_pwait系统调用
+* Linux特有的io_getevents系统调用
+* 操作System V消息队列和信号的阻塞系统调用：semop、semtimedop、msgrcv、msgsnd
+* 对inotify文件描述符发起的read调用
+* 用于将进程挂起指定时间的系统调用和库函数：sleep、nanosleep、clock_nanosleep
+* 特意设计用来等待某一信号到达的系统调用：pause、sigsuspend、sigtimedwait、sigwaitinfo
+
+为信号修改SA_RESTART标志：
+
+```
+#include <signal.h>
+
+int sigintertupt(int signo, int flag);
+// 返回值：若成功，返回0，若出错，返回-1
+
+// 若flag是真，针对信号signo处理函数将中断阻塞的系统调用，如是假，信号处理函数结束后自动重启阻塞的系统调用
+// 该接口SUSv4已经废止，推荐使用sigaction
+```
+
+对于某些Linux系统调用，未处理的停止信号会产生EINTR错误：
+
+Linux上，即使没有信号处理函数，某些阻塞的系统调用也会产生EINTR错误，如果系统调用遭到阻塞，并且进程因信号（SIGSTOP、SIGTSTP、SIGTTIN、SIGTTOU）而停止，之后又收到SIGCONT信号恢复执行时，就会发生这种错误，如下的系统调用和库函数具有这一行为：
+
+* epoll_pwait、epoll_wait、对inotify的文件描述符执行read、semop、semtimedop、sigwaitinfo、sigtimedwait
+
+这种行为的结果是程序因为信号而停止和重启，需要添加代码来重新启动这些系统调用，即使程序并未停止信号设置信号处理函数
