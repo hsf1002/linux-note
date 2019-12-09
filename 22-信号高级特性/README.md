@@ -105,4 +105,55 @@ RLIMIT_SIGPENDING：限制了可排对的信号总数
 
 1. 发送进程使用sigqueue系统调用发送信号及其伴随数据，kill、killpg、raise也可以发送，但不能保证排序
 2. 要为该信号建立信号处理函数，接收进程应以SA_SIGINFO标志发起对sigacton的调用
+3. 在sigaction结构的sa_sigacton而不是通常的sa_handler提供信号处理程序
+
+发送实时信号：
+
+```
+#include <signal.h>
+
+int sigqueue(pid_t pid, int signo, const union sigval value);
+// 若成功，返回0，若出错，返回-1，一旦超过排队限制，将调用失败，置errno为EAGAIN
+// 只能把信号发送给单个进程，可以使用value传递整型或指针，发送的信号不能被无限排队，最大为SIGQUEUE_MAX
+
+union
+{
+    int sival_int;   // 伴随数据之整型
+    void *sival_ptr; // 伴随数据之指针，很少使用
+}
+```
+
+处理实时信号：
+
+```
+struct sigaction act;
+
+sigemptyset(&act.sa_mask);
+act.sa_sigaction = handler;
+act.sa_flags = SA_RESTART | SA_SIGINFO;
+
+if (sigaction(SIGRTMIN + 5, &act, NULL) == -1)
+    perror("sigaction error");
+```
+
+一旦使用SA_SIGINFO标志，信号处理函数的第二个参数必须是一个siginfo_t结构，包含实时信号的附加信息：
+
+```
+typedef struct __siginfo 
+{
+	int	si_signo;		/* 信号编号 */
+	int	si_errno;		/* 错误码 */
+	int	si_code;		/* 信号来源的深入信息 */
+	pid_t	si_pid;			/* 发送进程的PID */
+	uid_t	si_uid;			/* 发送进程的真实用户ID */
+	int	si_status;		/* 子进程的退出状态 */
+	void	*si_addr;		/* 针对硬件产生的SIGBUS和SIGSEGV表示引发无效内存的地址，对于SIGILL和SIGFPE而言，表示信号产生的程序指令地址 */
+	union sigval si_value;		/* 伴随数据 */
+	long	si_band;		/* IO事件相关的“带事件“值 */
+	unsigned long	__pad[7];	/* Reserved for Future Use */
+} siginfo_t;
+
+```
+
+
 
