@@ -27,10 +27,10 @@ static void
 siginfo_handler(int signo, siginfo_t *s, void *ucontext)
 {
     if (signo == SIGINT || signo == SIGTERM)
+    {
         all_done = 1;
-    
-    return;
-
+        return;
+    }
     sig_cnt++;
 
     printf("caught signal: %d\n", signo);
@@ -47,6 +47,52 @@ siginfo_handler(int signo, siginfo_t *s, void *ucontext)
  * 接收处理发送实时信号
  * 
  
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./catch_rtsigs 80 &
+[1] 21074
+// 准备接收信号
+hefeng@sw-hefeng:/home/workspace1/logs/test$ ./catch_rtsigs: pid is 21074
+// 有四个信号不允许注册信号处理函数
+sigaction error: Invalid argument
+sigaction error: Invalid argument
+sigaction error: Invalid argument
+sigaction error: Invalid argument
+./catch_rtsigs: signals blocked - sleeping 80 seconds
+
+hefeng@sw-hefeng:/home/workspace1/logs/test$ 
+// 发送三个编号为40的信号，伴随数据是100
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 21074 40 100 3
+./sigqueue PID: 21076, UID: 1000
+// 发送一个编号为41的信号，伴随数据是200
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 21074 41 200
+./sigqueue PID: 21078, UID: 1000
+// 发送一个编号为42的信号，伴随数据是300
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 21074 42 300
+./sigqueue PID: 21080, UID: 1000
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ ./catch_rtsigs: sleep completed
+// 依次接收信号
+caught signal: 40
+, s_signo = 40, s_code = -1 (SI_QUEUE), s_value = 101
+    s_pid = 21076, s_uid = 1000 
+caught signal: 40
+, s_signo = 40, s_code = -1 (SI_QUEUE), s_value = 101
+    s_pid = 21076, s_uid = 1000 
+caught signal: 40
+, s_signo = 40, s_code = -1 (SI_QUEUE), s_value = 101
+    s_pid = 21076, s_uid = 1000 
+caught signal: 41
+, s_signo = 41, s_code = -1 (SI_QUEUE), s_value = 201
+    s_pid = 21078, s_uid = 1000 
+caught signal: 42
+, s_signo = 42, s_code = -1 (SI_QUEUE), s_value = 301
+    s_pid = 21080, s_uid = 1000 
+
+hefeng@sw-hefeng:/home/workspace1/logs/test$ ps|grep catch
+21074 pts/22   00:00:00 catch_rtsigs
+// 继续发送SIGINT或SIGTERM信号终止进程
+hefeng@sw-hefeng:/home/workspace1/logs/test$ kill -15 21074 (kill -2 21074)
+hefeng@sw-hefeng:/home/workspace1/logs/test$ ps|grep catch
+[1]+  已完成               LD_LIBRARY_PATH=. ./catch_rtsigs 80
+hefeng@sw-hefeng:/home/workspace1/logs/test$ ps|grep catch
 
  */
 int

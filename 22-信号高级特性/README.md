@@ -152,8 +152,40 @@ typedef struct __siginfo
 	long	si_band;		/* IO事件相关的“带事件“值 */
 	unsigned long	__pad[7];	/* Reserved for Future Use */
 } siginfo_t;
-
 ```
 
+##### 使用掩码来等待信号：sigsuspend
 
+场景：
+
+1. 临时阻塞一个信号，防止其信号处理函数不会将某些关键代码片段中断
+2. 解除对此信号的阻塞，暂停执行，直到有信号到达
+
+要达到此目的，需要将解除信号阻塞和挂起进程两个动作封装为一个原子操作：
+
+```
+#include <signal.h>
+
+int sigsuspend(const sigset_t *sigmask);
+// 总是返回-1，且将errno设置为EINTR
+
+// 1. 进程的信号屏蔽字设置为sigmask
+// 2. 在捕捉到一个信号或发生了一个会终止该进程的信号之前，该进程被挂起
+// 3. 如果捕捉到一个信号且从该信号处理函数返回，则sigsuspend返回，且该进程的信号屏蔽字设置为调用sigsuspend之前的值
+```
+
+相当于以不可中断方式执行如下操作：
+
+```
+sigprocmask(SIG_SETMASK, &block_mask, &prev_mask) // assign new mask
+pause();
+sigprocmask(SIG_SETMASK, &prev_mask, NULL)  // restore old mask
+```
+
+主要用途：
+
+* 保护代码临界区，使其不被特定信号中断
+
+- 等待一个信号处理程序设置一个全局变量
+- 实现父进程、子进程之间的同步
 
