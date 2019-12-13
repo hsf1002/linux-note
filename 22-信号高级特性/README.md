@@ -189,3 +189,24 @@ sigprocmask(SIG_SETMASK, &prev_mask, NULL)  // restore old mask
 - 等待一个信号处理程序设置一个全局变量
 - 实现父进程、子进程之间的同步
 
+##### 以同步方式等待信号
+
+作为sigsuspend的替代方案，使用更为简单：
+
+```
+#include <signal.h>
+
+int sigwaitinfo(const sigset_t *set, siginfo_t *info);
+// 返回值：若成功，返回发送的信号个数，若出错，返回-1
+// 调用会挂起进程，直至set信号集中某个信号到达，如果该信号处于等待状态，则立即返回
+// info若不为空，包含信号与信号处理函数中的参数相同
+// 不对标准信号排序，仅对实时信号排序，且遵循低编号优先
+// 调用sigwaitinfo而不阻塞set中的信号将导致不可预知的行为
+```
+
+```
+int sigtimedwait(const sigset_t *set, siginfo_t *info, const struct timespec *timeout);
+// 返回值：若成功，返回发送的信号个数，若出错或超时，返回-1
+// 如果将timeout的两个字段都指定为0，则立刻超时返回，如果将timeout指定为NULL，则等同于sigwaitinfo
+```
+
