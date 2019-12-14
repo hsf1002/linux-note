@@ -203,3 +203,19 @@ SIGEV_THREAD：通知进程在一个新的线程中启动sigev_notify_function�
 SIGEV_THREAD_ID：发送sigev_signo信号给sigev_notify_thread_id标识的线程
 ```
 
+配备和解除定时器：
+
+```
+int timer_settime(timer_t timerid, int flags, const struct itimerspec *value, const struct itimerspec *old_value);
+// 返回值：若成功，返回0，若出错，返回-1
+// 若flags为0，将value.it_value视为始于timer_settime调用时间点的相对值
+// 若flags为TIMER_ABSTIME，那么value.it_value是一个绝对时间
+// 要解除定时器，需要将value.it_value所有字段设置为0
+
+struct itimerspec
+{
+    struct timespec it_interval; //定时器周期值
+    struct timespec it_value;    //定时器到期值
+};
+```
+
