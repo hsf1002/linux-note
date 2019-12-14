@@ -232,3 +232,45 @@ int signalfd(int fd, const sigset *mask, int flags);
 * 没有对标准信号进行排序，对于实时信号，存在排队数量限制
 * 信号所携带的信号量有限，一个字节，过低的带宽使得信号传输极为缓慢
 
+##### 早期的信号API（System V和BSD）
+
+System V信号API：
+
+```
+#define _XOPEN_SOURCE 500
+
+#include <signal.h>
+
+void (*sigset(int signo, void (*handler)(int)))(int);
+// 返回值：若成功，返回上一次的信号处置，如果信号被阻塞，返回SIG_HOLD，若出错，返回-1
+// handler的参数可以是SIG_IGN、SIG_DFL或信号处理函数的地址，或指定为SIG_HOLD，将信号添加到信号屏蔽字而保持信号处置不变
+
+int sighold(int signo);  // 添加
+int sigrelse(int signo); // 移除
+int sigignore(int signo);// 设定某一信号的处置为忽略
+// 返回值：若成功，返回0，若出错，返回-1
+
+int sigpause(ing signo); // 类似sigsuspend
+// 总是返回-1，同时置errno为EINTR
+```
+
+BSD信号API：
+
+```
+#define _BSD_SOURCE
+#include <signal.h>
+
+int sigvec(int signo, struct sigvec *vec, struct sigvec *ovec); // 类似sigaction
+// 返回值：若成功，返回0，若出错，返回-1
+
+int sigblcok(int mask);  // 类似sigprocmask的SIG_BLOCK
+int sigsetmask(int mask);// 类似sigprocmask的SIG_SETMASK
+// 返回值：都返回上个信号屏蔽字
+
+int sigpause(int sigmask);
+// 总是返回-1，同时置errno为EINTR
+
+int sigmask(int sig);   // 类似sigsuspend，与System V具有不同的调用签名
+// 将信号编号转换为相应的32位掩码值
+```
+
