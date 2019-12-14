@@ -65,3 +65,34 @@ unsigned int alarm(unsigned int seconds);
 4. 系统调用返回后，再次调用alarm或setitimer屏蔽定时器
 5. 检查系统调用失败时是否将errno置为了EINTR（系统调用遭到中断）
 
+##### 暂停运行（休眠）一段时间
+
+低分辨率休眠：
+
+```
+#include <unistd.h>
+
+unsigned int sleep(unsigned int seconds);
+// 返回值：若成功，返回0，若因信号中断，返回剩余秒数
+// Linux将sleep实现为对nanosleep的调用
+```
+
+高分辨率休眠：
+
+```
+#define _POSIX_C_SOURCE 199309
+#include <time.h>
+
+int nanosleep(const struct timespec *request, struct timespec *remain);
+// 返回值：若成功，返回0，若出错或被中断，返回-1
+// 若参数remain不是NULL，则其返回剩余的休眠时间，可利用该值在系统调用重启后完成休眠
+// SUSv3明确规定不得使用信号实现该函数，意味着可以与alarm和setitimer混用，而不会危及移植性
+// 可以通过信号处理函数将其中断，此时返回-1，errno置为EINTR
+
+struct timespec
+{
+    time_t tv_sec;
+    long tv_nsec;  // 纳秒级别
+}
+```
+
