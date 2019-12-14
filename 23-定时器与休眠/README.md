@@ -96,3 +96,63 @@ struct timespec
 }
 ```
 
+##### POSIX时钟
+
+Linux中，调用此API需要以-lrt选项进行编译，从而与librt函数库链接
+
+获取时钟的值：
+
+```
+#define _POSIX_C_SOURCE 199309
+#include <time.h>
+
+int clock_gettime(clcokid_t clockid, struct timespec *tp);
+int clock_getres(clockid_t clockid, struct timespec *res);
+// 返回值：若成功，返回0，若出错，返回-1
+// clockid的类型：
+CLOCK_REALTIME：可设定的系统级实时时钟
+CLOCK_MONOTONIC：不可设定的恒定态时钟（适用于无法忍受系统时钟发生跳跃性变化）
+CLOCK_PROCESS_CPUTIME_ID：进程CPU时间的时钟
+CLOCK_THREAD_CPUTIME_ID：线程CPU时间的时钟
+```
+
+设置时钟的值：
+
+```
+int clock_settime(clcokid_t clockid, const struct timespec *tp);
+// 返回值：若成功，返回0，若出错，返回-1
+// 特权级进程可设置CLOCK_REALTIME类型时钟
+```
+
+获取特定进程的时钟ID：
+
+```
+#define _XOPEN_SOURCE 600
+#include <time.h>
+
+int clock_getcpuclockid(pid_t pid, clockid_t *clockid);
+// 返回值：若成功，返回0，若出错，返回负值
+// pid为0时，返回调用进程的CPU时间时钟ID
+```
+
+获取特定线程的时钟ID：
+
+```
+#define _XOPEN_SOURCE 600
+#include <time.h>
+#include <pthread.h>
+
+int pthread_getcpuclockid(pthread_t tid, clockid_t *clockid);
+// 返回值：若成功，返回0，若出错，返回负值
+```
+
+高分辨率休眠的改进版：clock_nanosleep
+
+```
+#define _XOPEN_SOURCE 600
+#include <time.h>
+
+int clock_nanosleep(clcokid_t clockid, int flags, const struct timespec *request, struct timespec *remain);
+// 返回值：若成功，返回0，若出错，返回负值
+```
+
