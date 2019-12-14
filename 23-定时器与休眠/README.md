@@ -239,3 +239,7 @@ int timer_delete(timer_t timerid);
 // 当进程终止时，会自动删除所有定时器
 ```
 
+通过信号发出通知：
+
+如果要用信号来接收定时器通知，处理信号既可以选择信号处理函数（注册时须注明SA_SIGINFO标志），也可以使用sigwaitinfo或sigtimedwait，借助这两个方法可以获取siginfo_t结构，除了si_signo、si_code、si_value之外，Linux还提供了非标准字段si_overrun表示定时器溢出个数
+
