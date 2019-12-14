@@ -156,3 +156,50 @@ int clock_nanosleep(clcokid_t clockid, int flags, const struct timespec *request
 // 返回值：若成功，返回0，若出错，返回负值
 ```
 
+##### POSIX间隔定时器
+
+使用setitimer来设置经典UNIX间隔定时器，有些制约：
+
+* 类型只能是ITIMER_REAL、ITIMER_VIRTUAL、ITIMER_PROF的一个
+* 只能通过发送信号方式通知定时器到期，也不能改变到期时产生的信号
+* 如果一个间隔定时器到期多次，且相应信号遭到阻塞，只会调用一次信号处理函数，无法确定定时器溢出情况
+* 定时器分辨率只能到达微秒级
+
+为了突破这些限制，可使用Linux定义的实现了POSIX.1b的一套API，需要编译时添加-lrt选项，由fork创建的子进程不会继承POSIX定时器，调用exec期间或进程终止时将停止并删除定时器
+
+创建定时器：
+
+```
+#define _POSIX_C_SOURCE 199309
+#include <time.h>
+#include <signal.h>
+
+int timer_create(clockid_t clockid, struct sigevent *evp, timer_t *timerid);
+// 返回值：若成功，返回0，若出错，返回-1
+// clockid是CLOCK_REALTIME、CLOCK_MONOTONIC、CLOCK_PROCESS_CPUTIME_ID、CLOCK_THREAD_CPUTIME_ID、CLOCK_BOOTTIME、CLOCK_REALTIME_ALARM、CLOCK_BOOTTIME_ALARM的一种
+// 返回时将定时器句柄保存在timerid，供后续调用
+// 参数evp决定到期时程序的通知方式，若是NULL，表明将sigev_notify置为SIGEV_SIGNAL，同时将sigev_signo置为SIGALRM，并将sigev_value.sival_int置为定时器ID
+
+union sigval 
+{          
+ 	  int  sival_int;         /* 通知时的伴随数据：Integer value */
+    void  *sival_ptr;       /* 通知时的伴随数据：Pointer value */
+};
+
+struct sigevent 
+{
+	  int sigev_notify; /* 通知方式 */
+    int sigev_signo;  /* 通知信号 */
+    union sigval sigev_value;  /* 通知时的伴随数据 */
+    
+    void (*sigev_notify_function) (union sigval);/* SIGEV_THREAD通知时调用的函数 */
+    void *sigev_notify_attributes;/* 线程属性 */
+    pid_t sigev_notify_thread_id; /* 线程ID，可用gettid或clone的返回值赋值 */
+};
+
+SIGEV_NONE：空的提醒，事件发生时不做任何事情
+SIGEV_SIGNAL：向进程发送sigev_signo中指定的信号
+SIGEV_THREAD：通知进程在一个新的线程中启动sigev_notify_function函数，函数的实参是sigev_value
+SIGEV_THREAD_ID：发送sigev_signo信号给sigev_notify_thread_id标识的线程
+```
+
