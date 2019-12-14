@@ -210,3 +210,17 @@ int sigtimedwait(const sigset_t *set, siginfo_t *info, const struct timespec *ti
 // 如果将timeout的两个字段都指定为0，则立刻超时返回，如果将timeout指定为NULL，则等同于sigwaitinfo
 ```
 
+##### 通过文件描述符来获取信号
+
+signalfd是Linux提供的非标准系统调用，可以创建一个特殊的文件描述符，发送给进程的信号都可以从此读取，为同步接收信号提供了sigwaitinfo之外的另一种选择：
+
+```
+#include <sys/signalfd.h>
+
+int signalfd(int fd, const sigset *mask, int flags);
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+// 如同sigwaitinfo一样，通常也应该调用sigprocmask阻塞mask中的信号，确保有机会读取这些信号前，不会按默认处置
+// 如果指定fd为-1，会创建一个新的文件描述符，用于读取mask中的信号，否则将修改与fd相关的mask值
+// flag可以指定为SFD_CLOEXEC或SFD_NONBLOCK
+```
+
