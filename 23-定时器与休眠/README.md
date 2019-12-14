@@ -229,3 +229,13 @@ int timer_settime(timer_t timerid, struct itimerspec *curr_value);
 // 若curr_value.it_interval两个字段都是0，那么定时器仅在curr_value.it_value指定的时间到期一次
 ```
 
+删除定时器：
+
+```
+int timer_delete(timer_t timerid);
+// 返回值：若成功，返回0，若出错，返回-1
+// 对于已经启动的定时器，删除前会自动停止
+// 若因定时器到期已经存在待定pending信号，那么信号保持这个状态
+// 当进程终止时，会自动删除所有定时器
+```
+
