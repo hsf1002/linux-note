@@ -264,3 +264,40 @@ int timer_getoverrun(timer_t timerid);
 通过线程来通知：
 
 SIGEV_THREAD标志允许程序从一个独立的线程中调用函数获取定时器到期通知
+
+##### 利用文件描述符进行通知的定时器：timerfd API
+
+Linux特有的timerfd API，可以从文件描述符中读取创建定时器的到期通知，也可以使用select、poll和epoll将这种文件描述符和其他描述符一起监控，所以非常实用
+
+创建定时器：
+
+```
+#include <sys/timerfd.h>
+
+int timerfd_create(int clockid, int flags);
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+// clockid支持CLOCK_REALTIME（系统实时时间,随系统实时时间改变而改变,即从UTC1970-1-1 0:0:0开始计时,中间时刻如果系统时间被用户改成其他,则对应的时间相应改变）、CLOCK_MONOTONIC（从系统启动这一刻起开始计时,不受系统时间被用户改变的影响）
+// flags支持TFD_CLOEXEC和TFD_NONBLOCK
+```
+
+启动或停止定时器：
+
+```
+int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+// 参数flags为1代表设置的是绝对时间（TFD_TIMER_ABSTIME 表示绝对定时器）,为0代表相对时间
+// 如果不关心定时器前一设置，可将old_value置为NULL
+// 一旦启动了定时器，就可以通过read读取定时器信息
+```
+
+获取定时器信息：
+
+```
+int timerfd_gettime(int fd, struct itimerspec *curr_value);
+// 返回值：若成功，返回文件描述符，若出错，返回-1
+// curr_value.it_value表示距离下次超时的时间，如果两个值为0，表示计时器已经解除
+// curr_value.it_interval表示间隔时间，如果两个值都是0，表示定时器只会到期一次
+```
+
+调用fork期间，子进程会继承timerfd_create所创建文件描述符的拷贝，这些文件描述符也能跨域exec得以保存（除非设置了运行时关闭标志）
+
