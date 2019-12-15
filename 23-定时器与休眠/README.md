@@ -261,3 +261,6 @@ int timer_getoverrun(timer_t timerid);
 // 属于异步信号安全函数
 ```
 
+通过线程来通知：
+
+SIGEV_THREAD标志允许程序从一个独立的线程中调用函数获取定时器到期通知
