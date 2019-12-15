@@ -243,3 +243,21 @@ int timer_delete(timer_t timerid);
 
 如果要用信号来接收定时器通知，处理信号既可以选择信号处理函数（注册时须注明SA_SIGINFO标志），也可以使用sigwaitinfo或sigtimedwait，借助这两个方法可以获取siginfo_t结构，除了si_signo、si_code、si_value之外，Linux还提供了非标准字段si_overrun表示定时器溢出个数
 
+定时器溢出：
+
+如果选择信号通知，在捕获或接收信号之前，定时器到期多次，可能是因为进程再次获得调度前的延迟所致；即使使用实时信号，也不会对该信号的多个实例进行排队，相反，接收信号后，不管通过信号处理函数还是sigwaitinfo都可以获取定时器溢出个数，有两种方式获取：
+
+* 调用timer_getoverrun，这是SUSv3指定的方法
+* 伴随数据siginfo_t中的si_overrun字段，这是Linux的扩展方法，无法移植
+
+每次收到定时器信号后，都会重置定时器溢出计数，若自处理或接收定时器信号后，定时器仅到期一次，则溢出计数为0，即无溢出
+
+```
+#define _POSIX_C_SOURCE 199309
+#include <time.h>
+
+int timer_getoverrun(timer_t timerid);
+// 返回值：若成功，返回溢出计时器个数，若出错，返回-1
+// 属于异步信号安全函数
+```
+
