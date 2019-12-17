@@ -25,16 +25,19 @@
 static void
 itimerspec_from_str(const char *str, struct itimerspec *tsp)
 {
+    char *dupstr;
     char *cptr;
     char *sptr;
 
-    if (NULL != (cptr = strchr(str, ':')))
+    dupstr = strdup(str);
+
+    if (NULL != (cptr = strchr(dupstr, ':')))
         *cptr = '\0';
     
-    if (NULL != (sptr = strchr(str, '/')))
-        *cptr = '\0';
+    if (NULL != (sptr = strchr(dupstr, '/')))
+        *sptr = '\0';
     
-    tsp->it_value.tv_sec = atoi(str);
+    tsp->it_value.tv_sec = atoi(dupstr);
     tsp->it_value.tv_nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
 
     if (NULL == cptr)
@@ -47,8 +50,8 @@ itimerspec_from_str(const char *str, struct itimerspec *tsp)
         if (NULL != (sptr = strchr(cptr, '/')))
             *sptr = '\0';
 
-        tsp->it_interval.sec = atoi(cptr + 1);
-        tsp->it_interval.nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
+        tsp->it_interval.tv_sec = atoi(cptr + 1);
+        tsp->it_interval.tv_nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
     }
 }
 
@@ -56,14 +59,14 @@ itimerspec_from_str(const char *str, struct itimerspec *tsp)
  * 
  */
 static void
-handler(int signo, siginfo_t si, void *uc)
+handler(int signo, siginfo_t *si, void *uc)
 {
     timer_t *tidptr;
 
     tidptr = si->si_value.sival_ptr;
 
-    printf("[%s] got signal %d \n", currTime("%T"), signo);
-    printf("    *sival_ptr         = %ld\n", (long)*tidptr)；
+    printf("[%s] got signal %d \n", curr_time("%T"), signo);
+    printf("    *sival_ptr         = %ld\n", (long)*tidptr);
     printf("    timer_getoverrun() = %ld\n", timer_getoverrun(*tidptr));
 }
 
@@ -72,14 +75,40 @@ handler(int signo, siginfo_t si, void *uc)
  *   
  * 
  * 使用信号进行POSIX定时器通知
- ./ptmr_sigev_signal 2:5 
+ * 编译要添加实时库：cc -g -Wall -o ptmr_sigev_signal ptmr_sigev_signal.c libcurtime.so -lrt
 
- Control+Z to suspend
+LD_LIBRARY_PATH=. ./ptmr_sigev_signal 1:3
+Timer ID: 21168208 (1:3) 
+[09:49:38] got signal 64 
+    *sival_ptr         = 21168208
+    timer_getoverrun() = 0
+[09:49:41] got signal 64 
+    *sival_ptr         = 21168208
+    timer_getoverrun() = 0
+[09:49:44] got signal 64 
+    *sival_ptr         = 21168208
+    timer_getoverrun() = 0
+[09:49:47] got signal 64 
+    *sival_ptr         = 21168208
+    timer_getoverrun() = 0
+^Z
+[2]+  已停止               LD_LIBRARY_PATH=. ./ptmr_sigev_signal 1:3
 
- fg
-
-
-
+fg
+LD_LIBRARY_PATH=. ./ptmr_sigev_signal 1:3
+[09:50:06] got signal 64 
+    *sival_ptr         = 21168208
+    timer_getoverrun() = 5
+[09:50:08] got signal 64 
+    *sival_ptr         = 21168208
+    timer_getoverrun() = 0
+[09:50:11] got signal 64 
+    *sival_ptr         = 21168208
+    timer_getoverrun() = 0
+[09:50:14] got signal 64 
+    *sival_ptr         = 21168208
+    timer_getoverrun() = 0
+^C
  */
 int
 main(int argc, char *argv[])    
@@ -98,7 +127,7 @@ main(int argc, char *argv[])
 
     // 带此标志信号处理函数才能带3个参数
     sa.sa_flags = SA_SIGINFO;
-    sa.__sigaction_u = handler;
+    sa.sa_handler = handler;
     sigemptyset(&sa.sa_mask);
     // 为实时信号注册信号处理函数
     if (-1 == sigaction(TIMER_SIG, &sa, NULL))
@@ -134,4 +163,3 @@ main(int argc, char *argv[])
 
     exit(EXIT_SUCCESS);
 }
-
