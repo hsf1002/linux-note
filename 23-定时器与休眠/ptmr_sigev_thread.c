@@ -11,8 +11,8 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <time.h>
-#include <sys/time.h>
 #include <pthread.h>
+#include <sys/time.h>
 #include "cur_time.h"
 
 
@@ -29,16 +29,19 @@ static int exprire_cnt = 0;
 static void
 itimerspec_from_str(const char *str, struct itimerspec *tsp)
 {
+    char *dupstr;
     char *cptr;
     char *sptr;
 
-    if (NULL != (cptr = strchr(str, ':')))
+    dupstr = strdup(str);
+
+    if (NULL != (cptr = strchr(dupstr, ':')))
         *cptr = '\0';
     
-    if (NULL != (sptr = strchr(str, '/')))
-        *cptr = '\0';
+    if (NULL != (sptr = strchr(dupstr, '/')))
+        *sptr = '\0';
     
-    tsp->it_value.tv_sec = atoi(str);
+    tsp->it_value.tv_sec = atoi(dupstr);
     tsp->it_value.tv_nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
 
     if (NULL == cptr)
@@ -51,8 +54,8 @@ itimerspec_from_str(const char *str, struct itimerspec *tsp)
         if (NULL != (sptr = strchr(cptr, '/')))
             *sptr = '\0';
 
-        tsp->it_interval.sec = atoi(cptr + 1);
-        tsp->it_interval.nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
+        tsp->it_interval.tv_sec = atoi(cptr + 1);
+        tsp->it_interval.tv_nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
     }
 }
 
@@ -84,18 +87,53 @@ thread_fun(union sigval sv)
         perror("cond signal error");
 }
 
-
 /**
  *   
  * 
  * 使用线程函数进行POSIX定时器通知
- ./ptmr_sigev_thread 5:5 10:10
+ * 
+ * 编译要添加实时库：cc -g -Wall -o sigev_thread sigev_thread.c libcurtime.so -lrt
+ * 
+LD_LIBRARY_PATH=. ./ptmr_sigev_thread 1:3 
+Timer ID: 37208432 (1:3) 
+[10:00:58] Thread notify 
+    timer ID = 37208432
+    timer_getoverrun() = 0 
+main: expire cnt = 1 
+[10:01:01] Thread notify 
+    timer ID = 37208432
+    timer_getoverrun() = 0 
+main: expire cnt = 2 
+[10:01:04] Thread notify 
+    timer ID = 37208432
+    timer_getoverrun() = 0 
+main: expire cnt = 3 
+[10:01:07] Thread notify 
+    timer ID = 37208432
+    timer_getoverrun() = 0 
+main: expire cnt = 4 
+[10:01:10] Thread notify 
+    timer ID = 37208432
+    timer_getoverrun() = 0 
+main: expire cnt = 5 
+^Z
+[2]+  已停止               LD_LIBRARY_PATH=. ./ptmr_sigev_thread 1:3
 
- Control+Z to suspend
-
- fg
-
-Control+C to kill
+fg
+LD_LIBRARY_PATH=. ./ptmr_sigev_thread 1:3
+[10:01:31] Thread notify 
+    timer ID = 37208432
+    timer_getoverrun() = 5 
+main: expire cnt = 11 
+[10:01:31] Thread notify 
+    timer ID = 37208432
+    timer_getoverrun() = 0 
+main: expire cnt = 12 
+[10:01:34] Thread notify 
+    timer ID = 37208432
+    timer_getoverrun() = 0 
+main: expire cnt = 13 
+^C
 
  */
 int
@@ -104,6 +142,7 @@ main(int argc, char *argv[])
     struct itimerspec ts;
     struct sigevent sev;
     timer_t *tidlist;
+    int s;
 
     if (argc < 2)
         fprintf(stderr, "%s sec[/nsec][:int-sec][/int-nsec]...\n", argv[0]);
@@ -154,4 +193,3 @@ main(int argc, char *argv[])
 
     exit(EXIT_SUCCESS);
 }
-
