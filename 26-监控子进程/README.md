@@ -119,5 +119,45 @@ else
     ;
 ```
 
+wait3和wait4提供的功能比wait、waitpid、waitid要多一个，与附加参数有关，该参数允许内核返回由终止进程及所有子进程使用的资源概括
 
+```
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+ 
+pid_t wait3(int *status, int options,
+            struct rusage *rusage);
+pid_t wait4(pid_t pid, int *status, int options,
+            struct rusage *rusage);
+// 两个函数的返回值：若成功，返回进程ID，若出错，返回-1
+wait3等同于waitpid(-1, &status, option)，等待的是任意子进程
+wait4等同于waitpid(pid, &status, option)，等待的是一个或多个子进程
+```
+
+返回的资源信息包括：用户CPU时间总量、系统CPU时间总量、缺页次数、接收到信号的次数等
+
+```
+struct rusage 
+{
+    struct timeval ru_utime;
+    struct timeval ru_stime;
+    long   ru_maxrss;       
+    long   ru_ixrss;        
+    long   ru_idrss;        
+    long   ru_isrss;        
+    long   ru_minflt;       
+    long   ru_majflt;       
+    long   ru_nswap;        
+    long   ru_inblock;      
+
+    long   ru_oublock;      
+    long   ru_msgsnd;       
+    long   ru_msgrcv;       
+    long   ru_nsignals;     
+    long   ru_nvcsw;        
+    long   ru_nivcsw;       
+};
+```
 
