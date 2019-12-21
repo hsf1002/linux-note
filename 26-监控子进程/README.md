@@ -77,3 +77,47 @@ handler(int signo)
 }
 ```
 
+waitid类似于waitpid，但提供了更多的灵活性，控制更为精准：
+
+```
+#include <sys/wait.h>
+
+pid_t waitid(idtype_t idtype, it_t id, siginfo_t, *infop, int options);
+// 返回值：若成功，返回0，若出错，返回-1
+```
+
+使用两个单独的参数表示要等待的子进程所属的类型，id的作用和idtype有关，idtype的类型：
+
+* P_PID：等待一个特定的进程：id等于等待子进程的进程ID
+* P_PGID：等待一个特定进程组中的任一子进程：id等于要等待子进程的进程组ID
+* P_ALL：等待任一子进程：忽略id
+
+option的状态：
+
+* WEXITED：等待已退出的进程，无论是否正常返回
+* WNOHANG：与waitpid语义相同，如无可用的子进程退出状态，立即返回而非阻塞
+* WNOWAIT：不破坏子进程退出状态。该子进程退出状态可由后续的wait、waitid或waitpid调用取得
+* WSTOPPED：等待一个通过信号而停止的进程
+
+- WCONTINUED：等待一个进程，它以前曾被停止，此后又已继续
+
+有个细节，如果option是WNOHANG，那么waitid返回0意味着两种情况：在调用时子进程的状态已经改变或者没有任何子进程的状态有所改变：
+
+```
+siginfo_t info;
+...
+memset(&info, 0x00, sizeof(siginfo_t));
+
+if (-1 == waitid(idtype, id, &info, option | WNOHANG))
+    perror("waitid error");
+    
+// 任何子进程的状态都未改变
+if (0 == info.si_pid)
+    ;
+// 一个子进程的状态已经改变
+else 
+    ;
+```
+
+
+
