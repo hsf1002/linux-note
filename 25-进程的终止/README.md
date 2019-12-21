@@ -63,3 +63,9 @@ int on_exit(void (*fun)(int, void*), void *arg);
 // 虽然更为灵活，但要保证移植性，应避免使用on_exit
 ```
 
+##### fork、stdio缓冲区以及_exit之间的交互
+
+在混合使用stdio函数和系统调用对同一文件IO处理时，需要特别谨慎：
+
+* fork之前应该强制使用fflush刷新stdio缓冲区，或使用setbuf关闭stdio缓冲区
+* 调用 _exit 而非exit，以避免刷新stdio缓冲区，更为通用的原则是父进程通过exit终止，其他子进程应调用 _exit终止，从而确保只有一个进程调用退出程序并刷新stdio缓冲区
