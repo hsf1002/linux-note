@@ -23,5 +23,28 @@ if (errno != ECHILD)
 如果同一时间多个子进程退出，其顺序取决于具体实现，Linux各个版本也不尽相同
 ```
 
+waitpid并不等待第一个终止子进程，它有若干选项，可以控制所等待的子进程，提供了三个wait没有的功能
 
+- waitpid可等待一个特定的进程，而wait则返回任一终止子进程的状态
+- waitpid提供了wait的非阻塞版本，有时候希望获取子进程的状态，而不阻塞
+- wait只能发现已经终止的子进程，对于因信号（SIGSTOP或SIGTTIN）而停止，而后恢复（SIGCONT）的情况则无能为力
+- waitpid通过WUNTRACED和WCONTINUED选项支持作业控制
+
+```
+#include <sys/wait.h>
+
+pid_t waitpid(pid_t pid, int *status, int options);
+// 返回值，若成功，返回进程ID，若出错，返回0或-1
+```
+
+- status如果为空，表示不关心终止状态，如果不为空，则保存终止状态
+- waitpid的第一个参数说明
+  - pid=-1：等待任一子进程，等同于wait
+  - pid=>0：等待进程ID与pid相等的子进程
+  - pid==0：等待组ID等于调用进程组ID的任一子进程
+  - pid<-1：等待组ID等于pid绝对值的任一子进程
+- option参数说明：
+  * WNOHANG：	若由pid指定的子进程未发生状态改变(没有结束)，则waitpid()不阻塞，立即返回0
+  * WUNTRACED： 除了返回终止子进程的信号外，还返回因信号停止的子进程信息
+  * WCONTINUED：返回收到SIGCONT信号而恢复执行的已停止子进程状态信息
 
