@@ -48,3 +48,19 @@ pid_t waitpid(pid_t pid, int *status, int options);
   * WUNTRACED： 除了返回终止子进程的信号外，还返回因信号停止的子进程信息
   * WCONTINUED：返回收到SIGCONT信号而恢复执行的已停止子进程状态信息
 
+wait和waitpid返回的status值，可以区分如下子进程事件：
+
+1. 子进程调用exit或 _exit终止，并指定一个整型值作为退出状态
+2. 子进程收到未处理信号而终止
+3. 子进程因为信号而停止，并以WUNTRAED标志调用waitpid
+4. 子进程因收到信号SIGCONT恢复，并以WCONTINUED标志调用waitpid
+
+以下四个互斥的宏可以取得子进程终止的原因：
+
+```
+WIFEXITED(status)：子进程正常结束则为真，可以通过WEXITSTATUS(status)取得子进程exit()返回的结束代码
+WIFSIGNALED(status)：异常终止子进程则为真，可以通过WTERMSIG(status)取得子进程因信号而中止的信号代码
+WIFSTOPPED(status)：子进程处于暂停状态则为真，可以通过WSTOPSIG(status)取得引发子进程暂停的信号代码
+WIFCONTINUED(status)：在作业控制暂停后已经继续的子进程返回则为真
+```
+
