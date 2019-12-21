@@ -176,3 +176,6 @@ struct rusage
 
 建议在创建任何子进程之前就设置好SIGCHLD信号处理程序，考虑到可重入性问题，系统调用waitpid等可能改变errno，因此在SIGCHLD信号处理程序中需要保存并恢复errno的值
 
+向已停止的子进程发送SIGCHLD信号：
+
+如果未使用SA_NOCLDSTOP标志，系统会在子进程停止时向父进程发送SIGCHLD信号，如果使用了此标志，那么子进程停止时就不会向父进程发送SIGCHLD信号，因为默认会忽略SIGCHLD，因此SA_NOCLDSTOP标志仅仅在设置SIGCHLD信号处理程序才有意义，当信号SIGCONT导致已停止的子进程恢复执行时，也向父进程发送SIGCHLD信号
