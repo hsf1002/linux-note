@@ -20,8 +20,51 @@
  * sigwaitinfo的替代方案
  * 
  * 
-./t_signalfd 44 &
-./sigqueue pid 44 123
+// 设置5个阻塞信号
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./signalfd_sigval 40 41 42 43 44 &
+[1] 20820
+hefeng@sw-hefeng:/home/workspace1/logs/test$ ./signalfd_sigval: pid is 20820
+
+// 发送一个实时信号
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 44 400 1
+./sigqueue PID: 20826, UID: 1000
+ got signal: 5076612 (Unknown signal 5076612)
+  ,si_pid = 20826n  ,ssi_int = 401n
+// 发送一个实时信号
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 43 300 1
+./sigqueue PID: 20827, UID: 1000
+ got signal: 5076612 (Unknown signal 5076612)
+  ,si_pid = 20827n  ,ssi_int = 301n
+// 发送一个实时信号
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 42 200 1
+./sigqueue PID: 20829, UID: 1000
+ got signal: 5076612 (Unknown signal 5076612)
+  ,si_pid = 20829n  ,ssi_int = 201n
+// 发送一个实时信号
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 41 100 1
+./sigqueue PID: 20830, UID: 1000
+ got signal: 5076612 (Unknown signal 5076612)
+  ,si_pid = 20830n  ,ssi_int = 101n
+// 发送一个实时信号
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 40 100 1
+./sigqueue PID: 20831, UID: 1000
+ got signal: 5076612 (Unknown signal 5076612)
+  ,si_pid = 20831n  ,ssi_int = 101n
+// 发送一个实时信号
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 41 101 1
+./sigqueue PID: 20832, UID: 1000
+ got signal: 5076612 (Unknown signal 5076612)
+  ,si_pid = 20832n  ,ssi_int = 102n
+// 发送一个实时信号
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 42 102 1
+./sigqueue PID: 20833, UID: 1000
+ got signal: 5076612 (Unknown signal 5076612)
+  ,si_pid = 20833n  ,ssi_int = 103n
+// 发送一个非阻塞的实时信号，终止了进程
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 45 105 1
+./sigqueue PID: 20836, UID: 1000
+ [1]+  实时信号 11         LD_LIBRARY_PATH=. ./signalfd_sigval 40 41 42 43 44
+hefeng@sw-hefeng:/home/workspace1/logs/test$ ps|grep signal
 
 
 
@@ -52,7 +95,7 @@ main(int argc, char *argv[])
     if (-1 == sigprocmask(SIG_SETMASK, &block_mask, NULL))
         perror("sigprocmask error");
 
-    if (-1 == (fd = signalfd(-1, &mask, 0)))
+    if (-1 == (fd = signalfd(-1, &block_mask, 0)))
         perror("signalfd error");
 
     for (;;)

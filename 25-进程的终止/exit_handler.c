@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <stdbool.h>
 
-//#define HAVE_ON_EXIT
+#define HAVE_ON_EXIT
 
 
 static void
@@ -46,11 +46,12 @@ onexit_fun2(int exit_status, void *arg)
 /**
  *   
  * 同时使用on_exit和atexit注册退出处理程序
-
+onexit_fun2 called, status = 2, arg = 20
 atexit_fun3 called
 atexit_fun2 called
 atexit_fun1 called
- */
+onexit_fun1 called, status = 2, arg = 10
+*/
 int
 main(int argc, char *argv[])    
 {

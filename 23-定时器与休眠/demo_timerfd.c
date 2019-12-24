@@ -14,7 +14,7 @@
 #include <sys/time.h>
 #include <stdint.h>
 #include "cur_time.h"
-
+#include "get_num.h"
 
 /**
  * 
@@ -25,14 +25,17 @@ itimerspec_from_str(const char *str, struct itimerspec *tsp)
 {
     char *cptr;
     char *sptr;
+    char *dupstr;
 
-    if (NULL != (cptr = strchr(str, ':')))
+    dupstr = strdup(str);
+
+    if (NULL != (cptr = strchr(dupstr, ':')))
         *cptr = '\0';
-    
-    if (NULL != (sptr = strchr(str, '/')))
-        *cptr = '\0';
-    
-    tsp->it_value.tv_sec = atoi(str);
+
+    if (NULL != (sptr = strchr(dupstr, '/')))
+        *sptr = '\0';
+
+    tsp->it_value.tv_sec = atoi(dupstr);
     tsp->it_value.tv_nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
 
     if (NULL == cptr)
@@ -42,11 +45,11 @@ itimerspec_from_str(const char *str, struct itimerspec *tsp)
     }
     else
     {
-        if (NULL != (sptr = strchr(cptr, '/')))
+        if (NULL != (sptr = strchr(cptr + 1, '/')))
             *sptr = '\0';
 
-        tsp->it_interval.sec = atoi(cptr + 1);
-        tsp->it_interval.nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
+        tsp->it_interval.tv_sec = atoi(cptr + 1);
+        tsp->it_interval.tv_nsec = (sptr != NULL) ? atoi(sptr + 1) : 0;
     }
 }
 
@@ -54,13 +57,30 @@ itimerspec_from_str(const char *str, struct itimerspec *tsp)
  *   
  * 
  * 使用文件描述符进行POSIX定时器通知
- ./demo_timerfd 1:1 100
 
- Control+Z to suspend
+cc -g -Wall -o timer_fd demo_timerfd.c libgetnum.so libcurtime.so
 
- fg
-
-Control+C to kill
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./timer_fd 5:10 4
+14:11:45 start
+14:11:50  5.  0: expiration read: 1; total=1
+14:12:00  15.  0: expiration read: 1; total=2
+14:12:10  25.  0: expiration read: 1; total=3
+14:12:20  35.  0: expiration read: 1; total=4
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./timer_fd 10:5 4
+14:12:36 start
+14:12:46  10.  0: expiration read: 1; total=1
+14:12:51  15.  0: expiration read: 1; total=2
+14:12:56  20.  0: expiration read: 1; total=3
+14:13:01  24.1000: expiration read: 1; total=4
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./timer_fd 10:5 4
+14:14:17 start
+14:14:27  10.  0: expiration read: 1; total=1
+^Z
+[1]+  已停止               LD_LIBRARY_PATH=. ./timer_fd 10:5 4
+hefeng@sw-hefeng:/home/workspace1/logs/test$ fg
+LD_LIBRARY_PATH=. ./timer_fd 10:5 4
+14:14:38  20.942: expiration read: 2; total=3
+14:14:42  25.  0: expiration read: 1; total=4
 
  */
 int
@@ -72,7 +92,7 @@ main(int argc, char *argv[])
     uint64_t num_exp, total_exp;
     ssize_t s;
 
-    if (argc < 2 || 0 == strmcp(argv[1], "--help"))
+    if (argc < 2 || 0 == strcmp(argv[1], "--help"))
         fprintf(stderr, "%s sec[/nsec][:int-sec][/int-nsec][max-exp]...\n", argv[0]);
     
     // 命令行指定参数转换为itimerspec结构
@@ -92,6 +112,8 @@ main(int argc, char *argv[])
     // 获取起始时间
     if (-1 == clock_gettime(CLOCK_MONOTONIC, &start))
         perror("clock_gettime error");
+
+    printf("%s start\n", curr_time("%T"));
 
     // 把每次过期的信息都打印出来
     for (total_exp=0; total_exp<max_exp;)
@@ -114,10 +136,9 @@ main(int argc, char *argv[])
             nanosecs += 1000000000;
         }
         
-        printf("%d.%3d: expiration read: %llu; total=%llu\n", secs, (nanosecs + 500000) / 1000000, \
+        printf("%s  %d.%3d: expiration read: %llu; total=%llu\n", curr_time("%T"), secs, (nanosecs + 500000) / 1000000, \
             (unsigned long long)num_exp, (unsigned long long)total_exp);
     }
 
     exit(EXIT_SUCCESS);
 }
-

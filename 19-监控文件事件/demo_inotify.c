@@ -66,7 +66,31 @@ display_inotify_events(struct inotify_event *i)
 /**
  *   
  *  展示对inotify的运用
- */
+
+echo "world" >> hi
+ll hi
+-rw-rw-r-- 1 hefeng hefeng 13 12月 24 10:56 hi
+chmod +x hi
+rm hi
+
+./a.out hi
+Watching hi using wd 1
+Read 16 bytes from inotify fd
+    wd = 1; mask = IN_OPEN 
+Read 16 bytes from inotify fd
+    wd = 1; mask = IN_MODIFY 
+Read 16 bytes from inotify fd
+    wd = 1; mask = IN_CLOSE_WRITE 
+Read 16 bytes from inotify fd
+    wd = 1; mask = IN_ATTRIB 
+Read 48 bytes from inotify fd
+    wd = 1; mask = IN_ATTRIB 
+    wd = 1; mask = IN_DELETE_SELF 
+    wd = 1; mask = IN_IGNORED 
+^C
+
+
+*/
 int
 main(int argc, char *argv[])    
 {

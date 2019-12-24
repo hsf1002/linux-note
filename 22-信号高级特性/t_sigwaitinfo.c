@@ -19,16 +19,51 @@
  *   
  * 使用sigsuspend的替代方案sigwaitinfo
  * 
- * 
-./t_sigwaitinfo 60 &
-./sigqueue pid 43 100
-./sigqueue pid 42 200
+ *
 
+ cc -g -Wall -o sig_waitinfo t_sigwaitinfo.c libgetnum.so
+// 睡眠100秒
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sig_waitinfo 100 &
+[1] 20389
+hefeng@sw-hefeng:/home/workspace1/logs/test$ ./sig_waitinfo: pid is 20389
+./sig_waitinfo: about to delay 100 seconds
 
-等待接收到信号后：
-echo $$ // display PID of shell
-kill -USR1 pid
-kill %1
+// 发送第一个实时信号41
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20389 41 200 1
+./sigqueue PID: 20393, UID: 1000
+// 发送第二个实时信号40
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20389 40 100 1
+./sigqueue PID: 20395, UID: 1000
+// 发送第三个实时信号43
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20389 43 100 1
+./sigqueue PID: 20407, UID: 1000
+// 发送第四个标准信号3
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20389 3  10 1
+./sigqueue PID: 20408, UID: 1000
+// 发送第五个标准信号4
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20389 4  20 1
+./sigqueue PID: 20411, UID: 1000
+ hefeng@sw-hefeng:/home/workspace1/logs/test$ ./sig_waitinfo: finished delay
+// 先接收标准信号（先发送的后接收？），再接收实时信号（接收顺序按照信号编号排序）
+got signal: 4 (Illegal instruction)
+    si_signo = 4, si_code = -1 (SI_QUEUE), si_value = 0
+    si_pid = 20411, si_uid = 1000
+got signal: 3 (Quit)
+    si_signo = 3, si_code = -1 (SI_QUEUE), si_value = 0
+    si_pid = 20408, si_uid = 1000
+got signal: 40 (Real-time signal 6)
+    si_signo = 40, si_code = -1 (SI_QUEUE), si_value = 0
+    si_pid = 20395, si_uid = 1000
+got signal: 41 (Real-time signal 7)
+    si_signo = 41, si_code = -1 (SI_QUEUE), si_value = 0
+    si_pid = 20393, si_uid = 1000
+got signal: 43 (Real-time signal 9)
+    si_signo = 43, si_code = -1 (SI_QUEUE), si_value = 0
+    si_pid = 20407, si_uid = 1000
+// 发送第六个标准信号15，终止进程
+hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20389 15  15 1
+./sigqueue PID: 20417, UID: 1000
+ [1]+  已完成               LD_LIBRARY_PATH=. ./sig_waitinfo 100
 
  */
 int
@@ -62,7 +97,7 @@ main(int argc, char *argv[])
     for (;;)
     {
         // 程序挂起，等待信号到达
-        if (-1 == sigwaitinfo(&block_mask, &si))
+        if (-1 == (sig_no = sigwaitinfo(&block_mask, &si)))
             perror("sigwaitinfo error");
 
         // 接收到信号，程序继续执行

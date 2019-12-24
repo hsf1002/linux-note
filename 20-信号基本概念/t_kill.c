@@ -14,8 +14,30 @@
 
 
 /**
- *   
- * 
+ *   ps|grep cat
+16258 pts/22   00:00:00 catch_rtsigs
+22235 pts/22   00:00:00 catch_rtsigs
+
+LD_LIBRARY_PATH=. ./t_kill 16258 15 (SIGTERM)
+./catch_rtsigs: sleep completed
+ps|grep cat
+22235 pts/22   00:00:00 catch_rtsigs
+[3]+  已完成               LD_LIBRARY_PATH=. ./catch_rtsigs 100
+
+LD_LIBRARY_PATH=. ./t_kill 22235 19 (SIGSTOP)
+[1]+  已停止               LD_LIBRARY_PATH=. ./catch_rtsigs 60
+ps|grep cat
+22235 pts/22   00:00:00 catch_rtsigs
+LD_LIBRARY_PATH=. ./t_kill 22235 18 (SIGCONT)
+caught signal: 18
+, s_signo = 18, s_code = 0 (SI_USER), s_value = 586486120
+    s_pid = 16366, s_uid = 1000 
+ps|grep cat
+22235 pts/22   00:00:00 catch_rtsigs
+LD_LIBRARY_PATH=. ./t_kill 22235 15 (SIGTERM)
+ps|grep cat
+[1]+  已完成               LD_LIBRARY_PATH=. ./catch_rtsigs 60
+ps|grep cat
  */
 int
 main(int argc, char *argv[])    
@@ -52,4 +74,3 @@ main(int argc, char *argv[])
 
     exit(EXIT_SUCCESS);
 }
-
