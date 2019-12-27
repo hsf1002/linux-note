@@ -24,3 +24,27 @@ int execve(const char* pathname, char* const argv[], char *const envp[]);
 * ENOEXEC：系统无法识别其文件格式
 * ETXTBSY：一个或多个进程已经以写方式打开pathname指向的文件
 * E2BIG：参数列表和环境列表所需空间总和超过了允许的最大值
+
+##### exec库函数
+
+```
+#include <unistd.h>
+
+int execl(const char *path, const char *arg, ...);
+int execlp(const char *file, const char *arg, ...);
+int execle(const char *path, const char *arg,..., char * const envp[]);
+int execv(const char *path, char *const argv[]);
+int execvp(const char *file, char *const argv[]);
+int fexecve(int fd, char *const argv[],char *const envp[]);
+
+int execve(const char *file, char *const argv[],char *const envp[]);
+```
+
+- 第一个参数是文件名、文件描述符或文件路径，当path作为参数时，如果包含/，视为路径名，否则按照PATH环境变量指定的目录搜索可执行文件
+- 后缀l表示列表list，v表示矢量vector，前三个函数的每个命令行参数都是一个独立的参数，而后四个函数应先构造一个指向各参数的指针数组，再将其作为参数传递
+- 以e结尾的三个函数可以传递一个指向环境字符串指针数组的指针，其他四个函数则是使用调用进程中的environ变量为新程序复制现有的环境
+- 字母p表示该函数取path作为参数，并且用PATH环境变量寻找可执行文件
+- l与v互斥，p与e互斥，p与f互斥
+- 进程中每个打开描述符都有一个执行时关闭标志FD_CLOEXEC，若设置了此标志，执行exec时关闭该描述符
+- exec执行前后实际用户ID和实际组ID保持不变，而有效ID是否改变取决于所执行程序文件的设置用户ID位和设置组ID位是否设置，如果设置了，则有效用户ID变成程序文件所有者ID，组ID处理方式一样
+- 在大多UNIX实现中，只有execve是内核的系统调用，其余六个只是库函数
