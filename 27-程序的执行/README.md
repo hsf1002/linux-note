@@ -48,3 +48,15 @@ int execve(const char *file, char *const argv[],char *const envp[]);
 - 进程中每个打开描述符都有一个执行时关闭标志FD_CLOEXEC，若设置了此标志，执行exec时关闭该描述符
 - exec执行前后实际用户ID和实际组ID保持不变，而有效ID是否改变取决于所执行程序文件的设置用户ID位和设置组ID位是否设置，如果设置了，则有效用户ID变成程序文件所有者ID，组ID处理方式一样
 - 在大多UNIX实现中，只有execve是内核的系统调用，其余六个只是库函数
+
+##### 解释器脚本
+
+解释器：能够读取并执行文本格式命令的程序，如UNIX shell、awk、sed、perl、python和ruby的程序，除了能够交互式读取和执行命令外，还可以从脚本文件中读取和执行命令
+
+* 必须赋予脚本文件可执行权限
+* 文件的起始行必须指定脚本解释器的路径名，一般是绝对路径
+
+```
+#! interpreter-path [optional-arg]
+```
+
