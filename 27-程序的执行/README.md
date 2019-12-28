@@ -60,3 +60,24 @@ int execve(const char *file, char *const argv[],char *const envp[]);
 #! interpreter-path [optional-arg]
 ```
 
+##### exec与文件描述符
+
+默认由exec的调用程序打开的所有文件描述符在exec执行时会保持打开状态，且在新程序中依然有效，shell利用这一特性为其所执行的程序处理IO重定向
+
+```
+ls /tmp > dir.txt
+```
+
+以上shell命令执行了如下步骤：
+
+1. 调用fork创建子进程
+2. 子shell以描述符1（标准输出）打开文件用于输出
+3. 子shell执行程序ls，ls将其结果输出到标准输出，亦即文件中
+
+从安全角度考虑，执行新程序应该关闭不必要的文件描述符，使用close会有局限：
+
+* 某些描述符是库函数打开的，但库函数无法使主程序在执行exec之前关闭文件描述符，所以库函数应该总是为打开的文件设置close-on-exec标志
+* 如果exec调用失败可能还需要使描述符保持打开状态，如果这些描述符已经关闭，将它们重新打开几乎不可能
+
+如果设置close-on-exec标志，执行exec时，会自动关闭该文件描述符，如果调用exec失败，则继续保持打开状态；当调用dup、dup2或fcntl为文件描述符创建副本时，总是会清除副本描述符的close-on-exec标志
+
