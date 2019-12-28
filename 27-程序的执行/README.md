@@ -84,3 +84,27 @@ ls /tmp > dir.txt
 ##### exec与信号
 
 exec会将现有进程的文本段丢掉，也包含调用进程创建的信号处理程序，内核会将对所有已设信号的处置重置为SIG_DFL，而其他信号的处置则保持不变，在调用exec期间，进程信号掩码以及挂起信号的设置都得以保存
+
+##### 执行shell命令：system
+
+```
+#include <stdlib.h>
+
+int system(const char *cmdstring);
+```
+
+UNIX中，system总是可用的，在其实现中调用了fork、waitpid和exec，有四种返回值：
+
+* 如果cmdstring为空，仅当system命令可用时，返回非0值，否则返回0，这可以确定系统是否支持system函数
+
+- fork失败或waitpid返回除了EINTR之外的出错，则system返回-1，且设置errno以指示错误类型
+- 如果exec失败（表示不能执行shell），返回值如同shell执行了exit(127)一样
+- 否则三个函数都成功，那么system返回shell的终止状态，格式在waitpid中已说明
+
+使用system而不是使用fork和exec的优点：
+
+* 进行了所需的各种出错处理以及各种信号处理
+* 无需处理fork、waitpid和exec的调用细节
+
+设置了用户ID和组ID的程序在特权模式下运行时，绝对不能调用system，以为你shell对操作的控制依赖于各种环境变量，因此这样会不可避免的给系统带来安全隐患
+
