@@ -108,3 +108,31 @@ UNIX中，system总是可用的，在其实现中调用了fork、waitpid和exec�
 
 设置了用户ID和组ID的程序在特权模式下运行时，绝对不能调用system，以为你shell对操作的控制依赖于各种环境变量，因此这样会不可避免的给系统带来安全隐患
 
+##### system的实现
+
+简化版
+
+------
+
+system内部正确处理信号：
+
+如果调用system的进程还创建了其他子进程，对SIGCHLD的信号处理函数也执行了wait，在shell创建的子进程退出并产生SIGCHLD信号，有机会调用waitpid之前，主程序的信号处理函数可能就会执行，即产生了竞争条件，两个不良后果：
+
+* 调用程序误以为为其所创建的某个子进程终止了
+* system函数无法获取其子进程的终止状态
+
+如`system("sleep 20")`在输入中断或退出字符，会发送信号给3个进程：调用system程序的进程、system锁创建的一个shell进程，sleep进程，shell在等待子进程期间会忽略SIGINT和SIGQUIT信号，默认会杀死其他两个进程，SUSv3规定：
+
+* 调用进程在执行命令期间应该忽略SIGINT和SIGQUIT信号
+* 子进程对这两个信号的处理，如同调用fork和exec一样，即对所有已设信号的处置重置为SIG_DFL，而其他信号的处置则保持不变
+
+改进版
+
+---
+
+注意事项：
+
+* 针对”如果cmdstring为空，仅当system命令可用时，返回非0值，否则返回0“，唯一可靠的办法是递归调用system去运行shell命令，并检查返回状态
+* 只有system的调用者才需要阻塞SIGCHLD，同时忽略SIGINT和SIGQUIT，必须在fork之前执行
+* system的调用者必须使用waitpid，如果使用wait，可能捕获到其他子进程的状态
+
