@@ -19,6 +19,19 @@ argv[2] = goodbye
 environ: GREET=sky
 environ: BEST=lotus
 
+
+
+skydeiMac:27-程序的执行 sky$ ./t_execve necho.script 
+execve error
+skydeiMac:27-程序的执行 sky$ ll necho.script 
+-rw-r--r--  1 sky  staff  48 12 28 19:20 necho.script
+skydeiMac:27-程序的执行 sky$ chmod +x necho.script 
+skydeiMac:27-程序的执行 sky$ ll necho.script 
+-rwxr-xr-x  1 sky  staff  48 12 28 19:20 necho.script*
+skydeiMac:27-程序的执行 sky$ ./t_execve necho.script
+some argument necho.script hello world goodbye
+skydeiMac:27-程序的执行 sky$ vim t_execve.c
+
 */
 int
 main(int argc, char *argv[])    
