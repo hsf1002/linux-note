@@ -121,3 +121,8 @@ CLONE_VM | CLONE_FILES | CLONE_FS | CLONE_SIGCHLD | CLONE_THREAD | CLONE_SETTLS 
 * __WALL：等待所有子进程，不论类型
 * __WNOTHREAD：调用者只等待自己的子进程，如未设置，等待与父进程隶属同一线程组的任何进程
 
+##### 进程的创建速度
+
+* fork：进程所占内存越大，耗时越久
+* vfork：进程所占内存大小，影响不大，因为并未像fork一样复制页表
+* clone：进程所占内存大小，影响不大，速度最快
