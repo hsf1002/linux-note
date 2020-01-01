@@ -56,3 +56,68 @@ Linux提供了/proc/sys/kernel/acct，包含三个值，按顺序是高水位、
 2. 增加ac_pid和ac_ppid：终止进程的进程ID及其父进程ID
 3. ac_uid和ac_gid从16位扩展到32位
 4. 将ac_etime从comp_t改为float，意在能够记录更长的时间
+
+##### 系统调用：clone
+
+Linux特有的系统调用clone也能创建一个新进程，与fork和vfork相比，在进程创建期间对步骤的控制更为精准，clone主要用于线程库的实现
+
+```
+#define _GNU_SOURCE
+#include <sched.h>
+
+int clone(int (*fn)(void *), void *stack, int flags, void *arg, ...
+  /* pid_t *parent_tid, void *tls, pid_t *child_tid */ );
+// 返回值：若成功，返回子进程PID，若出错，返回-1  
+// 对于内核而言，fork、vfork和clone由同一系统调用do_fork实现
+// 当函数fn返回或是调用exit/_exit时，子进程就会终止
+```
+
+flag的双重目的：低字节存放子进程的终止信号，因信号而终止依然产生并给父进程发送SIGCHLD信号，如果是0表示没有产生任何信号；剩余字节存放了位掩码：
+
+```
+CLONE_CHILD_CLEARTID: 当子进程调用exec或exit时，清除ctid
+CLONE_CHILD_SETTID: 将子进程的线程ID写入ctid
+CLONE_PARENT_SETTID：将子进程的线程ID写入ptid
+CLONE_FILES: 父子进程共享打开文件描述符
+CLONE_FS: 父子进程共享与文件系统相关的属性，涉及的系统调用umask、chdir、chroot
+CLONE_IO: 父子进程共享IO上下文环境
+CLONE_VM: 父子进程共享虚拟内存，涉及的系统调用mmap、munmap
+CLONE_SIGHAND: 父子进程共享对信号的处置
+CLONE_SETTLS: tls描述子进程的线程本地存储
+CLONE_NEWNS: 子进程获取父进程挂载命名空间的副本
+CLONE_PARENT: 子进程.PPID == 调用者.PPID（默认子进程的PPID == 调用者.PID）
+CLONE_THREAD: 将子进程置于父进程所属的线程组中（一个线程组每个线程都有一个唯一的TID，所有线程的TGID相同，第一个线程的TID即该线程组的TGID，以后每个线程的TID依次递加）
+CLONE_VFORK: 父进程一直挂起，直到子进程调用exec或exit释放虚拟内存资源
+...
+```
+
+fork相当于如下flag的clone：
+
+```
+SIGCHLD
+```
+
+vfork相当于如下flag的clone：
+
+```
+CLONE_VM |CLONE_VFORK | CLONE_SIGCHLD 
+```
+
+LinuxThreads线程相当于如下flag的clone：
+
+```
+CLONE_VM | CLONE_FILES | CLONE_FS | CLONE_SIGCHLD 
+```
+
+NPTL线程相当于如下flag的clone：
+
+```
+CLONE_VM | CLONE_FILES | CLONE_FS | CLONE_SIGCHLD | CLONE_THREAD | CLONE_SETTLS | CLONE_PARENT_SETTID | CLONE_CHLD_CLEARTID | CLONE_SYSVSEM
+```
+
+等待由clone产生的子进程，waitpid、wait3、wait4的位掩码取值：
+
+* __WCLONE：只等待克隆子进程，如未设置，只等待非克隆子进程
+* __WALL：等待所有子进程，不论类型
+* __WNOTHREAD：调用者只等待自己的子进程，如未设置，等待与父进程隶属同一线程组的任何进程
+
