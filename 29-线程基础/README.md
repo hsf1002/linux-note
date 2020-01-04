@@ -96,3 +96,17 @@ int pthread_create(pthread_t * __restrict tidp,
 - 新线程从start_rtn开始运行，该函数只有一个无类型指针参数，如果需要多个参数，需要放到一个结构体中
 - 线程创建后，不能保证新线程先运行，还是调用线程先运行
 
+### 终止线程
+
+单个线程的退出方式：
+
+- 从启动例程中返回，返回值是线程的退出码
+- 被同一进程的其他线程调用pthread_cancel取消
+- 调用pthread_exit
+- 任意线程调用exit或主程序执行了return
+
+```
+void pthread_exit(void * rval_ptr);
+```
+
+其返回值可被另一线程通过pthread_join获取，rval_ptr指向的内容不应该分配于线程栈上
