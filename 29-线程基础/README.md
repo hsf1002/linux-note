@@ -134,3 +134,16 @@ int pthread_equal(pthread_t tid1, pthread_t tid2);
 
 Linux中，线程ID在所有进程中都是唯一，POSIX线程ID由线程库负责分配和维护，而gettid返回的线程ID是由内核分配的数字，类似于进程ID
 
+### 连接已终止的线程
+
+pthread_join等待由pthread标识的线程终止，如果线程已经终止，则立即返回，否则一直阻塞，直到指定的线程调用pthread_exit、被取消（rval_ptr指定的内存单元设置为PTHREAD_CANCELED）或从启动例程返回，这种操作称为连接
+
+```
+int pthread_join(pthread_t thread, void ** rval_ptr)
+// 返回值：若成功，返回0，若出错，返回错误编号
+```
+
+如果线程没有分离，则必须进行连接，如果未能连接，则线程终止时将产生僵尸线程，pthread_join与waitpid的差异：
+
+* 线程之间的关系时对等的
+* 无法连接任意线程，也不能以非阻塞方式进行连接
