@@ -70,7 +70,7 @@ pthread_attr_t：线程的属性对象
 
 Linux将errno定义为宏，可展开为函数，并返回一个左值，为每个线程所独有，errno机制保留传统UNIX API报错方式的同时，适应了多线程环境
 
-Pthreads API函数返回值
+##### Pthreads API函数返回值
 
 ---
 
@@ -160,4 +160,36 @@ int pthread_detach(pthread_t tod);
 - 默认线程的终止状态会保存直到调用pthread_join
 - 如果线程已经被分离，其底层存储资源可以在线程终止时立即被收回
 - 如果线程已经被分离，调用pthread_join会产生未定义行为，也无法使其返回可连接的状态
+
+### 进程VS线程
+
+多线程的优点：
+
+1. 线程间数据共享很简单
+2. 创建线程快于进程创建
+
+多线程的缺点：
+
+1. 需要确保调用线程安全的函数，或者以线程安全的方式调用函数
+2. 每个线程都在争用宿主进程的有限的虚拟地址空间
+
+权衡与选择：
+
+1. 多线程中处理信号，需要小心设计，一般不建议在多线程程序中使用信号
+2. 所有线程都必须运行同一程序
+3. 除了数据，线程还可以共享某些其他信息（文件描述符、信号处置、当前工作目录、可用户ID、组ID等）
+
+进程和线程的接口异同：
+
+```
+进程原语        线程原语            描述
+fork        pthread_create      创建新的控制流
+exit        pthread_exit        从控制流中退出
+waitpid     pthread_join        得到退出状态
+atexit      pthread_cancel_push 注册退出函数
+getpid      pthread_self        获取控制流ID
+abort       pthread_cancel      请求控制流的非正常退出
+```
+
+
 
