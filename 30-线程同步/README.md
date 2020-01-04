@@ -66,3 +66,25 @@ int pthread_cond_broadcast(pthread_cond_t *cond); // 唤醒所有等待该条件
 * 其他线程可能率先醒来，并获取互斥量并改变相关共享变量的状态
 * 设计”宽松“的判断条件或许更为简单
 * 可能发生假唤醒，即使没有其他线程真的就条件变量发出信号，等待此条件变量的线程仍有可能醒来
+
+### 自旋锁
+
+与互斥量类似，但是不通过休眠使进程阻塞，而是在获取锁之前一直处于忙等阻塞状态，可用于以下情况：持有时间短而且线程并不希望在重新调度上花太多成本。使用前必须对它进行初始化，可以用PTHREAD_SPINLOCK_INITIALIZER或pthread_spin_init进行初始化
+
+```
+int pthread_spin_init (pthread_spinlock_t *lock, int pshared);
+int pthread_spin_destroy (pthread_spinlock_t *lock);
+// 两个函数返回值：若成功，返回0，若出错，返回错误编号
+```
+
+pshared表示进程共享属性：如果设置为PTHREAD_PROCESS_SHARED，则自旋锁能被可以访问锁底层内存的线程获取，即使那些线程属于不同的进程；如果设置为PTHREAD_PROCESS_PRIVATE，只能被进程内部的线程访问
+
+```
+int pthread_spin_trylock (pthread_spinlock_t *lock);
+int pthread_spin_unlock (pthread_spinlock_t *lock);
+int pthread_spin_lock (pthread_spinlock_t *lock);
+// 两个函数返回值：若成功，返回0，若出错，返回错误编号
+```
+
+不用调用在持有自旋锁情况下可能进入休眠状态的函数，会浪费CPU资源，因为其他线程需要获取自旋锁需要等待的时间延长了
+
