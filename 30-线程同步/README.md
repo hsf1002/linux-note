@@ -34,3 +34,35 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex);
 ##### 死锁
 
 如果试图对一个互斥量加锁两次，其自身会陷入死锁状态；或者程序中有一个以上的互斥量，两个线程互相请求对方所拥有的资源时，也会死锁。可以通过仔细控制互斥量加锁的顺序来避免死锁，如所有线程总是在对互斥量B加锁前先锁住互斥量A，但是对互斥量的排序有时候比较困难，可以使用pthread_mutex_trylock避免死锁，如果不能获取锁，先释放已经占有的资源，做好清理工作，过一段时间再试
+
+### 条件变量
+
+条件变量总是和互斥量结合使用，它允许一个线程就某个共享变量的状态变化通知其他线程，并让其他等待这个通知，使用前必须对它进行初始化，可以用PTHREAD_COND_INITIALIZER或pthread_cond_init进行初始化
+
+```
+int pthread_cond_init(pthread_cond_t * __restrict cond, const pthread_condattr_t * _Nullable __restrict attr);
+int pthread_cond_destroy(pthread_cond_t *cond);		
+// 两个函数返回值：若成功，返回0，若出错，返回错误编号
+```
+
+阻塞（等待唤醒）：
+
+```
+int pthread_cond_wait(pthread_cond_t * __restrict cond, pthread_mutex_t * __restrict mutex);
+int pthread_cond_timedwait(pthread_cond_t * __restrict cond, pthread_mutex_t * __restrict mutex, const struct timespec * _Nullable __restrict tsptr);
+// 两个函数返回值：若成功，返回0，若出错，返回错误编号
+```
+
+唤醒：
+
+```
+int pthread_cond_signal(pthread_cond_t *cond);	  // 至少唤醒一个等待该条件的线程
+int pthread_cond_broadcast(pthread_cond_t *cond); // 唤醒所有等待该条件的线程
+// 两个函数返回值：若成功，返回0，若出错，返回错误编号
+```
+
+一个通用的设计原则：必须由一个while循环而不是if语句，控制对pthread_cond_wait的调用，这是因为当代码返回时，并不能确定判断条件的状态，所以应该立即重新检查判断条件，在条件不满足的情况下继续休眠等待，之所以不能判断条件的状态，因为：
+
+* 其他线程可能率先醒来，并获取互斥量并改变相关共享变量的状态
+* 设计”宽松“的判断条件或许更为简单
+* 可能发生假唤醒，即使没有其他线程真的就条件变量发出信号，等待此条件变量的线程仍有可能醒来
