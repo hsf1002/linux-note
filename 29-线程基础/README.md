@@ -36,3 +36,47 @@
 * 栈，本地变量和函数的调用链接信息
 
 所有的线程驻留同一虚拟地址空间，利用一个合适的指针，各个线程可以在对方栈中相互共享数据
+
+##### Pthread API详细背景
+
+数据类型
+
+---
+
+pthread_t：tid
+
+pthread_mutex_t：互斥对象
+
+pthread_mutexattr_t：互斥对象属性
+
+pthread_cond_t：条件变量
+
+pthread_condattr_t：条件变量属性
+
+pthread_key_t：线程特有数据的键
+
+pthread_once_t：一次性初始化控制上下文
+
+pthread_attr_t：线程的属性对象
+
+线程和errno
+
+---
+
+Linux将errno定义为宏，可展开为函数，并返回一个左值，为每个线程所独有，errno机制保留传统UNIX API报错方式的同时，适应了多线程环境
+
+Pthreads API函数返回值
+
+---
+
+0表示成功，正值表示失败，失败时的返回值，与传统UNIX系统调用errno的含义相同
+
+编译Pthreads程序
+
+---
+
+添加cc -pthread的编译选项，效果如下：
+
+* 定义_REENTRANT预处理宏
+* 程序会与库libthread进行链接（-lpthread）
+
