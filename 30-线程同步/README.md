@@ -88,3 +88,17 @@ int pthread_spin_lock (pthread_spinlock_t *lock);
 
 不用调用在持有自旋锁情况下可能进入休眠状态的函数，会浪费CPU资源，因为其他线程需要获取自旋锁需要等待的时间延长了
 
+###屏障
+
+或栅栏，是用户协调多个线程并行工作的同步机制，允许每个线程等待，直到所有线程都达到某一点，然后继续执行，pthread_join就是屏障的一种
+
+```
+int pthread_barrier_init(pthread_barrier_t *restrict barrier, const pthread_barrierattr_t *restrict attr, unsigned count);
+int pthread_barrier_destroy(pthread_barrier_t *barrier);
+// 两个函数返回值：若成功，返回0，若出错，返回错误编号
+int pthread_barrier_wait(pthread_barrier_t *barrier);
+// 若成功，返回0或PTHREAD_BARRIER_SERIAL_THREAD，若出错，返回错误编号
+```
+
+调用pthread_barrier_wait的线程在屏障计数未满足条件，进入休眠状态，否则，所有线程都被唤醒
+
