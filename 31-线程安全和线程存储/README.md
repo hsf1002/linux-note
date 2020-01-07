@@ -12,3 +12,15 @@
 * 一些函数的接口在线程发明之前本身就被定为为不可重入，如asctime
 
 对于后缀是_r的可重入函数，要求由调用者分配缓冲区
+
+### 一次性初始化
+
+多线程程序有时不管创建多少个线程，有些初始化只做一次，pthread_once可以被调用多次，而init只会被调用一次，会被哪个线程调用，由内核调度决定
+
+```
+#include <pthread.h>
+
+int pthread_once(pthread_once_t *once_control, void (*init)(void))；
+// 返回值：若成功，返回0，若出错，返回负值
+```
+

@@ -25,7 +25,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex);
 // pthread_mutex_timedlock：如果互斥量已经锁定，并且时间期限已满，则失败并返回ETIMEDOUT错误
 ```
 
-#####类型
+##### 类型
 
 * PTHREAD_MUTEX_NORMAL：该类型的互斥量不具有死锁检测功能
 * PTHREAD_MUTEX_RERORCHECK：该类型的互斥量都会执行错误检查
@@ -88,7 +88,7 @@ int pthread_spin_lock (pthread_spinlock_t *lock);
 
 不用调用在持有自旋锁情况下可能进入休眠状态的函数，会浪费CPU资源，因为其他线程需要获取自旋锁需要等待的时间延长了
 
-###屏障
+### 屏障
 
 或栅栏，是用户协调多个线程并行工作的同步机制，允许每个线程等待，直到所有线程都达到某一点，然后继续执行，pthread_join就是屏障的一种
 

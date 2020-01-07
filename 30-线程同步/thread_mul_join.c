@@ -49,7 +49,7 @@ static struct
 static void *
 thr_func(void *arg)
 {
-    int idx = *((int *)arg);
+    int idx = (int)arg;
     int s;
 
     // 每个线程睡眠一段指定时间
@@ -77,7 +77,21 @@ thr_func(void *arg)
 /**
  *    pthread_join只能连接一个指定线程，且无任何机制去连接已终止的线程，本例通过条件变量绕开这个限制
  * 
- */
+
+./thread_mul_join 1 2 2 3 4
+total_thread = 5 
+thread 0 terminating 
+reaped thread 0 (num_lived = 4) 
+thread 1 terminating 
+thread 2 terminating 
+reaped thread 1 (num_lived = 3) 
+reaped thread 2 (num_lived = 2) 
+thread 3 terminating 
+reaped thread 3 (num_lived = 1) 
+thread 4 terminating 
+reaped thread 4 (num_lived = 0) 
+
+*/
 int
 main(int argc, char *argv[])    
 {
@@ -95,7 +109,7 @@ main(int argc, char *argv[])
     {
         thread[idx].sleep_time = getInt(argv[idx+1], GN_NONNEG, NULL);
         thread[idx].state = TS_ALIVE;
-        if (0 != (s = pthread_create(&thread[idx].tid, NULL, thr_func, &idx)))
+        if (0 != (s = pthread_create(&thread[idx].tid, NULL, thr_func, (void *)idx)))
             perror("pthread_create error");
     }
 
