@@ -43,3 +43,44 @@ int pthread_setcanceltype(int type, int *oldtype);
 void pthread_testcancel(void);
 ```
 
+### 取消点
+
+若将线程的取消状态和类型分别设置为启用和延迟，当线程抵达某个取消点，取消请求才会起作用
+
+POSIX定义了取消点和可选取消点的函数
+
+```
+// 一定会执行取消点的函数
+accept	mq_timedsend	putpmsg	sigsuspend
+aio_suspend	msgrcv	pwrite	sigtimedwait
+clock_nanosleep	msgsnd	read	sigwait
+close	msync	readv	sigwaitinfo
+connect	nanosleep	recv	sleep
+creat	open	recvfrom	system
+fcnt12	pause	recvmsg	tcdrain
+fsync	poll	select	usleep
+getmsg	pread	sem_timedwait	wait
+getpmsg	pthread_cond_timedwait	sem_wait	waitid
+lockf	pthread_cond_wait	send	waitpid
+mq_receive	pthread_join	sendmsg	write
+mq_send	pthread_testcancel	sendto	writev
+mq_timedreceive	putmsg	sigpause	
+```
+
+### 清理函数
+
+线程可以设置一个或多个清理函数，当线程遭到取消时自动运行这些函数，线程终止之前可执行诸如修改全局变量、解锁互斥量等动作，与进程退出时可以用atexit函数是类似的，执行顺序与注册顺序相反
+
+```
+void pthread_cleanup_push(void (*rtn)(void *), void *arg);
+void pthread_cleanup_pop(int execute);
+```
+
+当执行以下动作时，清理函数rtn由pthread_cleanup_push调度：
+
+- 调用pthread_exit时
+- 相应取消请求时
+- 用非零execute参数调用pthread_cleanup_pop时
+- 如果execute参数为0，则清理函数不被调用
+- 如果线程是通过它的启动例程中return返回而终止，它的清理程序就不会被调用
+
