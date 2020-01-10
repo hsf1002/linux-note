@@ -50,7 +50,18 @@ thr_func(void *arg)
 
 /**
  *    
- * 
+main thread has called strerror()
+other thread about to call strerror()
+other therad str(0x6014e0): Operation not permitted
+main thread str(0x6014e0): Operation not permitted
+
+
+给变量buf加上修饰：__thread
+main thread has called strerror()
+other thread about to call strerror()
+other therad str(0x7f771f164600): Operation not permitted
+main thread str(0x7f771f947700): Invalid argument
+* 
  */
 int
 main(int argc, char *argv[])    

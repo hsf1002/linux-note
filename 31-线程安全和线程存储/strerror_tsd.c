@@ -87,7 +87,14 @@ thr_func(void *arg)
 
 /**
  *    
- * 
+
+main thread has called strerror()
+other thread about to call strerror()
+other therad str(0x7f34200008c0): Operation not permitted
+main thread str(0xf09010): Invalid argument
+
+
+* 
  */
 int
 main(int argc, char *argv[])    
