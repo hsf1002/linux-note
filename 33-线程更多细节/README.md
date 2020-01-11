@@ -72,3 +72,19 @@ int pthread_attr_getstacksize(pthread_attr_t *attr, size_t *stacksize);
 * 针对为每个进程挂起的信号，以及为每条线程所挂起的信号，内核分别维护有记录，sigpending会返回整个进程和当前线程挂起信号的并集
 * 如果信号处理程序中断了pthread_mutex_lock的调用，该调用总是会自动重新开始，如果中断了pthread_cond_wait，该调用要么自动重新开始（Linux如此），要么返回0，表示遭遇了假唤醒
 
+##### 操作线程信号掩码
+
+把线程引入编程范型，使得信号的处理变得更加复杂。单个线程可以阻止某些信号，当某个线程修改了与某个给定信号相关的处理行为后，所有的线程都必须共享这个处理行为的改变。如一个线程忽略某个信号，则另一个线程就可以通过两种方式撤销上述线程的信号选择：恢复信号的默认处理行为，或为信号设置一个新的信号处理程序。如果一个信号与硬件故障有关，则该信号一般会发生到引起该事件的线程，其他信号则被发送到任意一个线程。进程中使用sigprocmask阻止信号发送，线程中则使用pthread_sigmask
+
+```
+int pthread_sigmask(int how, const sigset_t *restrict set, sigset_t *restrict oset);
+// 若成功，返回0，若出错，返回错误编号
+```
+
+- 工作方式与sigprocmask基本相同，how的取值
+  - SIG_BLOCK：把信号集添加到线程信号屏蔽字中
+  - SIG_SETMASK：用信号集替换线程的信号屏蔽字
+  - SIG_UNBLOCK：从线程信号屏蔽字中移除信号集
+- 如果oset不为空，则获取线程的信号屏蔽字并保存到oset
+- 如果set不为空，则设置线程的信号屏蔽字为set，如果set为空，oset不为空，则how被忽略
+
