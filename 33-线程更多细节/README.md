@@ -88,3 +88,25 @@ int pthread_sigmask(int how, const sigset_t *restrict set, sigset_t *restrict os
 - 如果oset不为空，则获取线程的信号屏蔽字并保存到oset
 - 如果set不为空，则设置线程的信号屏蔽字为set，如果set为空，oset不为空，则how被忽略
 
+##### 向线程发送信号
+
+发送信号给进程，可以调用kill，发送信号给线程，可以调用pthread_kill
+
+```
+int pthread_kill(pthread_t thread, int signo);
+// 若成功，返回0，若出错，返回错误编号
+// 无法发送信号给其他进程的线程
+```
+
+可以传0给signo检查线程是否存在，如果信号的默认处理动作是终止该进程，那么把信号传递给某个线程仍然会杀死整个进程
+
+Linux特有函数pthread_sigqueue将pthread_kill和sigqueue的功能合二为一：
+
+```
+#include <signal.h>
+#include <pthread.h>
+
+int pthread_sigqueue(pthread_t thread, int sig, const union sigval value);
+// 如成功，返回0，若出错，返回正数
+```
+
