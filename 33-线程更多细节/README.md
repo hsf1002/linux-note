@@ -154,3 +154,7 @@ int pthread_atfork(void (*prepare)(void), void (*parent)(void),void (*child)(voi
 - parent：在fork创建子进程后，返回之前在父进程的上下文中调用，任务是对prepare获取的所有锁进行解锁
 - child：在fork返回之前，在子进程上下文中调用，任务是释放prepare获取的所有锁
 
+##### 线程与exit
+
+如果任何线程调用了exit，或主线程执行了return，那么所有线程都会消失，也不会执行线程特有数据的解构函数以及清理函数
+
