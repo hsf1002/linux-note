@@ -110,3 +110,27 @@ int pthread_sigqueue(pthread_t thread, int sig, const union sigval value);
 // 如成功，返回0，若出错，返回正数
 ```
 
+##### 妥善的处理异步信号
+
+可以通过调用sigwait等待一个或多个信号的出现
+
+```
+int sigwait(const sigset_t *set, int *signop);
+// 若成功，返回0，若出错，返回错误编号
+```
+
+- set指定了等待的信号集
+- signop指向的整数将包含发送信号的数量
+- 如果信号集中某个信号在调用sigwait时处于挂起状态，那么sigwait无阻塞的返回，返回之前，从进程中移除那些处于挂起的信号；为了避免错误行为发生，线程在调用sigwait前，必须阻塞那些它正在等待的信号；sigwait会原子的取消信号集的阻塞状态，直到新的信号被递送，返回之前，sigwait将恢复线程的信号屏蔽字
+
+sigwait和sigwaitinfo几乎相同，除了以下差异：
+
+* sigwait只返回信号编号，而非返回一个siginfo_t的结构
+* 返回值与其他线程相关函数一致，而非传统的系统调用返回0或-1
+
+多个线程调用sigwait等待同一信号，只有线程会实际接收，但无法确定是哪个
+
+多线程程序必须要处理异步信号时，推荐的方法：
+
+* 所有线程都阻塞进程可能接收的所有异步信号：在创建任何其他线程之前，由主线程阻塞，后续创建的每个线程都会继承主线程的信号掩码
+* 再创建一个专有线程，调用函数sigwaitinfo、sigtimedwait或sigwait来接收信号
