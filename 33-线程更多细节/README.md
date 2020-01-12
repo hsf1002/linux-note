@@ -177,3 +177,38 @@ int pthread_atfork(void (*prepare)(void), void (*parent)(void),void (*child)(voi
 
 每个进程都拥有多个与之相关的KSE，也可以把多个线程映射到一个KSE，允许内核将同一应用的线程调度到不同的CPU上运行，同时也解决了随线程数量而放大的性能问题，M:N模型最大问题是过于复杂，线程调度任务由内核及用户空间的线程库共同承担，二者需要进行分工协作和信息交换
 
+### Linux POSIX线程的实现
+
+针对Ptheads API：Linux有两种实现
+
+* LinuxThreads：最初的线程实现（已经过时，glibc从2.4版本开始不再支持）
+* NPTL（Native POSIX Threads Library）：更符合SUSv3的标准，性能优于LinuxThreads
+
+##### LinuxThreads
+
+实现要点：
+
+* 线程的创建使用clone，指定标志：CLONE_VM|CLONE_FILES|CLONE_FS|CLONE_SIGHAND
+* 会额外创建一个附加的管理线程，负责处理其他线程的创建和终止
+* 利用信号处理内部操作
+
+对于标准行为的背离之处：
+
+* 同一进程的不同线程调用getpid返回不同值
+* 只有创建子进程的线程才可以使用wait
+* 线程之间不会共享凭证
+* 线程不共享一般的任务号和进程组号
+* 不共享使用fcntl建立的记录锁
+* 不共享资源限制
+* 不共享nice值
+
+##### NPTL
+
+NPTL弥补了LinuxThreads的大部分缺陷，其实现的测试程序可以创建10万个线程，而LinuxThreads实际的线程数量限制大约是2000个
+
+创建线程使用clone，指定标志：CLONE_VM|CLONE_FILES|CLONE_FS|CLONE_SIGHAND|CLONE_THREAD|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID|CLONE_SYSVSEM
+
+##### 确认线程实现
+
+`getconf GNU_LIBPTHREAD_VERSION`
+
