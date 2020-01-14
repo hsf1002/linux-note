@@ -118,7 +118,7 @@ main(int argc, char *argv[])
     else
     {
         printf("main: about to signal condition variable\n");
-
+        // 保护的不是同一段代码
         if (0 != (s = pthread_mutex_lock(&mtx)))
             perror("pthread_mutex_lock error");
         
