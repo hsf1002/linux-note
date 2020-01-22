@@ -217,3 +217,13 @@ jobs
 
 ![WechatIMG38.jpeg](https://i.loli.net/2020/01/22/DKvNVwyXWjR8eHB.jpg)
 
+#####  实现作业控制
+
+SIGCONT信号：内核允许一个进程如shell向同一会话中的任意进程发送SIGCONT信号，不管是否有权限
+
+SIGTTIN和SIGTTOU信号：
+
+* 当进程当前处于阻塞状态或忽视SIGTTIN信号的状态，则不发送SIGTTIN信号，这时如果试图从控制终端发起read调用会失败并返回EIO
+* 如果终端设置了TOSTOP标记，当进程当前处于阻塞状态或忽视SIGTTIN信号的状态，则不发送SIGTTOU信号，这时控制终端发起write调用是允许的（即TOSTOP标记被忽视了）
+* 不管是否设置了TOSTOP标记，后台进程试图在控制终端试图调用会修改终端驱动器数据结构的特定函数（如tcsetpgrp、tcsetattr、tcflush、tcflow、tcsendbreak、tcdrain）时会生成SIGTTOU信号
+
