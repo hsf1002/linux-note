@@ -147,3 +147,73 @@ SIGHUP的默认动作是终止进程
 ##### SIGHUP和控制进程的终止
 
 Linux上，SIGHUP后会跟随一个SIGCONT信号以确保之前被停止的进程组可以恢复
+
+### 作业控制
+
+1980年BSD系统的C shell推出的特性，它允许一个shell用户同时执行多个命令（作业），其中一个命令在前台运行，其他在后台运行，作业可以被停止和恢复，以及在前后台之间移动
+
+##### 在shell中使用作业控制
+
+输入的命令以&结束，该命令作为后台任务运行，作业号显示在方括号内：
+
+```
+sleep 600 &
+[2] 20222
+sleep 500 &
+[3] 20223
+```
+
+列出所有后台作业：
+
+```
+jobs
+[2]-  Running                 sleep 600 &
+[3]+  Running                 sleep 500 &
+```
+
+将后台作业移动到前台：
+
+```
+fg %2
+sleep 600
+```
+
+将前台作业挂起（使用Control+Z，会向前台进程组发送SIGTSTP信号）：
+
+```
+^Z
+[2]+  Stopped                 sleep 600
+```
+
+在后台恢复挂起的任务（shell会发送任务一个SIGCONT信号）：
+
+```
+jobs
+[2]+  Stopped                 sleep 600
+[3]-  Running                 sleep 500 &
+bg %2
+[2]+ sleep 600 &
+jobs
+[2]-  Running                 sleep 600 &
+[3]+  Running                 sleep 500 &
+```
+
+停止后台作业（发送SIGSTOP）：
+
+```
+jobs
+[2]-  Running                 sleep 600 &
+[3]+  Running                 sleep 500 &
+
+kill -STOP %2
+[2]+  Stopped                 sleep 600
+
+jobs
+[2]+  Stopped                 sleep 600
+[3]-  Running                 sleep 500 &
+```
+
+只有前台进程才能从控制终端读取输入，如果后台作业尝试读取输入，会接收到一个SIGTTIN信号，其默认动作是终止进程；默认情况下，后台作业是被允许向控制终端输入内容，如果终端设置了TOSTOP标记（终端输出停止），当后台作业尝试在终端输出时导致SIGTTOU信号，其默认动作也是终止进程
+
+![WechatIMG38.jpeg](https://i.loli.net/2020/01/22/DKvNVwyXWjR8eHB.jpg)
+
