@@ -62,3 +62,31 @@ int setpgrp(void);                   /* System V version */
 int setpgrp(pid_t pid, pid_t pgid);  /* BSD version */
 ```
 
+### 会话
+
+获取会话ID：
+
+```
+#define _XOPEN_SOURCE 500
+#include <unistd.h>
+
+pid_t getsid(pid_t pid);
+// 若成功，返回pid指定的进程所属的会话ID，若出错，返回-1
+// 如果pid指定为0，返回调用进程的会话ID
+```
+
+如果调用进程不是进程组首进程，则创建一个新会话：
+
+```
+#include <unistd.h>
+
+pid_t setsid(void);
+// 若成功，返回新会话的ID，若出错，返回-1
+
+1. 调用进程会成为新会话的首进程和会话中新进程组的首进程
+2. 调用进程没有控制终端，所有之前到控制终端的连接都会断开
+```
+
+如果调用进程是一个进程组首进程，那么setsid调用报EPERM错误，避免的方式是执行fork并让父进程直至以及让子进程调用setsid，由于子进程继承父进程的进程组ID并接收属于自己的唯一的进程ID，因为它无法成为进程组首进程
+
+为了检查进程是否拥有控制终端，可以尝试打开/dev/tty
