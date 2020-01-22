@@ -227,3 +227,14 @@ SIGTTIN和SIGTTOU信号：
 * 如果终端设置了TOSTOP标记，当进程当前处于阻塞状态或忽视SIGTTIN信号的状态，则不发送SIGTTOU信号，这时控制终端发起write调用是允许的（即TOSTOP标记被忽视了）
 * 不管是否设置了TOSTOP标记，后台进程试图在控制终端试图调用会修改终端驱动器数据结构的特定函数（如tcsetpgrp、tcsetattr、tcflush、tcflow、tcsendbreak、tcdrain）时会生成SIGTTOU信号
 
+##### 处理作业控制信号
+
+处理SIGTSTP信号的细节问题：如果它被捕获，就不会执行默认的终止进程的动作，可以让其处理器生成一个SIGSTOP信号，但这种方式不够准确，恰当的处理方式是让SIGTSTP信号再生成一个SIGTSTP信号来停止进程：
+
+1. 处理器将SIGTSTP信号的处理重置为默认SIG_DFL
+2. 处理器生成SIGTSTP信号
+3. 由于SIGTSTP信号会被阻塞进入处理器（除非指定SA_NODEFER），因此处理器会解除该信号的阻塞，这时生成的SIGTSTP信号会导致默认动作的执行，立即挂起进程
+4. 当进程接收到SIGCONT信号时会恢复
+5. 返回之前，处理器会重新阻塞SIGTSTP信号并重新注册本身来处理下一个SIGTSTP信号，重新阻塞SIGTSTP信号的目的是为了防止处理器重新注册本身之后和返回之前接收到另一个SIGTSTP信号导致处理器被递归调用的情况
+
+对于作业控制信号（SIGTSTP、SIGTTIN、SIGTTOU），在非作业控制shell中，这些信号的处理被设置成了SIG_IGN，只有作业控制shell时才会设置为SIG_DFL，类似的规则适用于其他由终端产生的信号如：SIGINT、SIGQUIT、SIGHUP
