@@ -129,3 +129,21 @@ int tcsetpgrp(int fd, pid_t pgid);
 // pgid必须与调用进程所属的会话中一个进程的进程组ID匹配
 ```
 
+### SIGHUP信号
+
+发送SIGHUP的条件：
+
+* 终端驱动器检测到连接断开
+* 终端窗口被关闭
+
+SIGHUP的默认动作是终止进程
+
+向控制进程发送SIGHUP信号会引起链式反应，从而导致将SIGHUP发送给很多其他进程，两种情况：
+
+##### 在shell中处理SIGHUP信号
+
+登录会话中，shell通常是控制进程，大多数shell程序在交互运行时会为SIGHUP建立处理器，其会终止shell，但在终止之前会向shell创建的各个进程组（前台进程组和后台进程组）发送SIGHUP信号，但是不会向不是由该shell创建的进程组发送此信号
+
+##### SIGHUP和控制进程的终止
+
+Linux上，SIGHUP后会跟随一个SIGCONT信号以确保之前被停止的进程组可以恢复
