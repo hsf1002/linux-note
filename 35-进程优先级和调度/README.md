@@ -80,6 +80,67 @@ SCHED_IDLE：与SCHED_OTHER类似，差别在于nice值毫无意义，它运行�
 int sched_get_priority_min(int policy); // 返回指定策略的最小优先级
 int sched_get_priority_max(int policy); // 返回指定策略的最大优先级
 // 若成功，返回非负整数，若出错，返回-1
+
 // policy指的是调度策略
+SCHED_RR: 实时循环
+SCHED_FIFO: 实时先入先出
+SCHED_IDLE: 与SCHED_OTHER类似
+SCHED_BATCH: 与SCHED_OTHER类似，用于批量执行
+SCHED_OTHER: 标准的循环时间共享
 ```
+
+##### 修改和获取策略和优先级
+
+修改进程pid的调度策略和优先级：
+
+```
+#include <sched.h>
+
+int sched_setscheduler(pid_t pid, int policy, const struct sched_param *param);
+// 若成功，返回0，若出错，返回-1
+// 对于SCHED_RR和SCHED_FIFO，param必须是sched_get_priority_min和sched_get_priority_max之间，对于其他，必须是0
+// 若成功，会将pid指定的进程移到与其优先级对应的队列队尾
+// fork创建的子进程会继承父进程的调度策略和优先级，且在exec中保持
+
+struct sched_param
+{
+    int sched_priority;
+}
+```
+
+sched_setparam提供了一个功能子集，仅修改优先级：
+
+```
+int sched_setparam(pid_t pid, const struct sched_param *param);
+// 若成功，返回0，若出错，返回-1
+```
+
+获取进程的调度策略和优先级：
+
+```
+int sched_getscheduler(pid_t pid);
+// 若成功，返回调度策略，若出错，返回-1
+int sched_getparam(pid_t pid, struct sched_param *param);
+// 若成功，返回0，param返回优先级，若出错，返回-1
+
+// 如果pid是0，则返回调用进程的信息
+```
+
+##### 防止实时进程锁住系统
+
+由于SCHED_RR和SCHED_FIFO进程会抢占低优先级的进程，因避免一直占用CPU从而锁住系统的情况：
+
+* 使用setrlimit设置一个合理的低软CPU时间组员限制，如果进程消耗太多CPU，会收到SIGXCPU，默认终止进程
+* 使用alarm设置警报定时器，如果超出，SIGALRM会终止进程
+* 创建一个拥有高实时优先级的看门狗进程，无限循环监控其他进程的状态（主要是CPU消耗量）
+* 非标准的资源限制RLIMIT_RTTIME，限制了一个进程在不执行阻塞式系统调用能够消耗的CPU时间，单位毫秒
+
+##### 子进程的调度策略
+
+如果指定了SCHED_RESET_ON_FORK标记，fork时创建的子进程不会继承特权调度策略和优先级，规则：
+
+* 如果调用进程的调度策略是SCHED_RR和SCHED_FIFO，子进程的策略被重置为SCHED_OTHER
+* 如果进程的nice值为负值（高优先级），子进程的nice被重置为0
+
+一旦启用该标记，只有特权进程（CAP_SYS_NICE）才能禁用此标记
 
