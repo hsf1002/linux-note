@@ -144,3 +144,13 @@ int sched_getparam(pid_t pid, struct sched_param *param);
 
 一旦启用该标记，只有特权进程（CAP_SYS_NICE）才能禁用此标记
 
+##### 释放CPU
+
+实时进程通过两种方式自愿释放CPU：阻塞式系统调用如read或：
+
+```
+int sched_yield(void);
+// 若成功，返回0，若出错，返回-1
+// 如果存在与调用进程相同的排队的其他可运行的进程，调用进程放在队尾，队头进程开始运行，如果队列中没有可运行的进程，那么sched_yield不会做任何事情，调用进程继续使用CPU
+```
+
