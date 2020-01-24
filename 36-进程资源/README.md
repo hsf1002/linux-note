@@ -57,3 +57,20 @@ struct rlimit
 
 fork创建的子进程会继承这些限制且在exec调用之间不会得到保持
 
+### 资源限制细节
+
+* RLIMIT_AS：限制进程的虚拟内存的最大字节数，影响brk、sbrk、mmap、mremap、shmat，超过返回ENOMEM错误
+* RLIMIT_CORE：限制产生的core文件的大小，0表示阻止生成core文件
+* RLIMIT_CPU：限制进程最多使用CPU的时间，超过返回SIGXCPU错误（每超过一秒发送一次，达到硬限制后发送SIGKILL信号）
+* RLIMIT_DATA：限制进程数据段的大小，影响brk、sbrk，超过返回ENOMEM错误
+* RLIMIT_FSIZE：限制进程能够创建的文件的大小，超过内核就会发送SIGXFSZ信号，系统调用write返回EFBIG错误
+* RLIMIT_MEMLOCK：限制一个进程最多多少字节的虚拟内存能够锁进物理内存防止内存被交换出去，影响mlock、mlockall、mmap、shmctl
+* RLIMIT_MSGQUEUE：限制能够为调用进程的真实用户ID的POSXI消息队列分配的最大字节
+* RLIMIT_NICE：nice和sched_setscheduler能够为进程设置的最大nice值，通过公式20-rlim_cur计算而来
+* RLIMIT_NOFILE：一个进程能够分配的最大文件描述符数量加1，由/proc/sys/fs/nr_open定义，失败的错误一般是EMFILE，但是在dup2中，返回错误是EBADF，fcntl返回错误是EINVAL；还有一个系统级限制，规定了所有进程能够打开的文件数量：/proc/sys/fs/file-max；Linux上还可以通过使用readdir扫描/proc/PID/fd目录下的内容检查一个进程当前打开的文件描述符
+* RLIMIT_NPROC：限制了进程的真实用户ID下最多能够创建的进程数量，试图fork、vfork、clone超过限制返回EAGAIN错误；Linux特有的/proc/sys/kernel/thread-max表示所有用户能够创建的线程数量
+* RLIMIT_RSS：Linux上没起作用
+* RLIMIT_RTPRIO：限制了sched_setscheduler和sched_setparam能够为进程设置的最高实时优先级
+* RLIMIT_RTTIME：规定了进程在实时调度策略中不睡眠（即执行阻塞式调用）情况下最大能消耗的CPU秒数，达到限制时行为与RLIMIT_CPU表现一样
+* RLIMIT_SIGPENDING：限制了调用进程的真实用户ID下信号队列中最多容纳的信号（标准信号+实时信号）数量，超过返回EAGAIN错误
+* RLIMIT_STACK：限制了进程栈的大小，试图扩展内核发送一个SIGSEGV信号
