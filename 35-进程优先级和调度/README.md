@@ -154,3 +154,12 @@ int sched_yield(void);
 // 如果存在与调用进程相同的排队的其他可运行的进程，调用进程放在队尾，队头进程开始运行，如果队列中没有可运行的进程，那么sched_yield不会做任何事情，调用进程继续使用CPU
 ```
 
+##### SCHED_RR时间片
+
+返回SCHED_RR每次被授权使用CPU时分配的时间片长度：
+
+```
+int sched_rr_get_interval(pid_t pid, struct timespec *tp);
+// 若成功，返回0，若出错，返回-1
+```
+
