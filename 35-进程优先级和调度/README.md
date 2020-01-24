@@ -163,3 +163,44 @@ int sched_rr_get_interval(pid_t pid, struct timespec *tp);
 // 若成功，返回0，若出错，返回-1
 ```
 
+### CPU亲和力
+
+为了防止高速缓冲器不一致，多处理器架构在某个时刻只允许数据被存放在一个CPU的高速缓冲器中，软CPU亲和力在条件允许的情况下进程尽量调度到原来的CPU上运行，可以为进程设置硬CPU亲和力，限制其在某个或某几个CPU上运行，原因是：
+
+* 避免由高速缓冲器的数据失效带来的性能影响
+* 多线程中可能提升性能
+* 对于时间关键的应用程序而言，可能需要为此应用预留一个或更多CPU，而将系统中大多数进程限制在其他CPU上
+
+设置pid指定的进程的CPU亲和力：
+
+```
+#define _GNU_SOURCE
+#include <sched.h>
+
+int sched_setaffinity(pid_t pid, size_t len, cpu_set_t *set);
+// 若成功，返回0，若出错，返回-1
+// 若pid是0，则指调用进程本身
+// CPU亲和力实际是线程属性，pid可以指定为gettid()
+```
+
+cpu_set_t是一个位掩码，应将其看成不透明的结构，所有这个结构的操作都应该使用宏：
+
+```
+void CPU_ZERO(cpu_set_t *set);        // 将set初始化为空
+void CPU_SET(int cpu, cpu_set_t *set);// 将cpu添加到set
+void CPU_CLR(int cpu, cpu_set_t *set);// 将cpu从set删除
+
+int CPU_ISSET(int cpu, cpu_set_t *set);// cpu是否属于set
+// 若成功，返回1，若出错，返回0
+```
+
+获取pid指定的进程亲和力掩码：
+
+```
+int sched_getaffinity(pid_t pid, size_t len, cpu_set_t *set);
+// 若成功，返回0，若出错，返回-1
+// 如果CPU亲和力没被修改，则返回系统所有CPU集合
+// 执行时不会进行权限检查，非特权及成年后能够获取所有进程的CPU亲和力掩码
+```
+
+fork创建的子进程会继承父进程的CPU亲和力掩码且在exec调用之间保留
