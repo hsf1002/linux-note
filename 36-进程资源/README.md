@@ -36,3 +36,24 @@ struct rusage
 };
 ```
 
+### 进程资源限制
+
+Linux特有的/proc/PID/limits文件可以查看任意进程的所有资源限制
+
+```
+#include <sys/resource.h>
+
+int getrlimit(int resource, struct rlimit *rlim);
+int setrlimit(int resource, const struct rlimit *rlim);
+// 若成功，返回0，若出错，返回-1
+
+struct rlimit
+{
+    rlim_t rlim_cur;  // 软限制：实际限制（取值0到硬限制之间）
+    rlim_t rlim_max;  // 硬限制：上限（特权CAP_SYS_RESOUCE进程能够增减硬限制，非特权进程只能减小）
+}
+// 如果无法表示，则RLIM_SAVED_CUR和RLIM_SAVED_MAX分别是rlim_cur和rlim_max的返回值
+```
+
+fork创建的子进程会继承这些限制且在exec调用之间不会得到保持
+
