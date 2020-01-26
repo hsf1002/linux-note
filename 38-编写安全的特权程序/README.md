@@ -104,3 +104,6 @@ set-user-ID和set-group-ID程序不应假设环境变量的值是可靠的，特
 
 set-user-ID程序应该避免假设其初始的运行环境是可靠的，如标准输入、输出或错误可能会被关闭
 
+### 小心缓冲区溢出
+
+永远不要使用gets、使用scanf、sprintf、strcpy、strcat时需要谨慎，最好使用其安全版本如snprintf、strncpy、strncat等，即使使用它们也要小心
