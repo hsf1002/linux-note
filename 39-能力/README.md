@@ -170,3 +170,13 @@ fork创建的子进程会继承securebits的标记，调用exec期间，除了SE
 * 使用strace检查哪个系统调用的错误号是EPERM，但偶尔其他原因也会导致这个错误
 * 使用一个内核探针在内核被要求执行能力检查时产生监控输出
 
+### 不具备文件能力的老式内核和系统
+
+Linux在下面两个场景中不支持文件能力：
+
+1. Linux2.6.24之前的内核
+2. Linux2.6.24以后的内核，但没有指定CONFIG_SECURITY_FILE_CAPABILITIES选项
+
+一个在有效集中包含CAP_SETPCAP能力的进程能够修改处自身之外的其他进程的能力
+
+通过Linux特有的/proc/sys/kernel/cap-bound可以查看系统级别的能力边界集，进程必须具备CAP_SYS_MODULE能力才能修改此文件的内容，只有init进程才能开启这个掩码的位
