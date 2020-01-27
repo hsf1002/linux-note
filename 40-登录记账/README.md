@@ -8,3 +8,7 @@ wtmp：包含所有用户登录和登出的记录，登录时在写入utmp的同
 
 在Linux中，utmp文件位于/var/run/utmp，wtmp文件位于/var/log/wtmp，程序中应使用`_PATH_UTMP`和`_PATH_WTMP`
 
+### utmpx API
+
+Linux提供了传统的utmp和从System V演化而来的utmpx API，这两组API返回的信息是完全一样的，差别之一是utmp API中的一些函数时可重入的，而utmpx中的函数时不可重入的
+
