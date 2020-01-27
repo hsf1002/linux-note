@@ -147,3 +147,18 @@ P'(effective) = P(effective)
 * 新许可集必须是既有许可集的一个子集
 * 新的有效集只能包含位于新许可集中的能力
 
+### 创建仅包含能力的环境
+
+从内核2.6.26开始，当在内核中启用文件能力时，Linux提供了securebits机制，他可以控制一组进程级别的标记，通过这组标记可以分别启用或禁用针对root的三种特殊情况的各种处理
+
+```
+SECBIT_KEEP_CAPS: 当一个或多个用户ID为0的进程将其所有的用户ID设置为非0时不要删除许可权限
+SECBIT_NO_SETUID_FIXUP: 有效用户或文件系统用户ID在0和非0之间切换时不要改变能力
+SECBIT_NOROOT: 真实或有效用户ID为0的进程调用exec或执行set-user-ID-root程序时不要赋予其能力
+
+SECBIT_KEEP_CAPS_LOCKED: 锁住SECBIT_KEEP_CAPS
+SECBIT_NO_SETUID_FIXUP_LOCKED: 锁住SECBIT_NO_SETUID_FIXUP
+SECBIT_NOROOT_LOCKED: 锁住SECBIT_NOROOT
+```
+
+fork创建的子进程会继承securebits的标记，调用exec期间，除了SECBIT_KEEP_CAPS之外的标记会保留
