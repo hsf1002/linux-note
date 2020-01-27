@@ -162,3 +162,11 @@ SECBIT_NOROOT_LOCKED: 锁住SECBIT_NOROOT
 ```
 
 fork创建的子进程会继承securebits的标记，调用exec期间，除了SECBIT_KEEP_CAPS之外的标记会保留
+
+### 发现程序所需的能力
+
+当一个程序不是set-user-ID-root程序时，如何确定将哪些能力赋予它：
+
+* 使用strace检查哪个系统调用的错误号是EPERM，但偶尔其他原因也会导致这个错误
+* 使用一个内核探针在内核被要求执行能力检查时产生监控输出
+
