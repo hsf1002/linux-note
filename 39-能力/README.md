@@ -85,3 +85,47 @@ fork创建的子进程会继承父进程的能力集，能力时一个线程级�
 * 内核必须提供允许获取和修改进程能力的系统调用
 * 内核必须支持将能力附加给可执行文件的概念
 
+### 在exec中转变进程能力
+
+在执行exec期间，内核会根据进程的当前能力以及被执行的文件的能力集设置进程新能力，规则：
+
+```
+P'(permitted) = (P(inheritable) & F(inheritable)) | (F(permitted) & cap_bset)             
+// 新进程的permitted有老进程的和新进程的inheritable和可执行文件的permitted及cap_bset运算得到
+P'(effective) = F(effective) ? P'(permitted) : 0            
+// 新进程的effective依赖可执行文件的effective位，使能和新进程的permitted一样，负责为空
+P'(inheritable) = P(inheritable)    [i.e., unchanged]       
+// 新进程的inheritable直接继承老进程的Inheritable
+
+说明:
+P   在执行execve函数前，进程的能力
+P'  在执行execve函数后，进程的能力
+F   可执行文件的能力
+cap_bset 系统能力的边界值，在此处默认全为1
+```
+
+##### 能力边界值
+
+是一种用于限制进程在exec期间能够获取的能力的安全机制：
+
+* exec调用期间，能力边界集会与文件许可能力取AND来确定被授予新程序的许可能力
+* 能力边界集时一个可以被添加到进程的可继承集中的能力的受限超集
+
+fork创建的子进程会继承这个特性并在exec中保持，init启动时会使用一个包含了所有能力的能力边界集
+
+准确的说，能力边界集是一个线程特性，/proc/PID/task/TID/status中的CapBnd字段可以查看
+
+##### 保持root语义
+
+执行一个文件时 为了保持root用户的传统语义，与该文件关联的所有能力集都会被忽略，exec调用期间，文件能力集的定义如下：
+
+* 如果执行了set-user-ID-root程序或调用exec的进程的真实或有效用户ID为0，那么文件的可继承和许可集被定义为包含所有能力
+* 如果执行了set-user-ID-root程序或调用exec的进程的有效用户ID为0，那么文件的有效位被定义为设置状态
+
+如在执行一个set-user-ID-root程序，根据文件能力集的概念，进程的新许可和有效能力集被简化了：
+
+```
+P'(permitted) = P(inheritable) | cap_bset          
+P'(effective) = P(effective)    
+```
+
