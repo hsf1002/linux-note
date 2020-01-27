@@ -118,3 +118,20 @@ void updwtmpx(char *wtmpx_file, struct utmpx *ut);
 // 将ut指向的记录追加到wtmpx_file的文件尾
 ```
 
+### lastlog文件
+
+lastlog记录着每个用户最近一次登录到系统的时间，提供登录服务的程序出了更新utmp和wtmp外，还应该更新lastlog文件，Linux上，此文件时/var/log/lastlog，通常也受保护
+
+```
+#define UT_NAMESIZE  32
+#define UT_HOSTSIZE  256
+
+struct lastlog
+{
+  time_t ll_time;
+  char   ll_line[UT_NAMESIZE];
+  char   ll_host[UT_HOSTSIZE];
+}
+```
+
+并没有包含用户名或用户ID，lastlog文件中的记录用用户ID作为索引，如要找出用户ID为1000的lastlog的记录，需要到文件的位置（1000*sizeof(struct lastlog)）查找
