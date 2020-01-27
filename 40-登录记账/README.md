@@ -46,3 +46,39 @@ USER_PROCESS：记录用户进程，通常是登录会话
 DEAD_PROCESS：记录标识出已经退出的进程
 ```
 
+### 从utmp和wtmp文件中检索信息
+
+将utmp文件的当前位置设置到起始：
+
+```
+#include <utmpx.h>
+
+void setutxent(void);
+```
+
+读取一条记录：
+
+```
+struct utmpx *getutxent(void);  // 顺序读取utmp文件的下一条记录
+struct utmpx *getutxid(const struct utmpx *ut);   // 从当前位置读取与ut匹配的记录，根据ut参数中的ut_type和ut_id字段搜索
+struct utmpx *getutxline(const struct utmpx *ut); // 从当前位置读取与ut匹配的记录，搜索字段ut_type为LOGIN_PROCESS或USER_PROCESS且ut_line与ut参数匹配的记录
+// 若成功，返回一个指向utmpx结构的指针（静态分配的），若到文件尾或没有匹配的记录，返回NULL
+```
+
+关闭文件：
+
+```
+void endutxent(void);
+```
+
+指定文件：
+
+```
+#define _GNU_SOURCE
+#include <utmpx.h>
+
+int utmpxname(const char *file);
+// 若成功，返回0，若出错，返回-1
+// 默认情况下，搜索的是utmp文件，如果是另一个文件如wtmp，必须调用此函数
+```
+
