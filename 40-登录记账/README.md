@@ -91,3 +91,30 @@ char *getlogin(void);
 
 getlogin会调用ttyname找出与调用进程的标准输入关联的终端名，接着搜索utmp文件找出ut_line值与终端名匹配的记录，如果找到了，就返回ut_user字段；失败可能是进程没有一个与其标准输入关联的终端，或者进程本身是一个daemon，或者终端会话没有记录在utmp中
 
+### 为登录会话更新utmp和wtmp文件
+
+在创建一个登录会话的程序如login或sshd，应该遵循下面的步骤更新utmp和wtmp文件：
+
+* 在登录的时候向utmp文件写入一条记录表明这个用户登录进系统了
+* 在登出的时候应该删除之前写入的utmp文件的记录，如果因为程序奔溃而没有及时清理，下一次重启init会自动清理那些记录
+
+通常utmp和wtmp文件只有特权用户才能更新
+
+将ut指向的记录写入到utmp文件中：
+
+```
+struct utmp *pututxline(const struct utmpx *ut);
+// 若成功，返回更新后的记录，若出错，返回NULL
+// pututxline会首先使用getutxid搜索一个可被重写的记录，如果找到就重写，否则就追加
+```
+
+将ut指向的记录追加到wtmp文件中：
+
+```
+#define _GNU_SOURCE
+#include <utmpx.h>
+
+void updwtmpx(char *wtmpx_file, struct utmpx *ut);
+// 将ut指向的记录追加到wtmpx_file的文件尾
+```
+
