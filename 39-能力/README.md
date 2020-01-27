@@ -138,3 +138,12 @@ P'(effective) = P(effective)
 * 如果一个进行原来的真实用户ID，有效用户ID，保存设置用户ID是0，由于某些操作这些ID都变成了非0，那么所有的的P和E能力全部清理
 * 如果一个文件系统的用户ID从0变成非0，那么以下的能力在E集合中清除：CAP_CHOWN, CAP_DAC_OVERRIDE,  CAP_DAC_READ_SEARCH,  CAP_FOWNER,  CAP_FSETID,  CAP_LINUX_IMMUTABLE  (since  Linux  2.2.30),  CAP_MAC_OVERRIDE,  CAP_MKNOD，如果一个文件系统的用户ID从0变成非0，那么在P集合中使能的能力将设置到E集合中
 
+### 用编程的方式改变进程能力
+
+修改进程能力的规则：
+
+* 如果进程的有效集中没有CAP_SETPCAP能力，新的可继承集必须是既有可继承集、许可集的一个子集
+* 新的可继承集必须是既有可继承集、能力边界集的一个子集
+* 新许可集必须是既有许可集的一个子集
+* 新的有效集只能包含位于新许可集中的能力
+
