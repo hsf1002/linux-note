@@ -82,3 +82,12 @@ int utmpxname(const char *file);
 // 默认情况下，搜索的是utmp文件，如果是另一个文件如wtmp，必须调用此函数
 ```
 
+### 获取登录名称
+
+```
+char *getlogin(void);
+// 若成功，返回登录名称，若出错，返回NULL
+```
+
+getlogin会调用ttyname找出与调用进程的标准输入关联的终端名，接着搜索utmp文件找出ut_line值与终端名匹配的记录，如果找到了，就返回ut_user字段；失败可能是进程没有一个与其标准输入关联的终端，或者进程本身是一个daemon，或者终端会话没有记录在utmp中
+
