@@ -129,3 +129,12 @@ P'(permitted) = P(inheritable) | cap_bset
 P'(effective) = P(effective)    
 ```
 
+### 改变用户ID对进程能力的影响
+
+为了与用户ID在0与非0之间切换的传统语义保持兼容，在改变进程的用户ID时，内核会完成如下操作：
+
+* 当一个进程的有效用户ID从0变化到非0， 那么所有的E能力清零
+* 当一个进程的有效用户ID从非0变化到0，那么现有的P集合拷贝到E集合
+* 如果一个进行原来的真实用户ID，有效用户ID，保存设置用户ID是0，由于某些操作这些ID都变成了非0，那么所有的的P和E能力全部清理
+* 如果一个文件系统的用户ID从0变成非0，那么以下的能力在E集合中清除：CAP_CHOWN, CAP_DAC_OVERRIDE,  CAP_DAC_READ_SEARCH,  CAP_FOWNER,  CAP_FSETID,  CAP_LINUX_IMMUTABLE  (since  Linux  2.2.30),  CAP_MAC_OVERRIDE,  CAP_MKNOD，如果一个文件系统的用户ID从0变成非0，那么在P集合中使能的能力将设置到E集合中
+
