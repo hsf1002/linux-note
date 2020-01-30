@@ -94,3 +94,12 @@ identifier = index + xxx_perm.__seq * SEQ_MULTIPLIER
 // index是关联数据结构entries数组的下标，SEQ_MULTIPLIER是一个常数
 ```
 
+### ipcs和ipcrm命令
+
+ipcs可以获取系统上IPC对象的信息，ipcrm可以删除一个IPC对象
+
+
+
+### IPC限制
+
+Linux上，ipcs -l可以列出各种IPC限制，程序使用LInux特有的IPC_INFO ctl操作获取同样的信息
