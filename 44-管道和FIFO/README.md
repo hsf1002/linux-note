@@ -95,3 +95,7 @@ popen与pipe一样，从管道读取时，若调用进程在cmd关闭写端，�
 * popen不忽略SIGINT和SIGQUIT信号，如果这些信号从键盘产生，它们会被发送到调用进程和被执行的命令中
 * 调用进程在popen和pclose之间可能创建子进程，SUSv3要求popen不能阻塞SIGCHLD信号
 
+### 管道和stdio缓冲
+
+popen返回的文件流没有引用一个终端，stdio库对这种文件流应用块缓冲，即以w打开popen时，默认只有sdio缓冲器满或pclose关闭了管道之后输出才被发送到另一个进程，如果要立刻接收数据，需要定期调用fflush或使用setbuf(fp, NULL)禁用stdio缓冲
+
