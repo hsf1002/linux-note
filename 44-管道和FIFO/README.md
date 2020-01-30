@@ -99,3 +99,38 @@ popen与pipe一样，从管道读取时，若调用进程在cmd关闭写端，�
 
 popen返回的文件流没有引用一个终端，stdio库对这种文件流应用块缓冲，即以w打开popen时，默认只有sdio缓冲器满或pclose关闭了管道之后输出才被发送到另一个进程，如果要立刻接收数据，需要定期调用fflush或使用setbuf(fp, NULL)禁用stdio缓冲
 
+### FIFO
+
+FIFO类似，差别在于FIFO在文件系统中拥有一个名称，使得其打开方式与普通文件类似，这样能够将FIFO用于非相关进程之间的通信，FIFO也有一个读端和写端，且从管道中读取数据的顺序与写入的顺序一致，FIFO的名称来源于此，也称为命名管道，shell 中使用mkfifo创建一个FIFO
+
+```
+mkfifo test
+ls -al test 
+prw-r--r--  1 sky  staff  0  1 30 15:52 test // p表示文件类型是FIFO
+ls -F test 
+test|  // | 表示管道符
+```
+
+```
+#include <sys/stat.h>
+
+int mkfifo(const char *pathname, mode_t mode);
+// 若成功，返回0，若出错，返回-1
+// 一旦FIFO被创建，任何进程都可以打开，只要能够通过常规的文件权限检测
+// SUSv3明确指出以O_RDWR方式打开一个FIFO的结果是未知的
+```
+
+shell管道线的一个特征是线性的，每个进程读取前一个进程的输出并发送到下一个进程的中，使用FIFO能在管道中创建子进程，这样除了将一个进程的输出发送到下一个进程外，还可以复制进程的输出并发送到另一个进程，完成这个任务需要tee命令：它将从标准输入读取的数据复制两份，一份写到标准输出，一份写入到指定的文件
+
+```
+wc -l < test & // 从管道文件中读取数据，如果没有数据则一直阻塞
+[1] 31130
+ls -l | tee test | sort -k5n // 将ls -l的输出写到管道文件，并传递给sort
+prw-r--r--  1 sky  staff     0  1 30 15:52 744
+prw-r--r--  1 sky  staff     0  1 30 15:52 test
+total 16
+-rw-r--r--@ 1 sky  staff  6456  1 30 15:54 README.md
+
+[1]+  Stopped                 wc -l < test // 从管道文件读取数据完毕，进程结束
+```
+
