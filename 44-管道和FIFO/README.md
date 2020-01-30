@@ -72,5 +72,26 @@ if (fd[1] != STDOUT_FILENO)
 }
 ```
 
+### 用管道与shell命令进行通信
 
+```
+#include <stdio.h>
+
+FILE *popen(const char *cmd, const char *mode);
+// 若成功，返回文件流指针，若出错，返回NULL
+// 创建一个管道，再创建一个子进程来执行shell，而shell又创建一个子进程来执行cmd字符串
+// mode的取值：
+r：以读方式打开，cmd标准输出写入管道，调用进程从管道读取
+w：以写方式打开，cmd标准输入读取管道，调用进程向管道写入
+
+int pclose(FILE *fp);
+// 若成功，返回子进程的终止状态，若出错，返回-1
+```
+
+popen与pipe一样，从管道读取时，若调用进程在cmd关闭写端，则read返回0，向管道写入时，若cmd关闭读端，则调用进程收到SIGPIPE信号及EPIPE错误；一旦IO结束，应该使用pclose关闭管道并等待子进程中shell的终止（不应该使用fclose，它不会等待子进程）
+
+有关system的规范适用于popen，使用popen更加方便，它会构建管道、执行文件描述符、关闭未使用的描述符并处理fork和exec的所有细节，这种便捷性牺牲的是效率，与system一样，特权进程中永远不该使用popen；调用system时shell命令被封装在单个函数，而调用popen时，调用进程与shell命令并行运行，然后调用pclose，具体的细节差异：
+
+* popen不忽略SIGINT和SIGQUIT信号，如果这些信号从键盘产生，它们会被发送到调用进程和被执行的命令中
+* 调用进程在popen和pclose之间可能创建子进程，SUSv3要求popen不能阻塞SIGCHLD信号
 
