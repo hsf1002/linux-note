@@ -48,3 +48,25 @@ SUSv3要求：
 
 Linux上ftok返回32位的key，由proj的低8位+文件所属的文件系统的次要设备号的低8位+pathname对应的i-node号的低16位组成，不同的文件可能产生的key相同，不过概率很小，因为不同文件系统上的两个文件的i-node号的最低16位可能相同，且两个不同的磁盘设备可能拥有同样的次要设备号
 
+### 关联数据结构和对象权限
+
+一旦IPC对象被创建，可以指定IPC_STAT操作获取该对象关联数据结构的一个副本，使用IPC_SET修改这个结构的部分数据，除了各种IPC特有数据外，三种包含同一个结构ipc_perm，即对象的权限信息：
+
+```
+struct ipc_perm
+{
+key_t  key;  /* 关键字 */
+uid_t  uid;  /* 所有者的有效用户ID，可更改 */
+gid_t  gid;  /* 所有者所属组的有效组ID*/
+uid_t  cuid; /* 创建者的有效用户ID，不可更改 */
+gid_t  cgid; /* 创建者所属组的有效组ID*/
+unsigned short  mode; /* Permissions + SHM_DEST和SHM_LOCKED标志*/
+unsigned short  seq;  /* 序列号*/
+};
+```
+
+IPC对象的权限模型和文件比，有明显差异
+
+* IPC对象只有读和写权限有意义，执行权限没有意义
+* 权限检测根据进程的有效用户ID、有效组ID、以及辅助组ID进行，文件使用的是文件系统ID
+
