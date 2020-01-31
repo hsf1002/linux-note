@@ -98,7 +98,20 @@ identifier = index + xxx_perm.__seq * SEQ_MULTIPLIER
 
 ipcs可以获取系统上IPC对象的信息，ipcrm可以删除一个IPC对象
 
+### 获取所有的IPC对象列表
 
+Linux提供了两种获取系统所有IPC对象列表的非标准方法：
+
+1. /proc/sysvipc目录
+2. 使用Linux特有的ctl调用
+
+/proc/sysvipc目录下由三个只读文件：
+
+```
+/proc/sysvipc/msg
+/proc/sysvipc/sem
+/proc/sysvipc/shm
+```
 
 ### IPC限制
 
