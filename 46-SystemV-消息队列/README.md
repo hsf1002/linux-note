@@ -80,3 +80,15 @@ type：返回哪一种消息，非0来取非先进先出的消息
     type<0：返回消息队列中消息类型值小于等于type绝对值的消息，如果由多个，取类型值最小的消息
 ```
 
+### 控制操作
+
+```
+int msgctl(int msqid, int cmd, struct msgid_ds *buf);
+// 若成功，返回0，若出错，返回-1
+
+cmd参数指定对msgid的队列要执行的命令，这三条命令也适用于信号量和共享存储
+IPC_STAT：取队列的msqid_ds结构，放在buf中
+IPC_SET：将字段msg_perm.uid、msg_perm.gid、msg_perm.mode和msg_qbytes从buf指向的结构复制到msqid
+IPC_RMID：删除消息队列及其数据，立刻生效，队列中剩余消息都会丢失，所有被阻塞的读者和写者进程会立刻醒来，忽略第三个参数
+```
+
