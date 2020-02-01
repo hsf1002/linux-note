@@ -61,3 +61,22 @@ int msgsnd(int msqid, const void *ptr, size_t nbytes, int flag);
 flag：可以指定为IPC_NOWAIT，类似于文件IO的非阻塞标志
 ptr：是一个mymsg的结构
 ```
+
+### 读取消息
+
+```
+ssize_t msgrcv(int msqid, void *ptr, size_t nbytes, long type, int flag);
+// 若成功，返回消息数据部分的长度，若出错，返回-1
+
+和msgsnd一样，ptr指向一个长整型数，其后是实际消息数据的缓冲区
+nbytes：缓冲区的长度
+flag：
+    MSG_NOERROR：若消息长度大于nbytes，且flag设置了MSG_NOERROR，消息会被截断，不设置此标志位，则出错返回E2BIG，
+    MSG_NOWAIT：执行非阻塞接收
+    MSG_EXCEPT：只有当type大于0才起作用，将队列中第一条mtype不等于type的消息删除并将其返回给调用者
+type：返回哪一种消息，非0来取非先进先出的消息
+    type==0：返回队列第一条消息
+    type>0：返回队列消息类型是type的第一条消息
+    type<0：返回消息队列中消息类型值小于等于type绝对值的消息，如果由多个，取类型值最小的消息
+```
+
