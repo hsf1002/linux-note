@@ -94,3 +94,12 @@ IPC_SET：将字段msg_perm.uid、msg_perm.gid、msg_perm.mode和msg_qbytes从bu
 IPC_RMID：删除消息队列及其数据，立刻生效，队列中剩余消息都会丢失，所有被阻塞的读者和写者进程会立刻醒来，忽略第三个参数
 ```
 
+### 消息队列的限制
+
+* MSGMNI：系统级，所能创建的消息队列标识符的数量（即消息队列的个数）
+* MSGMAX：系统级，单条消息最多可写入的字节数（msgsnd，EINVAL）
+* MSGMNB：系统级，一个消息队列中一次最多可以保存的字节数（msg_qbytes）
+* MSGTQL：系统级，所有消息队列所能存放的消息总数
+* MSGPOLL：系统级，所有消息队列的数据的缓冲池的大小
+
+Linux特有的msgctl IPC_INFO操作能够获取一个类型为msginfo的结构，其中包含了各种消息队列的限制值
