@@ -1,25 +1,27 @@
 ## 第46章 System V 消息队列
 
-### 创建或打开一个消息队列
+### 数据结构
 
 ```
 struct msqid_ds 
 {
-    struct ipc_perm msg_perm;	/* see Section 15.6.2 */
-    struct msg *msg_first;      /* first message on queue,unused  */
-    struct msg *msg_last;       /* last message in queue,unused */
-    __kernel_time_t msg_stime;  /* last msgsnd time */
-    __kernel_time_t msg_rtime;  /* last msgrcv time */
-    __kernel_time_t msg_ctime;  /* last change time */
+    struct ipc_perm msg_perm;	  /* 其中的uid、gid、mode可以通过IPC_SET修改 */
+    struct msg *msg_first;      /* 第一条消息，未使用  */
+    struct msg *msg_last;       /* 最后一条消息，未使用 */
+    __kernel_time_t msg_stime;  /* 初始值为0，调用msgsnd后更新为当前时间 */
+    __kernel_time_t msg_rtime;  /* 初始值为0，调用msgrcv后更新为当前时间 */
+    __kernel_time_t msg_ctime;  /* 创建或调用IPC_SET后更新为当前时间 */
     unsigned long  msg_lcbytes; /* Reuse junk fields for 32 bit */
     unsigned long  msg_lqbytes; /* ditto */
-    unsigned short msg_cbytes;  /* current number of bytes on queue */
-    unsigned short msg_qnum;    /* number of messages in queue */
-    unsigned short msg_qbytes;  /* max number of bytes on queue */
-    __kernel_ipc_pid_t msg_lspid;   /* pid of last msgsnd */
-    __kernel_ipc_pid_t msg_lrpid;   /* last receive pid */
+    unsigned short msg_cbytes;  /* 调用msgsnd或msgrcv后后更新 */
+    unsigned short msg_qnum;    /* 消息队列当前总数，调用msgsnd后递增，调用msgrcv后递减 */
+    unsigned short msg_qbytes;  /* 消息队列所有消息的mtext字段的大小总和 */
+    __kernel_ipc_pid_t msg_lspid;   /* 初始值为0，调用msgsnd后更新为调用进程的PID */
+    __kernel_ipc_pid_t msg_lrpid;   /* 初始值为0，调用msgrcv后更新为调用进程的PID */
 };
 ```
+
+### 创建或打开一个消息队列
 
 ```
 #include <sys/msg.h>
