@@ -42,3 +42,22 @@ msg_ctime：设置为当前时间
 msg_qbytes：设置为系统限制值
 ```
 
+### 发送消息
+
+```
+struct mymsg
+{
+    long mtype;
+    char mtext[512];
+}
+```
+
+```
+int msgsnd(int msqid, const void *ptr, size_t nbytes, int flag);
+// 若成功，返回0，若出错，返回-1
+// msgsnd若成功返回，消息队列相关的msqid_ds结构会随之更新
+
+每个消息包含三部分：一个正的长整型字段、一个非负长度nbytes以及实际数据，总是放在队列尾端
+flag：可以指定为IPC_NOWAIT，类似于文件IO的非阻塞标志
+ptr：是一个mymsg的结构
+```
