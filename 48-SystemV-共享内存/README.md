@@ -2,22 +2,24 @@
 
 ### 概述
 
-共享内存不由内核控制，意味着需要某种同步机制使得进程不会同时访问共享内存
+共享内存不由内核控制，意味着需要某种同步机制使得进程不会同时访问共享内存，它允许两个或多个进程共享一个给定的存储区，因为数据不需要在客户进程和服务器进程之间复制，这是最快的一种IPC
 
 ### 数据结构
 
 ```
-struct semid_ds 
+struct shmid_ds 
 {
-    struct ipc_perm    sem_perm;        /* 对信号量操作的许可权 */
-    __kernel_time_t    sem_otime;       /* 创建时初始化为0，调用semop成功或因SEM_UNDO改变时修改为当前时间 */
-    __kernel_time_t    sem_ctime;       /* 创建时及每次IPC_SET、IPC_SETALL、IPC_SETVAL时修改为当前时间 */
-    unsigned short     sem_nsems;       /* 数组中的信号量数 */
-
-    struct sem    *sem_base;            /*指向第一个信号量 */
-    struct sem_queue *sem_pending;      /* 等待处理的挂起操作 */
-    struct sem_queue **sem_pending_last;/* 最后一个正在挂起的操作 */
-    struct sem_undo    *undo;           /* 撤销的请求 */
+    struct ipc_perm        shm_perm;     /* 操作许可 */
+    int                    shm_segsz;    /* 共享内存大小，字节为单位 */
+    __kernel_time_t        shm_atime;    /* 创建时初始化为0，调用shmat后设置为当前时间 */
+    __kernel_time_t        shm_dtime;    /* 创建时初始化为0，调用shmdt后设置为当前时间 */
+    __kernel_time_t        shm_ctime;    /* 创建或每次IPC_SET后设置为当前时间 */
+    __kernel_ipc_pid_t    shm_cpid;      /* 创建共享内存的PID */
+    __kernel_ipc_pid_t    shm_lpid;      /* 创建时初始化为0，调用shaat或shadt后设置为调用进程的PID */
+    unsigned short        shm_nattch;    /* 当前使用该共享内存的进程数量，调用shmat递加，调用shmdt递减 */
+    unsigned short        shm_unused;    /* compatibility */
+    void             *shm_unused2;    /* ditto - used by DIPC */
+    void             *shm_unused3;    /* unused */
 };
 ```
 
