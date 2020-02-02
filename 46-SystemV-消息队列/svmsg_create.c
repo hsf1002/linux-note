@@ -93,8 +93,8 @@ main(int argc, char *argv[])
         }
     }
 
-    // 必须携带-f、-k、-p至少一个参数
-    if (-1 != num_key_flag)
+    // 必须携带-f、-k、-p一个参数，表示创建key的三种方式
+    if (1 != num_key_flag)
         usage_error(argv[0], "exactly one of the options[-f][-k][-p] must be supplied\n");
     
     // 创建共享内存

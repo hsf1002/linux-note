@@ -43,7 +43,31 @@ usage_error(const char *progName, const char *msg)
 
 /**
  *   使用System V消息队列，接收消息
- */
+
+// 要有root权限，否则消息发送失败
+su
+Password:
+sh-3.2# ./svmsg_create -p
+svmsg create success, msgid = 65538
+sh-3.2# ./svmsg_send 65538 20 "I hear and I forget."
+svmsg send success, msgid = 65538, msg_len = 21, msg_text = I hear and I forget.
+sh-3.2# ./svmsg_send 65538 10 "I see and I remember."
+svmsg send success, msgid = 65538, msg_len = 22, msg_text = I see and I remember.
+sh-3.2# ./svmsg_send 65538 30 "I do and I understand."
+svmsg send success, msgid = 65538, msg_len = 23, msg_text = I do and I understand.
+sh-3.2# ./svmsg_receive -t -20 65538
+svmsg receive success, msgid = 65538, msg_len = 21, mtype = 20
+svmsg msg: I hear and I forget.
+sh-3.2# ./svmsg_receive -t -20 65538
+svmsg receive success, msgid = 65538, msg_len = 22, mtype = 10
+svmsg msg: I see and I remember.
+sh-3.2# ./svmsg_receive -t -20 65538
+^Z
+[1]+  Stopped(SIGTSTP)        ./svmsg_receive -t -20 65538
+sh-3.2# ./svmsg_receive 65538
+svmsg receive success, msgid = 65538, msg_len = 23, mtype = 30
+svmsg msg: I do and I understand. 
+*/
 int
 main(int argc, char *argv[])    
 {
@@ -74,7 +98,7 @@ main(int argc, char *argv[])
         #ifdef MSG_EXCEPT    
             case 'x':
             {
-                flag | MSG_EXCEPT;
+                flag |= MSG_EXCEPT;
             }
             break;
         #endif
@@ -94,7 +118,7 @@ main(int argc, char *argv[])
     max_byptes = (argc > optind + 1) ? getInt(argv[optind + 1], 0, "max-bytes") : MAX_MTEXT;
 
     // 接收消息并打印到终端
-    if (-1 == msgrcv(msgid, &msg, max_byptes, type, flag))
+    if (-1 == (msg_len = msgrcv(msgid, &msg, max_byptes, type, flag)))
     {
         perror("msgrcv error");
         exit(EXIT_FAILURE);

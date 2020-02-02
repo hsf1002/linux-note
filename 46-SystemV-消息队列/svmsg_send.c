@@ -83,7 +83,7 @@ main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    printf("svmsg send success, msgid = %d\n", msgid);
+    printf("svmsg send success, msgid = %d, msg_len = %d, msg_text = %s\n", msgid, msg_len, msg.mtext);
 
     exit(EXIT_SUCCESS);
 }
