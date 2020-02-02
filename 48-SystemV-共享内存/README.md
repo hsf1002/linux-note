@@ -55,33 +55,19 @@ SHM_LOCK：对共享存储加锁，锁进内存RAM
 SHM_UNLOCK：对共享存储解锁，允许它被交换出去
 ```
 
-### 信号量操作
+### 使用共享内存
 
 ```
-#define _GNU_SOURCE
-#include <sys/types.h>
-#include <sys/sem.h>
+void *shmat(int shmid, const void *addr, int flag);
+// 若成功，返回指向共享存储段的指针，若出错，返回-1
 
-int semop(int semid, struct sembuf semoparray[], size_t nops);
-// 若成功，返回0，若出错，返回-1
-// 具有原子性，或者执行数组中所有操作，或者一个也不做
+addr==0：内核选择的第一个可用地址上，推荐的方式
+addr非0且没有指定SHM_RND：连接到addr指定的地址(SHM_RND的意思是取整)
+addr非0且指定了SHM_RND：连接到addr mod SHMLBA(shared memory low boundary)所表示的地址
 
-semoparray指向一个有sembuf结构表示的信号量操作数组
-struct sembuf
-{
-    unsigned short sem_num;
-    short sem_op;	  /* operatioin(negative, 0, or positive */
-    short sem_flg;	/* IPC_NOWAIT, SEM_UNDO */
-}
-
-sem_op为正：表示进程释放的占用的资源数，sem_op的值会加到信号量值上，若指定了SEM_UNDO，则从信号量调整值减去sem_op
-sem_op为负：表示要获取由该信号量控制的资源，若信号量值大于等于sem_op绝对值，则从信号量值中减去sem_op绝对值，若指定了SEM_UNDO，则sem_op的绝对值加到信号量调整值上
-sem_op为0：表示调用进程希望等待到该信号量值变成0，如果是0立即结束，否则一直阻塞
-
-
-int semtimedop(int semid, struct sembuf semoparray[], size_t nops, struct timespec *timeout);
-// 若成功，返回0，若出错，返回-1
-// 通过timeout设置阻塞的时间上限，如果设置为NULL，与semop一样
+flag指定为
+SHM_RDONLY：表示只读，试图更新导致SIGSEGV信号，否则以读写方式连接
+SHM_REMAP：指定之后addr必须是非0
 ```
 
 ### 多个阻塞信号量操作的处理
