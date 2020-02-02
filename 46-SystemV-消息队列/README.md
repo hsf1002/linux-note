@@ -103,3 +103,15 @@ IPC_RMID：删除消息队列及其数据，立刻生效，队列中剩余消息
 * MSGPOLL：系统级，所有消息队列的数据的缓冲池的大小
 
 Linux特有的msgctl IPC_INFO操作能够获取一个类型为msginfo的结构，其中包含了各种消息队列的限制值
+
+### 显示系统中所有消息队列
+
+获取系统中IPC对象的方法，除了/proc下的一组文件外，就是Linux特有的ctl方法如msgctl：
+
+* MSG_INFO、SEM_INFO、SHM_INFO
+* MSG_STAT、SEM_STAT、SHM_STAT：与IPC_STAT操作一样，获取一个IPC对象的数据结构，差别是，这些操作的第一个参数是entries数组的下标，如果操作成功，返回下标对应的IPC对象的标识符
+
+查找系统上所有消息队列的步骤：
+
+1. 使用MSG_INFO查找消息队列的entries数组的最大下标
+2. 执行循环，从0到最大下标之间的每个值都执行一个MSG_STAT操作
