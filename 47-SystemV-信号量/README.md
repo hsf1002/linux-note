@@ -82,6 +82,37 @@ GETZCNT：返回正在等待完全空闲资源的进程的数量
 除了GETALL以外的所有GET命令，返回相应值，其他命令，若成功，返回0，若出错，返回-1
 ```
 
+### 信号量操作
+
+```
+#define _GNU_SOURCE
+#include <sys/types.h>
+#include <sys/sem.h>
+
+int semop(int semid, struct sembuf semoparray[], size_t nops);
+// 若成功，返回0，若出错，返回-1
+// 具有原子性，或者执行数组中所有操作，或者一个也不做
+
+semoparray指向一个有sembuf结构表示的信号量操作数组
+struct sembuf
+{
+    unsigned short sem_num;
+    short sem_op;	  /* operatioin(negative, 0, or positive */
+    short sem_flg;	/* IPC_NOWAIT, SEM_UNDO */
+}
+
+sem_op为正：表示进程释放的占用的资源数，sem_op的值会加到信号量值上，若指定了SEM_UNDO，则从信号量调整值减去sem_op
+sem_op为负：表示要获取由该信号量控制的资源，若信号量值大于等于sem_op绝对值，则从信号量值中减去sem_op绝对值，若指定了SEM_UNDO，则sem_op的绝对值加到信号量调整值上
+sem_op为0：表示调用进程希望等待到该信号量值变成0，如果是0立即结束，否则一直阻塞
+
+
+int semtimedop(int semid, struct sembuf semoparray[], size_t nops, struct timespec *timeout);
+// 若成功，返回0，若出错，返回-1
+// 通过timeout设置阻塞的时间上限，如果设置为NULL，与semop一样
+```
+
+
+
 ### 消息队列的限制
 
 * MSGMNI：系统级，所能创建的消息队列标识符的数量（即消息队列的个数）
