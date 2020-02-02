@@ -23,20 +23,20 @@ struct shmid_ds
 };
 ```
 
-### 创建或打开一个信号量集
+### 创建或打开一个共享内存
 
 ```
-#include <sys/sem.h>
+#include <sys/shm.h>
 
-int semget(key_t key, int nsems, int flag);
-// 若成功，返回信号量ID，若出错，返回-1
-// 若创建一个新集合，必须指定nsems，且大于0
-// 若引用现有集合，将nsems指定为0
-// 无法修改一个既有集中信号量个数
+int shmget(key_t key, size_t size, int flag);
+// 若成功，返回共享存储ID，若出错，返回-1
+// size是共享存储段的长度，如果创建，必须指定size，且其内容初始化为0，如果引用，则将size指定为0
 
 flag的取值：
 IPC_CREAT：若key相关的信号量集不存在，则创建
 IPC_EXCL：若key相关的信号量存在且指定了IPC_CREAT，返回EEXIST错误
+SHM_HUGETLB：特权（CAP_IPC_LOCK）进程使用此标记创建一个使用huge page的共享内存，可降低硬件内存管理单元的超前转换缓冲器
+SHM_NORESERVE：与MAP_NORESERVE在mmap中所起的作用一样
 ```
 
 ### 控制操作
