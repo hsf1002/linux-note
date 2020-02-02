@@ -1,5 +1,7 @@
 ## 第47章 System V 信号量
 
+
+
 ### 数据结构
 
 ```
@@ -36,13 +38,34 @@ IPC_EXCL：若key相关的信号量存在且指定了IPC_CREAT，返回EEXIST错
 ### 控制操作
 
 ```
-int msgctl(int msqid, int cmd, struct msgid_ds *buf);
-// 若成功，返回0，若出错，返回-1
+int semctl(int semid, int semnum, int cmd, .../* union semun arg */);
+// 返回值，见下
+// 若是操作单个信号量，semnum是信号量集的数组索引，其他操作忽略此参数
 
-cmd参数指定对msgid的队列要执行的命令，这三条命令也适用于信号量和共享存储
-IPC_STAT：取队列的msqid_ds结构，放在buf中
-IPC_SET：将字段msg_perm.uid、msg_perm.gid、msg_perm.mode和msg_qbytes从buf指向的结构复制到msqid
-IPC_RMID：删除消息队列及其数据，立刻生效，队列中剩余消息都会丢失，所有被阻塞的读者和写者进程会立刻醒来，忽略第三个参数
+arg是联合，而非联合的指针
+union semun
+{
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+}
+
+cmd的含义如下：
+常规操作---忽略semnum参数
+IPC_STAT：对此集合取semid_ds结构，存储在arg.buf指向的结构
+IPC_SET：对信号量的属性进行设置
+IPC_RMID：删除semid指定的信号量集合semid_ds结构，所有因semop调用中等待这个集合的信号量而阻塞的进程立刻唤醒
+获取和初始化信号量值---
+GETVAL：返回信号量集semnum指定信号量的值
+GETALL：返回信号集量中所用信号量的值
+SETVAL：设置信号量集中semnum指定的信号量的值
+SETALL：设置信号量集中所用信号量的值
+获取单个信号量的信息---
+GETPID：返回最后一个执行semop操作的进程ID
+GETNCNT：返回正在等待资源的进程的数量
+GETZCNT：返回正在等待完全空闲资源的进程的数量
+
+除了GETALL以外的所有GET命令，返回相应值，其他命令，若成功，返回0，若出错，返回-1
 ```
 
 ### 消息队列的限制
