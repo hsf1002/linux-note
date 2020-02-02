@@ -20,7 +20,17 @@ struct semid_ds
 ### 创建或打开一个信号量集
 
 ```
+#include <sys/sem.h>
 
+int semget(key_t key, int nsems, int flag);
+// 若成功，返回信号量ID，若出错，返回-1
+// 若创建一个新集合，必须指定nsems，且大于0
+// 若引用现有集合，将nsems指定为0
+// 无法修改一个既有集中信号量个数
+
+flag的取值：
+IPC_CREAT：若key相关的信号量集不存在，则创建
+IPC_EXCL：若key相关的信号量存在且指定了IPC_CREAT，返回EEXIST错误
 ```
 
 ### 控制操作
