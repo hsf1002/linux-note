@@ -139,27 +139,20 @@ int semtimedop(int semid, struct sembuf semoparray[], size_t nops, struct timesp
 
 * 有条件的预留：如果信号量已经被一个进程预留了，立即返回状态不可用
 
-### 消息队列的限制
+### 信号量的限制
 
-* MSGMNI：系统级，所能创建的消息队列标识符的数量（即消息队列的个数）
-* MSGMAX：系统级，单条消息最多可写入的字节数（msgsnd，EINVAL）
-* MSGMNB：系统级，一个消息队列中一次最多可以保存的字节数（msg_qbytes）
-* MSGTQL：系统级，所有消息队列所能存放的消息总数
-* MSGPOLL：系统级，所有消息队列的数据的缓冲池的大小
+* SEMAEM：semadj总和的最大值（semop，ERANGE）
+* SEMMNI：系统级，所能创建的信号量标识符的数量，信号量集的个数（semget，ENOSPC）
+* SEMMSL：一个信号量集所能分配的最大数量（semget，EINVAL）
+* SEMMNS：系统级，所有信号量集上信号量数量（semget、ENOSPC）
+* SEMOPM：每个semop调用能够执行操作的最大数量（E2BIG）
+* SEMVMX：一个信号量值的最大值（semop，ERANGE）
+* SEMMNU：系统级，信号量撤销结构的总数量
+* SEMUME：每个信号量撤销结构中撤销条目的最大值
 
-Linux特有的msgctl IPC_INFO操作能够获取一个类型为msginfo的结构，其中包含了各种消息队列的限制值
+Linux特有的/proc/sys/kernel/sem中有些值可以修改
 
-### 显示系统中所有消息队列
-
-获取系统中IPC对象的方法，除了/proc下的一组文件外，就是Linux特有的ctl方法如msgctl：
-
-* MSG_INFO、SEM_INFO、SHM_INFO
-* MSG_STAT、SEM_STAT、SHM_STAT：与IPC_STAT操作一样，获取一个IPC对象的数据结构，差别是，这些操作的第一个参数是entries数组的下标，如果操作成功，返回下标对应的IPC对象的标识符
-
-查找系统上所有消息队列的步骤：
-
-1. 使用MSG_INFO查找消息队列的entries数组的最大下标
-2. 执行循环，从0到最大下标之间的每个值都执行一个MSG_STAT操作
+Linux特有的semctl IPC_INFO操作能够获取一个类型为seminfo的结构，其中包含了各种消息队列的限制值
 
 ### System V 消息队列的缺陷
 
