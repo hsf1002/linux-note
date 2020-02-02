@@ -39,7 +39,7 @@ struct semid_ds
 #include <sys/sem.h>
 
 int semget(key_t key, int nsems, int flag);
-// 若成功，返回信号量ID，若出错，返回-1
+// 若成功，返回信号量集标识符，若出错，返回-1
 // 若创建一个新集合，必须指定nsems，且大于0
 // 若引用现有集合，将nsems指定为0
 // 无法修改一个既有集中信号量个数
@@ -152,7 +152,7 @@ int semtimedop(int semid, struct sembuf semoparray[], size_t nops, struct timesp
 
 Linux特有的/proc/sys/kernel/sem中有些值可以修改
 
-Linux特有的semctl IPC_INFO操作能够获取一个类型为seminfo的结构，其中包含了各种消息队列的限制值
+Linux特有的semctl IPC_INFO操作能够获取一个类型为seminfo的结构，其中包含了各种的限制值
 
 ### System V 信号量的缺陷
 
