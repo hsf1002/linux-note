@@ -42,34 +42,17 @@ SHM_NORESERVE：与MAP_NORESERVE在mmap中所起的作用一样
 ### 控制操作
 
 ```
-int semctl(int semid, int semnum, int cmd, .../* union semun arg */);
-// 返回值，见下
-// 若是操作单个信号量，semnum是信号量集的数组索引，其他操作忽略此参数
-
-arg是联合，而非联合的指针
-union semun
-{
-    int val;
-    struct semid_ds *buf;
-    unsigned short *array;
-}
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+// 若成功，返回0，若出错，返回-1
 
 cmd的含义如下：
-常规操作---忽略semnum参数
-IPC_STAT：对此集合取semid_ds结构，存储在arg.buf指向的结构
-IPC_SET：对信号量的属性进行设置
-IPC_RMID：删除semid指定的信号量集合semid_ds结构，所有因semop调用中等待这个集合的信号量而阻塞的进程立刻唤醒
-获取和初始化信号量值---
-GETVAL：返回信号量集semnum指定信号量的值
-GETALL：返回信号集量中所用信号量的值
-SETVAL：设置信号量集中semnum指定的信号量的值
-SETALL：设置信号量集中所用信号量的值
-获取单个信号量的信息---
-GETPID：返回最后一个执行semop操作的进程ID
-GETNCNT：返回正在等待资源的进程的数量
-GETZCNT：返回正在等待完全空闲资源的进程的数量
+IPC_STAT：读取共享内存区的shmid_ds机构，并将其存储到buf指向的地址
+IPC_RMID：从系统中删除由shmid指向的共享内存区，以及数据结构shmid_ds，如果当前无进程附加该段，执行删除操作，否则等所有进程已经与该段分离（即shm_nattch字段为0）之后再删除
+IPC_SET：设置共享内存的shmid_ds结构
 
-除了GETALL以外的所有GET命令，返回相应值，其他命令，若成功，返回0，若出错，返回-1
+Linux和Solaris还提供了另外两个命令
+SHM_LOCK：对共享存储加锁，锁进内存RAM
+SHM_UNLOCK：对共享存储解锁，允许它被交换出去
 ```
 
 ### 信号量操作
