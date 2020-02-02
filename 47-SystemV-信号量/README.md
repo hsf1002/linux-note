@@ -111,6 +111,11 @@ int semtimedop(int semid, struct sembuf semoparray[], size_t nops, struct timesp
 // 通过timeout设置阻塞的时间上限，如果设置为NULL，与semop一样
 ```
 
+### 多个阻塞信号量操作的处理
+
+* 如果多个因减小一个信号量值而发生阻塞的进程对该信号量减去的数值一样，则当条件满足时哪个进程最先唤醒时不确定的
+* 如果多个因减小一个信号量值而发生阻塞的进程对该信号量减去的数值不一样，则最先满足条件的进程先唤醒
+
 
 
 ### 消息队列的限制
