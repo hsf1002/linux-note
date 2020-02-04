@@ -30,7 +30,7 @@ main(int argc, char *argv[])
         fprintf(stderr, "%s pathname\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-
+printf("stren = %d, sizeof = %d\n", strlen(argv[1]), sizeof(req.pathname));
     if (strlen(argv[1]) > sizeof(req.pathname) - 1)
     {
         perror("pathname too long");
@@ -44,47 +44,52 @@ main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+printf("server queue get ok\n");
     // 创建客户端的消息队列
     if (-1 == (client_id = msgget(IPC_PRIVATE, S_IRUSR | S_IWUSR | S_IWGRP)))
     {
         perror("msgget create error");
         exit(EXIT_FAILURE);
     }
-
+printf("client queue create ok\n");
     // 注册注销函数以删除消息队列
     if (0 != atexit(remove_queue))
         perror("atexit error");
-    
+printf("atexit ok\n");    
     req.mtype = 1;
     req.client_id = client_id;
     strncpy(req.pathname, argv[1], sizeof(req.pathname) - 1);
-
+    req.pathname[sizeof(req.pathname) - 1] = '\0';
+printf("prepare to send msg\n");
     // 向服务器发送消息，传递客户端消息队列标识符和文件路径
     if (-1 == msgsnd(server_id, &req, REQ_MSG_SIZE, 0))
     {
         perror("msgsnd clientid error");
         exit(EXIT_FAILURE);
     }
-
+    else
+    {
+        printf("client:send the first message\n");
+    }
     // 接收服务器发送的第一条消息
     if (-1 == (msg_len = msgrcv(client_id, &res, RES_MSG_SIZE, 0, 0)))
         perror("msgrcv the first msg error");
-
+    else
+        printf("client:receive the first message, type=%d\n", res.mtype);
     // 原因是文件打开失败
     if (res.mtype == RES_MT_FAILURE)
     {
         printf("%s \n", res.data);
-        if (-1 == msgctl(client_id, IPC_RMID, NULL))
-            perror("msgctl remove client");
         exit(EXIT_FAILURE);
     }
 
     total_bytes = msg_len;
+    printf("client:total = %ld\n", total_bytes);
 
     for (num_msg=1; res.mtype==RES_MT_DATA; num_msg++)
     {
         // 循环不断接收服务端的消息
-        if (-1 == (msg_len = msgrcv(server_id, &res, RES_MSG_SIZE, 0, 0)))
+        if (-1 == (msg_len = msgrcv(client_id, &res, RES_MSG_SIZE, 0, 0)))
         {
             perror("msgrcv data error");
             exit(EXIT_FAILURE);
