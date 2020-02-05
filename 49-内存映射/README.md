@@ -99,3 +99,17 @@ int munmap(void *addr, size_t len);
 
 创建一个大小超过底层文件大小的映射可能是无意义的，但通过扩展文件的方法（write或ftruncate）可以使得这种映射之前不可访问的部分变得可用
 
+### 同步映射区域：msync
+
+内核自动将发生在MAP_SHARED映射内容的变更写入底层文件，但默认内核不会保证同步何时发生，可手动同步：
+
+```
+int msync(void *addr, size_t len, int flag);
+// 若成功，返回0，若出错，返回-1
+// addr和len指定了需同步的起始地址和大小
+// flag的取值：
+MS_SYNC: 同步写入，阻塞直到所有修改被写入磁盘
+MS_ASYNC: 异步写入，仅与内核高速缓冲区同步，会在将来某个时刻写入磁盘（由pdflush内核线程执行）
+MS_INVALIDTE: 使得映射数据的缓存副本失效
+```
+
