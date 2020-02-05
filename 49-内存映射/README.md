@@ -113,3 +113,14 @@ MS_ASYNC: 异步写入，仅与内核高速缓冲区同步，会在将来某个�
 MS_INVALIDTE: 使得映射数据的缓存副本失效
 ```
 
+### mmap的其他标记
+
+除了MAP_PRIVATE和MAP_SHARED之外，还有其他标记，SUSv3之规定了MAP_FIXED
+
+* MAP_ANONYMOUS：创建 一个匿名映射
+* MAP_FIXED：
+* MAP_HUGETLB：创建一个使用巨页的映射
+* MAP_LOCKED：将映射分页锁进内存
+* MAP_NORRESERVE：是否提前为映射的交换空间执行预留
+* MAP_POPULATE：填充一个映射的分页，对文件映射而言，将执行超前读取
+* MAP_UNINITIALIZED：不清楚匿名映射
