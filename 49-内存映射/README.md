@@ -23,5 +23,25 @@
 
 通过Linux特有的/proc/PID/maps能够查看一个进程的映射信息
 
-### 
+### 创建一个映射
+
+```
+#include <sys/mmap.h>
+
+void *mmap(void *addr, size_t len, int prot, int flag, int fd, off_t offset);
+// 若成功，返回映射起始地址，若出错，返回MAP_FAILED
+// addr为NULL，内核自动选择一个合适的地址，这是推荐的可移植的做法
+// len指定了映射的字节数
+// prot的取值（一个进程若在访问时违反了保护位，内核产生SIGSEGV信号）：
+PROT_NONE: 区域内容无法访问
+PROT_READ: 区域内容可读
+PROT_WRITE: 区域内容可写
+PROT_EXEC: 区域内容可执行
+// flag的取值：
+MAP_PRIVATE: 私有映射，区域内内容发生的变更对使用同一映射的其他进程不可见，对文件映射，变更不会反应在底层文件
+MAP_SHARED: 共享映射，区域内内容发生的变更对使用同一映射的其他进程可见，对文件映射，变更会反应在底层文件
+// fd和offset用于文件映射，标识被映射的文件和偏移（是系统分页大小的倍数），映射整个文件，将offset指定为0且len为文件大小
+```
+
+
 
