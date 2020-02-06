@@ -198,3 +198,42 @@ Linux特有的/proc/PID/oom_score代表的权重越大，被杀死的可能性�
 
 使用remap_file_pages可以取得同样的效果，它是Linux特有的
 
+### 非线性映射：remap_file_pages
+
+使用mmap创建的文件映射是连续的，映射文件的分页与内存区域的分页存在一个顺序的，一对一的对应关系
+
+![WechatIMG46.jpeg](https://i.loli.net/2020/02/06/IlpXMBmYziVaNbC.jpg)
+
+使用MAP_FIXED的mmap调用创建非线性映射的伸缩性不好，每个mmap调用都会创建一个独立的内核虚拟内存区域（VMA）数据结构，大量的VMA会降低虚拟内存管理器的性能，/proc/PID/maps的一行代表一个VMA
+
+使用remap_file_pages创建非线性映射的步骤：
+
+1. 使用mmap创建一个映射
+2. 使用一个或多个remap_file_pages调整内存分页和文件分页之间的对应关系
+
+```
+#define _GNU_SOURCE
+#include <sys/mman.h>
+
+int remap_file_pages(void *addr, size_t size, int prot, size_t pgoff, int flag);
+// 若成功，返回0，若出错，返回-1
+// addr标识分页需调整的既有映射，必须是位于之前创建的映射区域的地址
+// size指定了文件区域的长度，单位是字节
+// pgoff指定了文件区域的起始位置，单位是系统分页代销
+// prot会被忽略，其值必须是0
+// flag未使用
+// 目前仅适用于MAP_SHARED映射
+```
+
+```
+// 系统分页大小
+ps =  sysconf(_SC_PAGESIZE);
+// 创建包含三个系统分页的共享文件映射
+addr = mmap(0, 3*ps, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+// 将文件分页0映射到内存区域的分页2
+remap_file_pages(addr, ps, 0, 2, 0);
+// 将文件分页2映射到内存区域的分页0
+remap_file_pages(addr + 2*ps, ps, 0, 0, 0);
+```
+
