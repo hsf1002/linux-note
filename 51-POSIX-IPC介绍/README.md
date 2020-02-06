@@ -34,3 +34,14 @@ System V IPC可以通过ipcs和ipcrm来列出和删除IPC对象，POSIX IPC没�
 
 需要连接实时库librt，cc命令可以指定-lrt选项
 
+### System V IPC与POSIX IPC比较
+
+POSIX IPC的优势：
+
+* 接口简单
+* 对象引用计数
+* 使用名字替代键，open、close、unlink与传统UNIX文件模型一致
+
+System V IPC的优势：
+
+* 可移植性
