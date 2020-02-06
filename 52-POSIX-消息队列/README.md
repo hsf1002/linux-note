@@ -122,5 +122,37 @@ mqd_t mq_timedreceive(mqd_t mqdes, char *msg_ptr,
 // Linux上如果abs_timeout为NULL，表示永远不会超时
 ```
 
+### 消息通知
 
+注册调用进程在一条消息进入描述符mqdes引用的空队列时接收通知：
+
+```
+int mq_notify(mqd_t mqdes, const struct sigevent *notification);
+// 若成功，返回0，若出错，返回-1
+```
+
+* 任何时刻都只有一个进程（注册进程）能够向一个特定的消息队列注册接收通知，如果消息队列已经存在注册进程了，则失败返回EBUSY错误
+* 只有当一条新消息进入之前为空的队列时注册进程才会收到通知，如果在注册的时候队列已经有消息，当队列消息被清空后又有新消息到达时才发通知
+* 注册进程发送一个通知之后就会删除注册消息，之后任何进程就能够向队列注册接收通知了，如果一个进程要持续的接收通知，必须每次接收到通知后再次注册
+* 注册进程只有在当前不存在其他在该队列上调用mq_receive而发生阻塞的进程时才会收到通知，如果其他进程在mq_receive阻塞了，那么该进程会读取消息，注册进程会保持注册状态
+* 一个进程可以通过传入notification为NULL撤销自己在消息通知上的注册信息
+
+```
+union sigval 
+{
+	/* Members as suggested by Annex C of POSIX 1003.1b. */
+	int	sival_int;
+	void	*sival_ptr;
+};
+
+struct sigevent
+{
+  int sigev_notify;         // 通知方式：SIGEV_NONE、SIGEV_SIGNAL、SIGEV_THREAD
+  int sigev_signo;          // 如果是SIGEV_SIGNAL，表示信号编号
+  union sigval sigev_value; // 如果是SIGEV_THREAD，表示传入参数
+  
+  void (*sigev_notify_func)(union sigval); // 函数指针
+  void *sigev_notify_attributes;           // really 'pthread_attr_t'
+}
+```
 
