@@ -141,3 +141,51 @@ Linux有两种创建匿名映射的方法：
 ##### 共享匿名映射
 
 允许相关进程共享一块内存区域而无需一个对应的映射文件
+
+### 重新映射一个区域：mremap
+
+```
+#defein _GNU_SOURCE
+#include <sys/mmap.h>
+
+void mremap(void *old_addr, size_t old_size, size_t new_size, int flag, ...);
+// old_addr和old_size指定了需要扩展或收缩的既有映射的位置和大小，新大小通过new_size指定
+```
+
+在重新映射过程中内核可能为映射在进程的虚拟空间重新指定一个位置，具体由flag控制：
+
+* MREMAP_MAYMOVE：内核可能重新指定位置，没有指定此标记且无足够空间扩展，返回ENOMEM错误
+
+* MREMAP_FIXED：只能与MREMAP_MAYMOVE一起使用，且需指定一个额外的 *new_addr的参数，映射将迁移至此，之前由new_addr和new_size范围确定的映射都会被解除
+
+由于调用成功返回的地址可能与之前不同，使用mremap的应用程序在引用映射区的地址时应使用偏移量而不是绝对指针
+
+Linux上，remalloc使用mremap高效的为malloc使用mmap MAP_ANONYMOUS分配的大内存重新指定位置
+
+### MAP_NORRESERVE和过度利用交换空间
+
+懒交换预留：内核只在用到映射分页的时候（即当程序访问访问时）为它们预留交换空间，优点是程序总共利用的虚拟内存量能够超过RAM+交换空间的总量，这种方式可以很好工作，只要所有进程都不试图访问整个映射，否则RAM和交换空间就会被耗尽，此时内核会杀死系统中一个多多个进程降低内存压力
+
+```
+overcommit_memory  指定了MAP_NORRESERVE  未指定
+0                    允许过度利用         拒绝明显的过度利用
+1                    允许过度利用         允许过度利用
+2                    严格的过度利用        严格的过度利用
+```
+
+Linux特有的/proc/sys/vm/overcommit_memory的值控制着内核对交换空间过度利用的处理，当其值大于等于2时，内核在所有mmap分配上执行严格的记账并将系统分配的总量控制在小于等于：
+
+```
+[swap_size] + [RAM_size] overcommit_ratio * / 100
+```
+
+Linux特有的/proc/sys/vm/overcommit_ratio是一个整数百分比，默认50，表示内核最多可分配的空间为系统RAM总量的50%，只适用于私有可写映射和共享匿名映射
+
+OOM杀手一般不会杀死这些进程：
+
+* 特权进程，因为他们可能在执行重要的任务
+* 正在访问裸设备（没有分区格式化，无法被读取）的进程，杀死他们可能导致设备处于不可用状态
+* 已经运行很长时间或已经消耗大量CPU的进程，杀死他们可能导致丢失很多“工作”
+
+Linux特有的/proc/PID/oom_score代表的权重越大，被杀死的可能性越大，而Linux特有的/proc/PID/oom_adj可以影响oom_score的值，其值在-16到+15之间，负数减小oom_score，正数增加oom_score，特殊值-17完全将进程从OOM杀手名单删除
+
