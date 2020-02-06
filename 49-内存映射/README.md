@@ -189,3 +189,12 @@ OOM杀手一般不会杀死这些进程：
 
 Linux特有的/proc/PID/oom_score代表的权重越大，被杀死的可能性越大，而Linux特有的/proc/PID/oom_adj可以影响oom_score的值，其值在-16到+15之间，负数减小oom_score，正数增加oom_score，特殊值-17完全将进程从OOM杀手名单删除
 
+### MAP_FIXED标记
+
+指定了MAP_FIXED，那么addr必须分页对齐，可移植程序不该指定此标记并将addr置为NULL，存在需要指定此标记的情况是，它可以将一个文件的多个部分映射到一块连续的内存区域：
+
+1. 使用mmap创建一个匿名映射，mmap调用中将addr指定为NULL并不指定MAP_FIXED
+2. 使用一系列指定了MAP_FIXED的mmap调用将文件区域映射（重叠覆盖）到上步创建的映射的不同部分
+
+使用remap_file_pages可以取得同样的效果，它是Linux特有的
+
