@@ -76,3 +76,21 @@ int mincore(void *addr, size_t len, unsigned char *vec);
 // 返回起始地址为addr长度为len字节的虚拟地址范围内的内存驻留信息，通过vec返回
 ```
 
+### 建议后续的内存使用模式：madvise
+
+madvise通过通知内核调用进程对起始地址为addr长度为len的范围分页可能的使用情况来提升程序性能
+
+```
+#define _BSD_SOURCE
+#include <sys/mman.h>
+
+int madvise(void *addr, size_t len, int advise);
+// 若成功，返回0，若出错，返回-1
+// advise的取值：
+MADV_NORMAL：默认行为，分页以簇的形式传输，导致一些预先读和事后读
+MADV_RANDOM：会被随机访问
+MADV_SEQUENTIAL：只会被访问一次，且时顺序访问，内核会激进的预先读，并在访问之后就将分页释放了
+MADV_WILLNEED：预先读此区域以备将来的访问只需
+MADV_DONTNEED：调用进程不再要求此区域的分页驻留在内存中
+```
+
