@@ -63,3 +63,16 @@ MCL_CURRENT: 将调用进程的虚拟地址空间中当前所有映射的分页�
 MCL_FUTURE: 将后续调用进程的虚拟地址空间中所有分页锁进内存
 ```
 
+### 确定内存驻留性：mincore
+
+查询在一个虚拟地址范围内哪些分页当前驻留在RAM，因此访问时不会导致分页故障：
+
+```
+#define _BSD_SOURCE
+#include <sys/mman.h>
+
+int mincore(void *addr, size_t len, unsigned char *vec);
+// 若成功，返回0，若出错，返回-1
+// 返回起始地址为addr长度为len字节的虚拟地址范围内的内存驻留信息，通过vec返回
+```
+
