@@ -54,3 +54,31 @@ fork的子进程会接收父进程的消息队列描述符的副本，不会继�
 
 POSIX消息队列在Linux被实现成了虚拟文件系统中的i-node，消息队列描述符和打开着的消息队列之间的关系与文件描述符与打开着的文件之间的关系类似
 
+### 消息队列特性
+
+```
+struct mq_attr
+{
+  long int mq_flags;    // 消息队列的标志：0或O_NONBLOCK,用来表示是否阻塞 
+  long int mq_maxmsg;   // 消息队列的最大消息数
+  long int mq_msgsize;  // 消息队列中每个消息的最大字节数
+  long int mq_curmsgs;  // 消息队列中当前的消息数目
+  long int __pad[4];
+};
+```
+
+##### 获取消息队列特性
+
+```
+mqd_t mq_getattr(mqd_t mqdes, struct mq_attr *attr);
+// 若成功，返回0，若出错，返回-1
+```
+
+##### 修改消息队列特性
+
+```
+mqd_t mq_setattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
+// 若成功，返回0，若出错，返回-1
+// 如果oldattr不为NULL，就返回之前的特性
+```
+
