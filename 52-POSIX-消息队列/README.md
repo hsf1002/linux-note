@@ -82,3 +82,45 @@ mqd_t mq_setattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
 // 如果oldattr不为NULL，就返回之前的特性
 ```
 
+### 交换消息
+
+##### 发送消息
+
+```
+int mq_send(mqd_t mqdes, const char *msg_ptr, size_t msg_len, unsigned msg_prio);
+// 若成功，返回0，若出错，返回-1
+// msg_len指定了msg_ptr指向的消息的长度，必须小于等于队列的mq_msgsize，长度为0是允许的
+// msg_prio是非负的优先级，0表示优先级最低，无需使用优先级，指定为0即可
+```
+
+##### 接收消息
+
+```
+ssize_t mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, unsigned *msg_prio);
+// 若成功，返回成功接收的字节数，若出错，返回-1
+// 删除一条优先级最高，存在时间最长的消息
+// 如果消息队列为空，一直阻塞直到有可用的消息，启用标记O_NONBLOCK则立即失败返回EAGAIN错误
+```
+
+##### 设置超时
+
+```
+#define _XOPEN_SOURCE 600
+#include <mqueue.h>
+#include <time.h>
+
+int mq_timedsend(mqd_t mqdes, const char *msg_ptr,
+                      size_t msg_len, unsigned msg_prio,
+                      const struct timespec *abs_timeout);
+// 若成功，返回0，若出错，返回-1
+// 如果要指定一个相对的时长，可以使用clock_gettime来获取CLOCK_REALTIME时钟的当前值并加上时长
+ 
+mqd_t mq_timedreceive(mqd_t mqdes, char *msg_ptr,
+                      size_t msg_len, unsigned *msg_prio,
+                      const struct timespec *abs_timeout);
+// 若成功，返回成功接收的字节数，若出错，返回-1
+// Linux上如果abs_timeout为NULL，表示永远不会超时
+```
+
+
+
