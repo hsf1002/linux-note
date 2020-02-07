@@ -148,5 +148,10 @@ int sem_init(sem_t *sem, int pshared, unsigned int value);
 
 它们的性能比较接近，但是互斥体是首选，因为其所有权属性能够确保代码具有良好的结构性，信号量有时候被称为并发性编程中的goto；信号处理器中可以使用sem_post与另一个线程同步，而互斥体接口并非接口安全，然而处理异步信号的首选方法是使用sigwaitinfo来接收信号，而不是使用信号处理器
 
+### 信号量的限制
 
+SUSv3定义了两个限制：
+
+* SEM_NSEMS_MAX：一个进程能够拥有的POSIX信号量的最大数目
+* SEM_VALUE_MAX：一个POSIX信号量值能取的最大值
 
