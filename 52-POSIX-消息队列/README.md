@@ -191,6 +191,14 @@ rm /dev/mqueue/newq
 ./pmsg_create -c /mq
 ./pmsg_send /mq abcdefg
 cat /dev/mqueue/mq
+
+./mq_notify_sig /mq &
+cat /dev/mqueue/mq
+
+kill %1
+
+./mq_notify_thread /mq &
+cat /dev/mqueue/mq
 ```
 
 ##### 使用另一种IO模型操作消息队列
@@ -210,3 +218,14 @@ Linux特有的/proc/sys/fs/mqueue下三个值：
 
 Linux特有的RLIMIT_MSGQUEUE为属于调用进程的真实用户ID的所有消息队列消耗的空间提供了上限
 
+### POSIX和System V消息队列比较
+
+优势：
+
+* 消息通知特性允许一个进程能够在一条消息进入前为空的队列时异步的通过信号或线程来接收通知
+* 可以使用poll、select等监控消息队列
+
+劣势：
+
+* 可移植性差
+* System V消息队列根据消息类型选择消息的功能灵活性更强
