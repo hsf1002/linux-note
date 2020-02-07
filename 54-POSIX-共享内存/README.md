@@ -23,14 +23,11 @@ int shm_open(const char *name, int oflag, mode_t mode);
 // 新的共享内存对象创建时长度为0，通常需要在mmap之前进行ftruncate设置对象大小
 ```
 
-
-
-
-
-
+### 删除共享内存对象
 
 ```
 int shm_unlink(const char *name);
-
+// 若成功，返回0，若出错，返回-1
+// 删除共享内存对象不会影响对象的既有映射，它会保持直到调用munmap为止，但会阻止后续的shm_open打开此对象，所有的进程都解除映射，这个对象才会删除
 ```
 
