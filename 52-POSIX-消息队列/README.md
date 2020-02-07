@@ -197,3 +197,16 @@ cat /dev/mqueue/mq
 
 Linux上消息队列描述符实际上是一个文件描述符，因此可以使用IO多路复用系统调用来监控这个文件描述符
 
+### 消息队列限制
+
+* MQ_PRIO_MAX：一条消息的最大优先级
+* MQ_OPEN_MAX：一个进程最多能打开的消息队列数量
+
+Linux特有的/proc/sys/fs/mqueue下三个值：
+
+* msg_max：mq_maxmsg的上限
+* msgsize_max：mq_msgsize的上限
+* queues_max：系统级，系统最多能创建的消息队列的数量，一旦达到，就只有特权进程（CAP_SYS_RESOURCE）才能创建新队列
+
+Linux特有的RLIMIT_MSGQUEUE为属于调用进程的真实用户ID的所有消息队列消耗的空间提供了上限
+
