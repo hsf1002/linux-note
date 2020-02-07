@@ -156,3 +156,44 @@ struct sigevent
 }
 ```
 
+### Linux特性
+
+##### 通过命令行显示和删除消息队列对象
+
+为了使用ls和rm列出和删除POSIX消息队列就必须使用如下命令将其挂载到文件系统：
+
+```
+mount -t mqueue source target
+如：
+su
+mkdir /dev/mqueue
+mount -t mqueue none /dev/mqueue
+```
+
+显示新挂载的记录和权限：
+
+```
+cat /proc/mounts | grep mqueue
+ls -ld /dev/mqueue
+```
+
+创建消息队列后即可以ls和rm：
+
+```
+./pmsg_create -c /newq
+ls /dev/mqueue
+rm /dev/mqueue/newq
+```
+
+##### 获取消息队列相关信息
+
+```
+./pmsg_create -c /mq
+./pmsg_send /mq abcdefg
+cat /dev/mqueue/mq
+```
+
+##### 使用另一种IO模型操作消息队列
+
+Linux上消息队列描述符实际上是一个文件描述符，因此可以使用IO多路复用系统调用来监控这个文件描述符
+
