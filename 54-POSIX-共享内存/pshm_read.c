@@ -21,6 +21,12 @@
 /**
  * 从一个POSIX共享内存对象读取数据
  * 
+./pshm_create -c /demo_shm 0
+ls -al /dev/shm
+./pshm_write /demo_shm 'hello'
+ls -l /dev/shm
+
+./pshm_read /demo_shm 
  */
 int main(int argc, char *argv[])
 {
