@@ -163,5 +163,7 @@ chmod g+s,g-x /testfs/file
 7. 锁的起始字节，对flock永远是0
 8. 锁的结束字节，对flock永远是EOF
 
+### 单例模式
 
+一般daemon需要以单例模式运行，可以让daemon在一个标准目录创建一个文件并在该文件持有一把写锁，如果启用daemon的其他实例，在获取写锁时就会失败，一般/var/run是放置此类锁的目录，daemon会将其PID写入锁文件，并以.pid作为扩展名
 
