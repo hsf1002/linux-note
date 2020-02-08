@@ -150,5 +150,18 @@ chmod g+s,g-x /testfs/file
 * 在公开访问的文件启用强制锁需要慎重，因为即使特权进程也无法覆盖一个强制锁
 * 使用强制锁存在性能开销，内核必须检查文件上是否存在冲突的锁
 
+### /proc/locks文件
+
+通过检查此文件可以查看系统中当前存在的锁，包含flock和fcntl创建的，每把锁包含8个字段：
+
+1. 序号
+2. 创建方式：FLOCK表示flock创建，POSIX表示fcntl创建
+3. 模式：ANVISORY或MANDATORY
+4. 类型：READ或WRITE
+5. PID
+6. 所属文件：三个冒号分割的数字表示文件系统的主要和次要设备号及i-node号
+7. 锁的起始字节，对flock永远是0
+8. 锁的结束字节，对flock永远是EOF
+
 
 
