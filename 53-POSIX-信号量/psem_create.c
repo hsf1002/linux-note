@@ -34,7 +34,7 @@ usage_error(const char *progName)
 
 /**
  * 
-创建一个POSIX信号量
+创建一个POSIX命令信号量
 
 umask 007
 ./psem_create -cx /demo 666
