@@ -29,6 +29,12 @@ cc -g -Wall -o anon_mmap anon_mmap.c
 ./anon_mmap
 mmap error: Operation not supported by device
 
+
+Ubuntu:
+./anon_mmap
+child started, value = 1
+parent, value = 2
+
  */
 int main(int argc, char *argv[])
 {

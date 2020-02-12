@@ -86,10 +86,10 @@ int main(int argc, char *argv[])
     }
 
     // 进行文件映射，一般不需要
-    if (MAP_FAILED == (addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)))
+//    if (MAP_FAILED == (addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)))
     {
-        perror("mmap error");
-        exit(EXIT_FAILURE);
+  //      perror("mmap error");
+    //    exit(EXIT_FAILURE);
     }
 
     exit(EXIT_SUCCESS);

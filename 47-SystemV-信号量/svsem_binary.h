@@ -2,6 +2,7 @@
 #ifndef BINARY_SEMS_H           /* Prevent accidental double inclusion */
 #define BINARY_SEMS_H
 
+#include "sem_un.h"
 
 /* Use SEM_UNDO during semop()? */
 extern bool bs_use_undo;    

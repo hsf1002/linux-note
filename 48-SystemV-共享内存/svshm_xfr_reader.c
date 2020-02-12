@@ -24,13 +24,16 @@
  *   
  *将 一个System V的共享内存段中的数据传输到标准输出
 
+read.c write.c   shmseg->shmget
+svsem_binary.h 
 
- wc -c /etc/services
+LD_LIBRARY_PATH=. ./svshm_xfr_write
+hello world, this is sky
 
- ./svshm_xfr_writer < /etc/services &
-
- ./svshm_xfr_reader > out.txt
-
+^Z
+[1]+  已停止               LD_LIBRARY_PATH=. ./svshm_xfr_write
+LD_LIBRARY_PATH=. ./svshm_xfr_read 
+hello world, this is sky
 
 
  */

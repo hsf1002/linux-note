@@ -26,6 +26,12 @@
  * 
  * 使用mprotect修改内存保护
 
+
+./t_protect
+before protect
+7fc1bab74000-7fc1bac74000 ---s 00000000 00:05 76273                      /dev/zero (deleted)
+after protect
+7fc1bab74000-7fc1bac74000 rw-s 00000000 00:05 76273                      /dev/zero (deleted)
  */
 int main(int argc, char *argv[])
 {

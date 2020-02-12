@@ -21,13 +21,33 @@
 /**
  * 从一个POSIX共享内存对象读取数据
  * 
-./pshm_create -c /demo_shm 0
-ls -al /dev/shm
-./pshm_write /demo_shm 'hello'
-ls -l /dev/shm
 
-./pshm_read /demo_shm 
- */
+cc pshm_create.c -o pshm_create libgetnum.so -lrt
+LD_LIBRARY_PATH=. ./pshm_create -c /demo_shm 0
+ls -al /dev/shm/
+总用量 1956
+drwxrwxrwt  2 root    root         280 2月  10 10:14 .
+drwxr-xr-x 21 root    root        4440 2月  10 08:44 ..
+-rw-------  1 hefeng  hefeng         0 2月  10 10:13 demo_shm
+-rwx------  1 hefeng  hefeng  67108904 2月  10 08:59 pulse-shm-1615134154
+-rwx------  1 hefeng  hefeng  67108904 2月  10 08:47 pulse-shm-196334817
+-rwx------  1 hefeng  hefeng  67108904 2月  10 09:18 pulse-shm-2087997901
+-rwx------  1 hefeng  hefeng  67108904 2月  10 09:57 pulse-shm-2521685313
+-rwx------  1 lightdm lightdm 67108904 2月  10 08:44 pulse-shm-3252598537
+-rwx------  1 hefeng  hefeng  67108904 2月  10 09:57 pulse-shm-3300736866
+-rwx------  1 hefeng  hefeng  67108904 2月  10 08:47 pulse-shm-3462187467
+-rwx------  1 lightdm lightdm 67108904 2月  10 08:44 pulse-shm-3549659178
+-rwx------  1 hefeng  hefeng  67108904 2月  10 08:47 pulse-shm-3734538068
+-rwx------  1 hefeng  hefeng  67108904 2月  10 10:14 pulse-shm-3739145572
+-rwx------  1 lightdm lightdm 67108904 2月  10 08:44 pulse-shm-757771001
+
+./pshm_write /demo_shm 'hello'
+shared memory resized to 5 bytes
+now shared memory addr = hello
+
+./pshm_read /demo_shm
+hello
+*/
 int main(int argc, char *argv[])
 {
     int fd;
