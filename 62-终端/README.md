@@ -39,3 +39,88 @@ TCSADRAIN: 所有当前处于排队的输出已经传送到终端后，修改生
 TCSAFLUSH: 效果同TCSADRAIN，但是除此之外，该标志生效时仍然等待处理的输入数据都会丢弃
 ```
 
+### stty命令
+
+以命令行的形式模拟函数tcgetattr和tcsetattr的功能
+
+##### 检视终端当前所有属性
+
+```
+stty -a
+// 线速，终端大小
+speed 9600 baud; 36 rows; 128 columns; 
+// 标志前带连字符-表示当前被禁用
+// 控制终端输入的用户界面标志
+lflags: icanon isig iexten echo echoe -echok echoke -echonl echoctl
+	-echoprt -altwerase -noflsh -tostop -flusho pendin -nokerninfo
+	-extproc
+// 控制终端输入的标志	
+iflags: -istrip icrnl -inlcr -igncr ixon -ixoff ixany imaxbel iutf8
+	-ignbrk brkint -inpck -ignpar -parmrk
+// 控制终端输出的标志
+oflags: opost onlcr -oxtabs -onocr -onlret
+// 控制终端线速的硬件控制相关标志
+cflags: cread cs8 -parenb -parodd hupcl -clocal -cstopb -crtscts -dsrflow
+	-dtrflow -mdmbuf
+// 特殊字符	
+cchars: discard = ^O; dsusp = ^Y; eof = ^D; eol = <undef>;
+	eol2 = <undef>; erase = ^?; intr = ^C; kill = ^U; lnext = ^V;
+	min = 1; quit = ^\; reprint = ^R; start = ^Q; status = ^T;
+	stop = ^S; susp = ^Z; time = 0; werase = ^W;
+```
+
+##### 修改中断字符为Ctrl + L
+
+```
+skydeiMac:62-终端 sky$ sleep 30
+^C
+skydeiMac:62-终端 sky$ stty intr ^L
+skydeiMac:62-终端 sky$ sleep 30
+^C^C^C^L
+skydeiMac:62-终端 sky$ stty -a |grep intr
+	eol2 = <undef>; erase = ^?; intr = ^L; kill = ^U; lnext = ^V;
+```
+
+##### 修改中断字符为非控制字符如q
+
+```
+skydeiMac:62-终端 sky$ stty intr q
+skydeiMac:62-终端 sky$ sleep 30
+^C^C^C^Lq
+skydeiMac:62-终端 sky$ stty -a |grep intr
+	eol2 = <undef>; erase = ^?; intr = q; kill = ^U; lnext = ^V;
+```
+
+##### 启动/关闭某个终端标志
+
+```
+skydeiMac:62-终端 sky$ stty -a |grep tostop
+	-echoprt -altwerase -noflsh -tostop -flusho pendin -nokerninfo
+	
+skydeiMac:62-终端 sky$ stty tostop
+skydeiMac:62-终端 sky$ stty -a |grep tostop
+	-echoprt -altwerase -noflsh tostop -flusho pendin -nokerninfo
+	
+skydeiMac:62-终端 sky$ stty -tostop
+skydeiMac:62-终端 sky$ stty -a |grep tostop
+	-echoprt -altwerase -noflsh -tostop -flusho pendin -nokerninfo	
+```
+
+##### 终端处于可以显示但不可用状态时
+
+当程序奔溃时，除了奢侈的关闭再重新打开一个窗口外，可以输入如下指令，将终端标志和特殊字符还原到一个合理的状态：
+
+```
+// Ctrl + J才是真正的换行符，某些模式下可能换行符不再映射为Enter键
+Ctrl + J stty sane Ctrl + J 
+```
+
+##### 监视stty命令的终端属性
+
+```
+su
+password: 
+
+stty -a -F /dev/ttyt3
+```
+
