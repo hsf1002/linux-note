@@ -124,3 +124,27 @@ password:
 stty -a -F /dev/ttyt3
 ```
 
+### 终端特殊字符
+
+c_cc下标都是字符的常量名添加V，除了CR和NL没有对应的c_cc下标
+
+```
+字符     c_cc下标    描述    默认设定
+CR        无        回车      ^M
+DISCARD  VDISCARD  丢弃输出    ^O
+EOF       VEOF     文件结尾    ^D
+EOL                行结尾
+EOL2              另一种行结尾
+ERASE               擦除字符   ^?
+INTR             中断(SIGINT) ^C
+KILL                擦除一行   ^U
+LNEXT   字面化下一个字符(一般是特殊字符) ^V
+NL                   换行      ^J
+QUIT             退出(SIGQUIT) ^\
+REPRINT          重新打印输入行  ^R
+START              开始输出     ^Q
+STOP               停止输出     ^S
+SUSP             暂停(SIGTSTP)  ^Z
+WERASE           擦除一个字符    ^W
+```
+
