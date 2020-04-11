@@ -275,3 +275,29 @@ int cfsetospeed(struct termios *temios_p, speed_t speed);
 ```
 
 尽管输入和输出线速是分开的，但在许多终端两个速率应该保持一致，Linux中，非标准字段c_ispeed和c_ospeed未被使用
+
+### 终端的行控制
+
+```
+int tcsendbreak(int fd, int duration);
+// 通过传输连续的0比特流产生break状态，duration为0，持续0.25秒（SUSv3规定至少0.25秒，最多0.5秒），不为0，则表示多少毫秒
+
+int tcdrain(int fd);
+// 刷新（丢弃）终端输入队列、终端输出队列或两者的数据
+
+int tcflush(int fd, int queue_selector);
+// 刷新（丢弃）终端输入队列（由终端驱动程序接收还没被任何进程读取的数据）、终端输出队列（已经写入终端驱动程序但是还没传递给设备的数据）或两者的数据，如丢弃提示输入密码之前就已经输入的数据
+queue_selector的取值：
+TCIFLUSH: 刷新输入队列
+TCOFLUSH: 刷新输出队列
+TCIOFLUSH: 刷新输入输出队列
+
+int tcflow(int fd, int action);
+// 控制数据在计算机和终端之间的数据流方向，其中TCIOFF和TCION只有在终端可以解释STOP和START字符时才有效
+action的取值：
+TCOOFF: 暂停终端的输出
+TCOON: 恢复终端的输出
+TCIOFF: 传送一个STOP字符给终端
+TCION: 传送一个START字符给终端
+```
+
