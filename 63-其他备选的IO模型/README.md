@@ -92,3 +92,55 @@ POLLMSG                                Linux中不使用
 需要定义_GNU_SOURCE测试宏：  POLLRDHUP
 ```
 
+##### 文件描述符何时就绪
+
+如果对IO函数的调用不会阻塞（未指定O_NONBLOCK标记），而不论是否能够实际传输数据，此时文件描述符就被认为是就绪的，select和poll只会告诉我们IO操作是否会阻塞
+
+普通文件：
+
+```
+select: 总是可读和可写
+poll：会在revents字段返回POLLIN和POLLOUT标志
+```
+
+终端和伪终端：
+
+```
+条件或事件                             select    poll
+有输入                                  r       POLLIN
+可输出                                  w       POLLOUT  
+伪终端对端调用close后                     rw    取决于实现，Linux至少有POLLHUP    
+信号模式下的伪终端主设备检测到从设备状态改变   x       POLLPRI  
+```
+
+管道和FIFO：
+
+```
+读端(假定revents字段已经指定了POLLIN)：
+         条件或事件
+管道中有数据？  写端打开了？    select    poll
+  N             N             r     POLLHUP
+  Y             Y             r      POLLIN
+  Y             N             r   POLLIN|POLLHUP
+  
+写端(假定revents字段已经指定了POLLOUT)：
+             条件或事件
+有PIPE_BUF字节空间？  读端打开了？    select    poll
+  N                    N             w     POLLERR
+  Y                    Y             w      POLLOUT
+  Y                    N             w   POLLOUT|POLLERR
+```
+
+套接字：
+
+```
+(假定revents字段已经指定了POLLIN|POLLOUT|POLLPRI)
+条件或事件            select    poll
+有输入                 r       POLLIN
+可输出                 w       POLLOUT
+在监听套接字上建立连接    r       POLLIN
+接收到带外数据（限TCP）   x       POLLPRI
+流式套接字的对端关闭连接  rw  POLLIN|POLLOUT|POLLRDHUP
+或执行了shutdown
+```
+
