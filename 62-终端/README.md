@@ -258,3 +258,20 @@ XCASE：规范大/小写表示(仅SVR4)；
 * 加工模式：本质上是带有处理默认特殊字符功能的规范模式
 * 原始模式：与加工模式恰好相反，所有的输入输出都不能做任何处理，而且不能回显
 * cbreak模式：介于加工模式和原始模式之间，输入按照非规范方式处理，产生信号的字符会被解释
+
+#### 终端线速（比特率）
+
+不同的终端传输和接收的速率不同，准确的说，波特（baud）是线路中信号每秒可以变化的频率，和每秒传送的位数不是一回事
+
+```
+// 获取给定终端的输入线速
+speed_t cfgetispeed(const struct termios *temios_p);
+// 获取给定终端的输出线速
+speed_t cfgetospeed(const struct termios *temios_p);
+// 设置给定终端的输入线速
+int cfsetispeed(struct termios *temios_p, speed_t speed);
+// 设置给定终端的输出线速
+int cfsetospeed(struct termios *temios_p, speed_t speed);
+```
+
+尽管输入和输出线速是分开的，但在许多终端两个速率应该保持一致，Linux中，非标准字段c_ispeed和c_ospeed未被使用
