@@ -24,3 +24,34 @@ select/poll  Y             N
 epoll        Y             Y
 ```
 
+### IO多路复用
+
+select首次出现在BSD系统的套接字API中，poll应该更为广泛，出现在System V中，可以在普通文件、终端、伪终端、管道、FIFO、套接字以及其他字符型设备上使用select或poll检查文件描述符
+
+##### 系统调用select
+
+```
+#include <sys/select.h>
+
+int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout);
+// 返回值：若成功，返回准备就绪的文件描述符的个数（每个返回的文件描述符集合都需要FD_ISSET检查，如果一个文件描述符在三个集合同时被指定，且多个IO事件都处于就绪的话，则会统计多次），超时返回0，若出错返回-1（EBADF表示文件描述符非法，EINTR表示调用被信号中断）
+// readfds, writefds, errorfds分别表示输入是否就绪、输出是否就绪、异常（1. 连接到处于信包模式下的伪终端主设备上的从设备状态发生了变化 2. 流式套接字上接收到了带外数据）是否发生的文件描述符集合
+// nfds比三个文件描述符集合所包含的最大值还要大1
+// 在缺少亚秒级sleep如nanosleep的系统中，select可以通过将nfds设为0，readfds, writefds, errorfds设为NULL，期望的休眠时间再timeout中指定来实现
+```
+
+```
+// 将fdset初始化为空
+void FD_ZERO(fd_set *fdset)
+// 将fd添加到fdset中
+void FD_SET(fd, fd_set *fdset);
+// 将fd从fdset中移除
+void FD_CLR(fd, fd_set *fdset);
+// fd是否是fdset中成员
+int FD_ISSET(fd, fd_set *fdset);
+// 将fdset_orig拷贝到fdset_copy
+void FD_COPY(fd_set *fdset_orig, fd_set *fdset_copy);
+
+文件描述符最大值由常量FD_SETSIZE决定
+```
+
