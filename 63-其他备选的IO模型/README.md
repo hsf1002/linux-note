@@ -55,3 +55,40 @@ void FD_COPY(fd_set *fdset_orig, fd_set *fdset_copy);
 文件描述符最大值由常量FD_SETSIZE决定
 ```
 
+##### 系统调用poll
+
+```
+#include <poll.h>
+
+int poll(struct pollfd fds[], nfds_t nfds, int timeout);
+// 返回值：若成功返回准备就绪的文件描述符个数，若超时返回0，若出错返回-1
+// 与select不同的是，即使同一个文件描述符在revents中设定了多个位掩码，返回的文件描述符集合中也不会统计多次
+
+struct pollfd 
+{
+  int    fd;       /* 文件描述符 */
+  short  events;   /* 监控的事件 */
+  short  revents;  /* 发生的事件 */
+};
+
+位掩码      events的输入    revents的返回    描述
+POLLIN        Y               Y        可读取非高优先级数据
+POLLRDNORM    Y               Y        同POLLIN
+POLLRDBAND    Y               Y        可读取高优先级数据（Linux中不可用）
+POLLPRI       Y               Y        可读取高优先级数据
+POLLRDHUP     Y               Y        对端套接字关闭
+
+POLLOUT       Y               Y        普通数据可写
+POLLWRNORM    Y               Y        POLLOUT
+POLLWRBAND    Y               Y        优先级数据可写
+
+POLLERR                       Y        有错误发生
+POLLHUP                       Y        出现挂断
+POLLNVAL                      Y        文件描述符未打开
+
+POLLMSG                                Linux中不使用
+
+需要定义_XOPEN_SOURCE测试宏：POLLRDNORM、POLLRDBAND、POLLWRNORM、POLLWRBAND
+需要定义_GNU_SOURCE测试宏：  POLLRDHUP
+```
+
