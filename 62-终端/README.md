@@ -308,3 +308,25 @@ TCION: 传送一个START字符给终端
 * 终端窗口大小改变后发送一个SIGWINCH信号给前台进程组，默认情况下，该信号被忽略
 * 任意时刻，通常收到SIGWINCh信号后，进程可以使用ioctl的TIOCGWINSZ获取终端窗口的当前大小
 
+### 终端标识
+
+ctermid可以返回进程控制终端的名称，UNIX下通常为/dev/tty，而isatty可以判断fd是否与一个终端关联
+
+```
+#include <unistd.h>
+
+int isatty(int fd);
+// 如果fd与终端关联，返回1，否则返回0
+```
+
+ttyname返回与之相关的终端设备名称
+
+```
+#include <unistd.h>
+
+char *ttyname(int fd);
+// 成功则返回一个静态分配的字符串，否则返回NULL
+```
+
+/dev目录包含了有关虚拟控制台的条目如/dev/tty1和BSD伪终端，/dev/pts目录包含了System V风格的伪终端从设备
+
