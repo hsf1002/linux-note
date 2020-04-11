@@ -144,3 +144,17 @@ poll：会在revents字段返回POLLIN和POLLOUT标志
 或执行了shutdown
 ```
 
+##### 比较select和poll
+
+* 实现细节：Linux内核层面，select和poll都使用了相同的内核poll例程集合
+
+* API之间的区别：
+  * select使用的fd_set有一个上限FD_SETSIZE，poll本质上没有上限
+  * select的参数fd_set同时也是保存结果的地方，如果要循环调用select，需要每次重新初始化fd_set，poll通过两个独立的字段events和revents单独处理
+  * select提供的超时精度（微秒）比poll提供的毫秒要高
+  * 如果一个文件描述符关闭了，在对应的revents字段设定POLLNVAL标记，poll会准确的告诉我们时哪个文件描述符，而select只会返回-1，并设错误码EBADF
+
+* 性能：如果满足如下条件之一，则select和poll具有相似的性能表现
+  * 待检查的文件描述符数量较小
+  * 有大量的文件描述符待检查，但是分布得很密集
+
