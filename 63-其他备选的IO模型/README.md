@@ -301,3 +301,24 @@ typedef union epoll_data
 }epoll_data_t;
 ```
 
+##### 事件等待
+
+```
+int epoll_wait(int epfd, struct epoll_event *evlist, int maxevents, int timeout);
+// 返回值：若成功，返回就绪列表的文件描述符个数，若超时返回0，若出错返回-1
+// evlist返回就绪列表的文件描述符信息，空间由调用者申请，元素个数由maxevents指定
+// 由于data字段是唯一可以获知这个事件相关的文件描述符的途径，调用epoll_ctl添加文件描述符时要么指定ev.data.fd为文件描述符，要么将ev.data.ptr设置为指向包含文件描述符的结构体
+// timeout为-1表示一直阻塞，0表示执行一次非阻塞检查，大于0表示阻塞多少毫秒
+
+位掩码        作为epoll_ctl的输入？ 由epoll_wait返回？      描述
+EPOLLIN            Y                  Y          可读取非高优先级数据
+EPOLLPRI           Y                  Y          可读取高优先级数据
+EPOLLRDHUP         Y                  Y          套接字对端关闭
+EPOLLOUT           Y                  Y          普通数据可写
+EPOLLET            Y                             采用边缘触发事件通知
+EPOLLONESHOT       Y                             完成事件通知后禁用检查
+EPOLLERR                              Y          错误发生
+EPOLLHUP                              Y          出现挂断
+```
+
+默认情况下，epoll_ctl添加EPOLL_CTL_ADD文件描述符到兴趣列表后，其一直保持激活状态，如果希望某个特定的文件描述符只得到一次通知，可以在ev.events中指定EPOLLONESHOT标记，要重新激活需要调用epoll_ctl的EPOLL_CTL_MOD操作
