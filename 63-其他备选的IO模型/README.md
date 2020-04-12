@@ -199,3 +199,50 @@ poll：会在revents字段返回POLLIN和POLLOUT标志
   * 套接字上发生了异步错误
 
 * inotify文件描述符：可读状态时
+
+##### 优化信号驱动IO的使用
+
+信号驱动IO的高性能是因为内核可以记住要检查的文件描述符，且仅当IO事件实际发生在这些文件描述符上时才向程序发送信号，固其性能可以根据发生IO事件的数量扩展，而与被检查的文件描述符数量无关，要想利用其优点，需执行如下两个步骤：
+
+1. 通过fcntl的F_SETSIG操作指定一个实时信号，当文件描述符IO就绪时，此信号取代SIGIO被发送
+2. 使用sigaction为上一步的实时信号安装信号处理器，并指定SIGINFO标记
+
+使用F_SETSIG改变IO就绪发送默认信号SIGIO的理由：
+
+1. 默认的SIGIO是标准的非排队信号，如有多个IO事件发送了信号，而SIGIO被阻塞了，解除阻塞后只能收到第一个信号
+2. 指定SIGINFO标记可以标识出在哪个文件描述符上发生了事件，以及事件的类型
+
+需要同时使用F_SETSIG以及SA_SIGINFO才能将一个合法的siginfo_t结构传递到信号处理器中，如果F_SETSIG时指定的sig为0，将回退到默认行为，siginfo_t与之相关的字段：
+
+```
+si_signo: 信号值
+si_fd: 发生IO事件的文件描述符
+si_code: 发生事件的类型代码
+si_band: 位掩码，包含的位与poll返回的revents字段相同
+
+si_code和si_band字段的可能值
+si_code    si_band                             描述
+POLL_IN   POLLIN | POLLRDNORM                 存在输入，文件结尾
+POLL_OUT  POLLOUT | POLLWRNORM | POLLWRBAND   可输出
+POLL_MSG  POLLIN | POLLRDNORM | POLLMSG       存在输出消息（不使用）
+POLL_ERR  POLLERR                             IO错误
+POLL_PRI  POLLPRI | POLLRDNORM                高优先级输入
+POLL_HUP  POLLHUP | POLLERR                   宕机
+```
+
+纯输入驱动的程序中，可以进一步优化使用F_SETSIG，可以阻塞待发出的IO就绪信号，通过sigwaitinfo或sigtimedwait接收排队的信号，这种方式实际是以同步方式处理事件，同select和poll比，更为高效的获知文件描述符上发生的IO事件；但是实时信号的数量是有限的，为了防止溢出，一个设计良好的程序也应该为SIGIO安装信号处理器，一旦接收到了SIGIO信号，表明队列已满，可以先通过sigwaitinfo将队列中的实时信号全部获取，然后临时切换到select或poll，获取剩余的IO事件
+
+非标准的fcntl操作F_SETOWN_EX和F_GETOWN_EX可以允许指定线程为IO就绪的目标，fcntl的第三个参数为：
+
+```
+struct f_owner_ex
+{
+  int type;
+  pid_t pid;
+}
+type定义了pid的类型：
+F_OWNER_PGRP：pid为进程组ID
+F_OWNER_PID：pid为进程ID
+F_OWNER_TID：pid为线程ID
+```
+
