@@ -246,3 +246,58 @@ F_OWNER_PID：pid为进程ID
 F_OWNER_TID：pid为线程ID
 ```
 
+### epoll编程接口
+
+相比于select和poll，epoll的优点：
+
+* 检查大量文件描述符时，epoll性能延展性比select和poll高很多
+* select和poll只支持水平触发，信号驱动IO只支持边缘触发，epoll两者都支持
+
+相比于信号驱动IO，epoll的优点：
+
+* 避免复杂的信号处理流程，如信号队列溢出的处理
+* 灵活性高，可以指定希望检查的事件类型
+
+epoll API核心数据结构是epoll实例，与一个打开的文件描述符关联，这个文件描述符不是做IO操作，它是内核数据结构的句柄，实现了两个目的：
+
+* 记录了在进程中声明过的感兴趣的文件描述符列表：兴趣列表
+* 维护了处于IO就绪状态的文件描述符列表：就绪列表（兴趣列表的子集）
+
+##### 创建epoll实例
+
+```
+#include <sys/epoll.h>
+
+int epoll_create(int size);
+// 返回值：若成功，返回文件描述符（epoll实例），若出错，返回-1
+// size 表示想要通过epoll实例来检查的文件描述符个数，自内核2.6.8以来，已被忽略
+// Linux专有文件/proc/sys/fd/epoll/max_user_watches表示每个用户可以注册到epoll实例上的文件描述符上限
+```
+
+##### 修改epoll兴趣列表
+
+```
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *ev);
+// 返回值：若成功，返回0，若出错，返回0
+// epfd是epoll_create的返回值
+// fd指明了要修改的兴趣列表的哪一个文件描述符，可以是管道、FIFO、套接字、POSIX消息队列、inotify实例、终端、设备或另一个epoll实例的文件描述符（可以为受检查的描述符建立一种层次关系），但是不能是普通文件或目录的文件描述符
+op的取值：
+EPOLL_CTL_ADD：将fd添加到epfd对应的兴趣列表中，已存在返回EEXIST错误
+EPOLL_CTL_MOD：修改fd对应的事件，信息由ev传入，fd不在兴趣列表返回ENOENT错误
+EPOLL_CTL_DEL：将fd从epfd对应的兴趣列表删除，fd不在兴趣列表返回ENOENT错误，关闭一个文件描述符自动将其从所有的epoll实例的兴趣列表删除
+
+struct epoll_event
+{
+  uint32_t   events; // 位掩码
+  epoll_data_t data; // 用户数据
+}
+
+typedef union epoll_data
+{
+  void  *ptr; // 用户实际数据
+  int   fd;   // 文件描述符
+  uint32 u32; // 
+  uint64 u64; // 
+}epoll_data_t;
+```
+
