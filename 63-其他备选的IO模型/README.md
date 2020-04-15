@@ -378,3 +378,7 @@ sigprocmask(SIG_SETMASK, &origmask, NULL);
 
 Linux还提供了非标准的ppoll，同poll的关系类似于pselect和select，epoll_pwait是对epoll_wait的扩展
 
+##### self-pipe技巧
+
+由于pselect没有被广泛使用，可移植的程序必须采取其他手段避免当等待信号同时调用select时出现的竞态条件，通常会使用的技术为self-pipe
+
