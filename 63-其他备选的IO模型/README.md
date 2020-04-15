@@ -353,3 +353,28 @@ epoll默认是水平触发通知，表示epoll能在文件描述符上以非阻�
 
 信号驱动IO采用的是边缘触发通知，故而也需要考虑文件描述符饥饿的情况
 
+### 在信号和文件描述符上等待
+
+有时候需要在一组文件描述符上等待IO就绪，也要等待信号，如果使用sigaction+select方式，在两个调用之间如果信号到来，则select依然会阻塞
+
+```
+#define _XOPEN_SOURCE 600
+#include <sys/select.h>
+
+int pselect(int nfds, fd_set *restrict readfds, fd_set *restrict writefds, fd_set *restrict errorfds, const struct timespec *restrict timeout, const sigset_t *restrict sigmask);
+// 返回值：若成功返回就绪的文件描述符个数，若超时返回0，若出错返回-1
+// SUSv3明确表示此调用不会修改timeout，若sigmask为NULL，那等同于select
+
+ready=pselect(nfds, &readfds, &writefds, &errorfds, timeout, &sigmask);
+如同以原子方式调用：
+sigset_t origmask;
+// 设置信号屏蔽字
+sigprocmask(SIG_SETMASK, &sigmask, &origmask);
+// 等待IO就绪状态
+ready = select(nfds, &readfds, &writefds, &errorfds, timeout);
+// 恢复信号屏蔽字
+sigprocmask(SIG_SETMASK, &origmask, NULL);
+```
+
+Linux还提供了非标准的ppoll，同poll的关系类似于pselect和select，epoll_pwait是对epoll_wait的扩展
+
