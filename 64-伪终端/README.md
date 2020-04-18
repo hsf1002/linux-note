@@ -32,3 +32,65 @@
 
 System V的实现在某种程度比BSD接口易于使用，SUSv3的伪终端规范就是基于System V的接口，Linux上的伪终端通常指的是UNIX98伪终端
 
+### UNIX98伪终端
+
+##### 打开未使用的主设备：posix_openpt
+
+```
+#define _XOPEN_SOURCE 600
+#include <stdlib.h>
+#include <fcntl.h>
+
+int posix_openpt(int oflag);
+// 返回值：若成功返回第一个可用的主设备的文件描述符，若出错返回-1
+// oflag的取值：
+O_RDWR：同时可读可写
+O_NOCTTY：使得该终端不要成为进程的控制终端，Linux上无论是否指定，都不会成为进程的控制终端
+// 同open一样，打开的始终时最小的可用文件描述符
+// 该调用会在/dev/pts文件夹中创建对应的伪终端从设备文件
+// 每一对伪终端都会占据一小段不能被交换的内核内存空间
+// Linux的/proc/sys/kernel/pty/max：伪终端的数量
+// Linux的/proc/sys/kernel/pty/nr:  当前系统有多少伪终端正在使用中
+```
+
+##### 修改从设备属主和权限：grantpt
+
+```
+#define _XOPEN_SOURCE 500
+#include <stdlib.h>
+
+int grantpt(int fildes);
+// 返回值：若成功返回0，若出错返回-1
+// 该函数会创建一个子进程pt_chown来执行设定用户ID为root的程序，在伪终端从设备做如下操作：
+1. 将从设备属主修改为与调用进程相同的有效用户ID
+2. 将从设备的组修改为tty
+3. 修改从设备的权限，使得拥有者由读写权限，组有写权限
+// 在Linux上，会自动执行上述步骤，故而无需调用此函数，为了移植性，仍然应该调用
+```
+
+##### 解锁从设备：unlockpt
+
+```
+#define _XOPEN_SOURCE 500
+#include <stdlib.h>
+
+int unlockpt(int mfd);
+// 返回值：若成功返回0，若出错返回-1
+// 该函数会移除从设备的内部锁，该从设备与文件描述符mfd所代表的伪终端主设备相关联，解锁的目的是为了允许调用进程在其他进程能够打开这个伪终端从设备之前执行必要的初始化工作，如调用grantpt
+// 该函数调用之前尝试打开伪终端从设备将导致失败，错误码EIO
+```
+
+##### 获取从设备名称：ptsname
+
+```
+#define _XOPEN_SOURCE 500
+#include <stdlib.h>
+
+char *ptsname(int mfd);
+// 返回值：若成功返回静态分配的字符串，若出错返回NULL
+// Linux上，返回形式：/dev/pts/nn的字符串，nn是该伪终端从设备专有的唯一标识符
+
+GNU C提供的可重入版本：
+int ptsname_r(int fildes, char *buffer, size_t buflen);
+```
+
