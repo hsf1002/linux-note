@@ -145,3 +145,15 @@ if (-1 == ioctl(m_fd, TIOCPKT, &arg))
 
 当工作于信包模式的伪终端状态发生变化，select会提示主设备发生异常（参数exceptfds），而poll在revents中返回POLLPRI
 
+### 实现script(1)程序
+
+简化版的标准script(1)程序：开启一个新的shell会话，从该会话记录所有的输入和输出到文件，其实大部分shell会话都是使用script程序记录的
+
+普通的登录会话中，shell直接连接到用户的终端，运行script程序时，将自己置于用户的终端和shell之间，然后使用一对伪终端在自己和shell之间创建通信通道
+
+shell：连接到伪终端从设备上
+
+script：连接到伪终端主设备端，如同代理，接收用户键入到终端的输入然后写入伪终端主设备，从伪终端从设备读取再写入到用户的终端，会生成一个输出文件（默认名为typescript），该文件包含所有输出到伪终端主设备的字节，这就达到了不仅记录shell会话产生的输出，还包含了用户提供的输入的效果
+
+![WechatIMG55.jpeg](https://i.loli.net/2020/04/18/Z32mW5TNfi4pGDc.jpg)
+
