@@ -98,3 +98,13 @@ int ptsname_r(int fildes, char *buffer, size_t buflen);
 
 自定义的pty_master_open隐藏了所有特定于UNIX98规范的细节，用于打开一个未使用的伪终端主设备
 
+### 将进程连接到伪终端
+
+自定义的pty_fork创建一个子进程，通过伪终端对，连接到父进程上
+
+Linux上，glibc提供了两个相关的非标准函数
+
+openpty：打开一个伪终端对，返回主设备和从设备的文件描述符，也可以设置终端属性和窗口大小
+
+forkpty：除了没有提供类似sn_len的参数，与自定义实现pty_fork完全一样
+
