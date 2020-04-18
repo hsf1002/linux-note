@@ -94,3 +94,7 @@ GNU C提供的可重入版本：
 int ptsname_r(int fildes, char *buffer, size_t buflen);
 ```
 
+### 打开主设备
+
+自定义的pty_master_open隐藏了所有特定于UNIX98规范的细节，用于打开一个未使用的伪终端主设备
+
