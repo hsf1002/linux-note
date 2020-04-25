@@ -1,0 +1,52 @@
+[?1034hbash-3.2$ ttt[Ky
+/dev/ttys002
+bash-3.2$ echo $$
+35081
+bash-3.2$ ps -p 76173 -p 35081 -C script -o "pid ppid sid tty cmd"
+ps: illegal argument: script
+usage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]
+          [-g grp[,grp...]] [-u [uid,uid...]]
+          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]
+       ps [-L]
+bash-3.2$ ps -p 76173 -p 35081 -C script -o "pid ppid sid tty cmd"[C[C[1P[1P[1P[1P[1P[1P[1@s[1@c[1@r[1@i[1@p[1@t
+ps: illegal argument: script
+usage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]
+          [-g grp[,grp...]] [-u [uid,uid...]]
+          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]
+       ps [-L]
+bash-3.2$ ps -p 76173 -p 35081 -C script -o "pid ppid sid tty cmd"[1@p[1@t[1@y[1@_
+ps: illegal argument: pty_script
+usage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]
+          [-g grp[,grp...]] [-u [uid,uid...]]
+          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]
+       ps [-L]
+bash-3.2$ ps -p 76173 -p 35081 -C pty_script -o "pid ppid sid tty cmd"[1P[1P[1P[1P[1P[1P[1P[1P[1P[1P[1@p[1@t[1@y[1@_[1@s[1@c[1@r[1@i[1@p[1@t
+ps: illegal argument: pty_script
+usage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]
+          [-g grp[,grp...]] [-u [uid,uid...]]
+          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]
+       ps [-L]
+bash-3.2$ ps -p 76173 -p 35081 -C pty_script -o "pid ppid sid tty cmd"[1@.[1@/
+ps: illegal argument: ./pty_script
+usage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]
+          [-g grp[,grp...]] [-u [uid,uid...]]
+          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]
+       ps [-L]
+bash-3.2$ 
+bash-3.2$ 
+bash-3.2$ 
+bash-3.2$ psc[K -C script
+ps: illegal argument: script
+usage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]
+          [-g grp[,grp...]] [-u [uid,uid...]]
+          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]
+       ps [-L]
+bash-3.2$ 
+bash-3.2$ 
+bash-3.2$ 
+bash-3.2$ 
+bash-3.2$ 
+bash-3.2$ 
+bash-3.2$ 
+bash-3.2$ exit
+exit
