@@ -49,7 +49,7 @@ grep 'model name' /proc/cpuinfo | wc -l
 * I/O 密集型进程，等待 I/O 也会导致平均负载升高，但 CPU 使用率不一定很高
 * 大量等待 CPU 的进程调度也会导致平均负载升高，此时的 CPU 使用率也会比较高
 
-##### 平均负载案例分析
+##### 案例分析
 
 ```
 apt install stress sysstat
@@ -159,4 +159,88 @@ pidstat -u 5 1
 
 * CPU 上下文切换，是保证 Linux 系统正常工作的核心功能之一，一般情况下不需要特别关注
 * 过多的上下文切换，会把 CPU 时间消耗在寄存器、内核栈以及虚拟内存等数据的保存和恢复上，从而缩短进程真正运行的时间，导致系统的整体性能大幅下降
+
+##### 查看系统的上下文切换情况
+
+vmstat：一个常用的系统性能分析工具，主要用来分析系统的内存使用情况，也常用来分析 CPU 上下文切换和中断的次数
+
+```
+// 每隔5秒输出1组数据
+vmstat 5
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 0  0      0 7005360  91564 818900    0    0     0     0   25   33  0  0 100  0  0
+ 
+r（running or runnable）：就绪队列的长度，也就是正在运行和等待 CPU 的进程数
+b（blocked）：处于不可中断睡眠状态的进程数
+in (interrupt)：每秒中断的次数
+cs (context switch)：每秒上下文切换的次数
+us (user CPU time)：用户空间占用CPU百分比
+sy (system CPU time)：内核空间占用CPU百分比
+ni (nice CPU time)：用户进程空间内改变过优先级的进程占用CPU百分比
+id (idle)：空闲CPU百分比
+wa (iowait)：等待输入输出的CPU时间百分比
+hi (hardware irq)：硬件中断
+si (software irq)：软件中断 
+st (steal time)：实时
+```
+
+查看每个进程的详细情况，需要使用 pidstat。加上 -w 选项，就可以查看每个进程上下文切换的情况
+
+```
+// 每隔5秒输出1组数据
+pidstat -w 5
+Linux 4.15.0 (ubuntu)  09/23/18  _x86_64_  (2 CPU)
+
+08:18:26      UID       PID   cswch/s nvcswch/s  Command
+08:18:31        0         1      0.20      0.00  systemd
+08:18:31        0         8      5.40      0.00  rcu_sched
+
+cswch（voluntary context switches）：自愿上下文切换，是指进程无法获取所需资源，导致的上下文切换。比如说， I/O、内存等系统资源不足时
+nvcswch（non voluntary context switches）：非自愿上下文切换，是指进程由于时间片已到等原因，被系统强制调度，进而发生的上下文切换。比如说，大量进程都在争抢 CPU 时
+```
+
+##### 案例分析
+
+sysbench 是一个多线程的基准测试工具，一般用来评估不同系统参数下的数据库负载情况
+
+```
+// 空闲系统的上下文切换次数，间隔1秒后输出1组数据
+vmstat 1 1
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 0  0      0 6984064  92668 830896    0    0     2    19   19   35  1  0 99  0  0
+ 
+// 第一个终端里运行 sysbench 模拟系统多线程调度的瓶颈, 以10个线程运行5分钟的基准测试，模拟多线程切换的问题
+sysbench --threads=10 --max-time=300 threads run
+
+// 第二个终端运行 vmstat，观察上下文切换情况, 每隔1秒输出1组数据（需要Ctrl+C才结束）
+vmstat 1
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 6  0      0 6487428 118240 1292772    0    0     0     0 9019 1398830 16 84  0  0  0
+ 8  0      0 6487428 118240 1292772    0    0     0     0 10191 1392312 16 84  0  0  0
+
+r 列：就绪队列的长度已经到了 8，远远超过了系统 CPU 的个数 2，所以肯定会有大量的 CPU 竞争
+us（user）和 sy（system）列：系统 CPU 使用率，也就是 sy 列高达 84%，说明 CPU 主要是被内核占用了
+in  列：中断次数也上升到了 1 万左右，说明中断处理也是个潜在的问题
+
+// 第三个终端再用 pidstat 来看一下， CPU 和进程上下文切换的情况
+// 每隔1秒输出1组数据（需要 Ctrl+C 才结束）-w参数表示输出进程切换指标，而-u参数则表示输出CPU使用指标$ pidstat -w -u 1
+CPU 使用率的升高果然是 sysbench 导致的，它的 CPU 使用率已经达到了 100%。但上下文切换则是来自其他进程，包括非自愿上下文切换频率最高的 pidstat  ，以及自愿上下文切换频率最高的内核线程 kworker 和 sshd
+
+// pidstat 默认显示进程的指标数据，加上 -t 参数后，才会输出线程的指标,-wt 参数表示输出线程的上下文切换指标
+pidstat -wt 1
+虽然 sysbench 进程（也就是主线程）的上下文切换次数看起来并不多，但它的子线程的上下文切换次数却有很多
+
+// 第三个终端里，  Ctrl+C 停止刚才的 pidstat 命令，然后运行下面的命令，观察中断的变化情况
+watch -d cat /proc/interrupts
+变化速度最快的是重调度中断（RES），这个中断类型表示，唤醒空闲状态的 CPU 来调度新的任务运行。这是多处理器系统（SMP）中，调度器用来分散任务到不同 CPU 的机制，通常也被称为处理器间中断（Inter-Processor Interrupts，IPI），这里的中断升高还是因为过多任务的调度问题，跟前面上下文切换次数的分析结果是一致的
+```
+
+如果系统的上下文切换次数比较稳定，那么从数百到一万以内，都应该算是正常的。但当上下文切换次数超过一万次，或者切换次数出现数量级的增长时，就很可能已经出现了性能问题。这时，还需要根据上下文切换的类型，再做具体分析：
+
+* 自愿上下文切换变多了，说明进程都在等待资源，有可能发生了 I/O 等其他问题
+* 非自愿上下文切换变多了，说明进程都在被强制调度，也就是都在争抢 CPU，说明 CPU 的确成了瓶颈
+* 中断次数变多了，说明 CPU 被中断处理程序占用，需要查看 /proc/interrupts 文件来分析具体的中断类型
 
