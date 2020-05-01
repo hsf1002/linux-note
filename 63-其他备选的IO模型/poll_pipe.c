@@ -27,6 +27,11 @@
  * 
     使用poll检查多个文件描述符
 
+ cc -g -Wall -o poll_pipe poll_pipe.c libgetnum.so 
+./poll_pipe 10
+writing (random_pipe:   1), (read fd:   5), (write fd:   6)
+poll() returned: 1
+readable: 1    5
 
  */
 int main(int argc, char *argv[])
@@ -67,7 +72,7 @@ int main(int argc, char *argv[])
         printf("writing (random_pipe: %3d), (read fd: %3d), (write fd: %3d)\n", random_pipe, pfds[random_pipe][0], pfds[random_pipe][1]);
 
         // 随机向管道中写入一个字符
-        if (-1 == write(pfds[random_pipe][1], 'a', 1))
+        if (-1 == write(pfds[random_pipe][1], "a", 1))
             perror("write error");
     }
 
