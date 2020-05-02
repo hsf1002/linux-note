@@ -458,3 +458,117 @@ Tasks: 247 total,   1 running,  79 sleeping,   0 stopped, 115 zombie
 4. 最后再看每个进程的情况， CPU 使用率最高的进程只有 0.3%，看起来并不高；但有两个进程处于 D 状态，它们可能在等待 I/O，但光凭这里并不能确定是它们导致了 iowait 升高
 ```
 
+##### iowait 分析
+
+dstat：可以同时查看 CPU 和 I/O 这两种资源的使用情况，便于对比分析
+
+```
+// 间隔1秒输出10组数据
+dstat 1 10
+You did not select any stats, using -cdngy by default.
+--total-cpu-usage-- -dsk/total- -net/total- ---paging-- ---system--
+usr sys idl wai stl| read  writ| recv  send|  in   out | int   csw
+  0   0  96   4   0|1219k  408k|   0     0 |   0     0 |  42   885
+  0   0   2  98   0|  34M    0 | 198B  790B|   0     0 |  42   138
+  0   0   0 100   0|  34M    0 |  66B  342B|   0     0 |  42   135
+  0   0  84  16   0|5633k    0 |  66B  342B|   0     0 |  52   177
+  0   3  39  58   0|  22M    0 |  66B  342B|   0     0 |  43   144
+  0   0   0 100   0|  34M    0 | 200B  450B|   0     0 |  46   147
+  0   0   2  98   0|  34M    0 |  66B  342B|   0     0 |  45   134
+  0   0   0 100   0|  34M    0 |  66B  342B|   0     0 |  39   131
+  0   0  83  17   0|5633k    0 |  66B  342B|   0     0 |  46   168
+  0   3  39  59   0|  22M    0 |  66B  342B|   0     0 |  37   134
+```
+
+每当 iowait 升高（wai）时，磁盘的读请求（read）都会很大。这说明 iowait 的升高跟磁盘的读请求有关，很可能就是磁盘读导致
+
+```
+// 观察一会儿按 Ctrl+C 结束
+top
+...
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+ 4340 root      20   0   44676   4048   3432 R   0.3  0.0   0:00.05 top
+ 4345 root      20   0   37280  33624    860 D   0.3  0.0   0:00.01 app
+ 4344 root      20   0   37280  33624    860 D   0.3  0.4   0:00.01 app
+...
+```
+
+有两个 D 状态的进程，PID 分别是 4344 和 4345
+
+```
+// -d 展示 I/O 统计数据，-p 指定进程号，间隔 1 秒输出 3 组数据
+pidstat -d -p 4344 1 3
+06:38:50      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+06:38:51        0      4344      0.00      0.00      0.00       0  app
+06:38:52        0      4344      0.00      0.00      0.00       0  app
+06:38:53        0      4344      0.00      0.00      0.00       0  app
+
+kB_rd: 表示每秒读的 KB 数 
+kB_wr: 表示每秒写的 KB 数
+iodelay: 表示 I/O 的延迟（单位是时钟周期）
+kB_ccwr: 表示在执行时写入磁盘被取消的数量
+它们都是 0，表示此时没有任何的读写，说明问题不是 4344 进程导致的
+```
+
+使用 pidstat，但这次去掉进程号，干脆就来观察所有进程的 I/O 使用情况
+
+```
+// 间隔 1 秒输出多组数据 (这里是 20 组)
+pidstat -d 1 20
+...
+06:48:46      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+06:48:47        0      4615      0.00      0.00      0.00       1  kworker/u4:1
+06:48:47        0      6080  32768.00      0.00      0.00     170  app
+06:48:47        0      6081  32768.00      0.00      0.00     184  app
+
+06:48:47      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+06:48:48        0      6080      0.00      0.00      0.00     110  app
+
+06:48:48      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+06:48:49        0      6081      0.00      0.00      0.00     191  app
+
+06:48:49      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+
+06:48:50      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+06:48:51        0      6082  32768.00      0.00      0.00       0  app
+06:48:51        0      6083  32768.00      0.00      0.00       0  app
+
+06:48:51      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+06:48:52        0      6082  32768.00      0.00      0.00     184  app
+06:48:52        0      6083  32768.00      0.00      0.00     175  app
+
+06:48:52      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+06:48:53        0      6083      0.00      0.00      0.00     105  app
+...
+```
+
+确定是app 进程在进行磁盘读，进程想要访问磁盘，就必须使用系统调用，需要找出  app 进程的系统调用。strace  正是最常用的跟踪进程系统调用的工具。所以，从 pidstat 的输出中拿到进程的 PID 号，比如 6082，然后在终端中运行 strace 命令，并用 -p 参数指定 PID 号
+
+```
+strace -p 6082
+strace: attach: ptrace(PTRACE_SEIZE, 6082): Operation not permitted
+```
+
+如果已经是以root运行，则先检查一下进程的状态是否正常
+
+```
+ps aux | grep 6082
+root      6082  0.0  0.0      0     0 pts/0    Z+   13:43   0:00 [app] <defunct>
+```
+
+发现6082已经变成僵尸了，没法儿继续分析它的系统调用，可以用  perf top 看看有没有新发现。或者在终端中运行 perf record，持续一会儿（例如 15 秒），然后按 Ctrl+C 退出，再运行 perf report 查看报告。app 的确在通过系统调用 sys_read() 读取数据。并且从 new_sync_read 和 blkdev_direct_IO  能看出，进程正在对磁盘进行直接读，也就是绕过了系统缓存，每个读请求都会从磁盘直接读，这就可以解释我们观察到的 iowait 升高了
+
+##### 僵尸进程分析
+
+```
+// -a 表示输出命令行选项, p表PID, s表示指定进程的父进程
+$ pstree -aps 3084
+systemd,1
+  └─dockerd,15006 -H fd://
+      └─docker-containe,15024 --config /var/run/docker/containerd/containerd.toml
+          └─docker-containe,3991 -namespace moby -workdir...
+              └─app,4009
+                  └─(app,3084)
+```
+
+3084 号进程的父进程是 4009，就是 app 应用，查看 app 应用程序的代码，看看子进程结束的处理是否正确，比如有没有调用 wait() 或 waitpid() ，抑或是，有没有注册 SIGCHLD 信号的处理函数
