@@ -399,3 +399,85 @@ PID      UID      CMD              HITS     MISSES   DIRTIES  READ_HIT%  WRITE_H
 优化前，通过 cachetop 只能看到很少一部分数据的全部命中，而没有观察到大量数据的未命中情况是因为，cachetop 工具并不把直接 I/O 算进来
 ```
 
+### 内存泄漏了，该如何定位和处理？
+
+实际应用程序可能会比较复杂
+
+* malloc() 和 free() 通常并不是成对出现，而是需要在每个异常处理路径和成功路径上都释放内存 
+* 在多线程程序中，一个线程中分配的内存，可能会在另一个线程中访问和释放
+* 在第三方的库函数中，隐式分配的内存可能需要应用程序显式释放
+
+##### 案例分析
+
+分析工具：
+
+* sysstat 软件包中的 vmstat ，可以观察内存的变化情况
+* memleak 可以跟踪系统或指定进程的内存分配、释放请求，然后定期输出一个未释放内存和相应调用栈的汇总情况，是bbc包中的一个工具
+
+预先安装 sysstat、Docker 以及 bcc 软件包
+
+```
+# install sysstat docker
+sudo apt-get install -y sysstat docker.io
+
+# Install bcc
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4052245BD4284CDD
+echo "deb https://repo.iovisor.org/apt/bionic bionic main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+sudo apt-get update
+sudo apt-get install -y bcc-tools libbcc-examples linux-headers-$(uname -r)
+```
+
+```
+// 第一个终端运行斐波那契数列的程序，一秒打印一次
+$ docker run --name=app -itd feisky/app:mem-leak
+$ docker logs app
+2th => 1
+3th => 2
+4th => 3
+5th => 5
+6th => 8
+7th => 13
+
+// 第二个终端运行下面的 vmstat ，等待一段时间，观察内存的变化情况，每隔3秒输出一组数据
+$ vmstat 3
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+0  0      0 6601824  97620 1098784    0    0     0     0   62  322  0  0 100  0  0
+0  0      0 6601700  97620 1098788    0    0     0     0   57  251  0  0 100  0  0
+0  0      0 6601320  97620 1098788    0    0     0     3   52  306  0  0 100  0  0
+0  0      0 6601452  97628 1098788    0    0     0    27   63  326  0  0 100  0  0
+2  0      0 6601328  97628 1098788    0    0     0    44   52  299  0  0 100  0  0
+0  0      0 6601080  97628 1098792    0    0     0     0   56  285  0  0 100  0  0 
+
+未使用内存free在逐渐减小，而 buffer 和 cache 基本不变，系统中使用的内存一直在升高。但这并不能说明有内存泄漏，因为应用程序运行中需要的内存也可能会增大。比如说，程序中如果用了一个动态增长的数组来缓存计算结果，占用内存自然会增长
+
+# -a 表示显示每个内存分配请求的大小以及地址，-p 指定案例应用的PID号
+$ docker cp app:/app /app
+$ /usr/share/bcc/tools/memleak -p $(pidof app) -a
+Attaching to pid 12512, Ctrl+C to quit.
+[03:00:41] Top 10 stacks with outstanding allocations:
+    addr = 7f8f70863220 size = 8192
+    addr = 7f8f70861210 size = 8192
+    addr = 7f8f7085b1e0 size = 8192
+    addr = 7f8f7085f200 size = 8192
+    addr = 7f8f7085d1f0 size = 8192
+    40960 bytes in 5 allocations from stack
+        fibonacci+0x1f [app]
+        child+0x4f [app]
+        start_thread+0xdb [libpthread-2.27.so] 
+        
+fibonacci() 函数分配的内存没释放，修复之后再次运行
+ 
+# 清理原来的案例应用
+$ docker rm -f app
+# 运行修复后的应用
+$ docker run --name=app -itd feisky/app:mem-leak-fix
+# 重新执行 memleak工具检查内存泄漏情况
+$ /usr/share/bcc/tools/memleak -a -p $(pidof app)
+Attaching to pid 18808, Ctrl+C to quit.
+[10:23:18] Top 10 stacks with outstanding allocations:
+[10:23:23] Top 10 stacks with outstanding allocations: 
+```
+
