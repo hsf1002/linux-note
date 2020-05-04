@@ -481,3 +481,101 @@ Attaching to pid 18808, Ctrl+C to quit.
 [10:23:23] Top 10 stacks with outstanding allocations: 
 ```
 
+### 为什么系统的Swap变高了
+
+内存资源紧张时会导致两种结果：
+
+* OOM（Out Of Memory）：系统杀死占用大量内存的进程，释放这些内存，再分配给其他更需要的进程
+* 内存回收：系统释放掉可以回收的内存，如缓存和缓冲区，就属于可回收内存。它们在内存管理中，通常被叫做文件页（File-backed Page）。大部分文件页，都可以直接回收，以后有需要时，再从磁盘重新读取就可以了。而那些被应用程序修改过，并且暂时还没写入磁盘的数据（也就是脏页），就得先写入磁盘，然后才能进行内存释放。这些脏页，一般可以通过两种方式写入磁盘
+  * 在应用程序中，通过系统调用 fsync  ，把脏页同步到磁盘中
+  * 由内核线程 pdflush 负责这些脏页的刷新
+
+文件页：除了缓存和缓冲区，通过内存映射获取的文件映射页，也是一种常见的文件页。它也可以被释放掉，下次再访问的时候，从文件重新读取
+
+匿名页（Anonymous Page）：如果这些内存在分配后很少被访问，Swap 把这些不常访问的内存先写到磁盘中，然后释放这些内存，给其他更需要的进程使用。再次访问这些内存时，重新从磁盘读入内存就可以了
+
+##### Swap 原理
+
+* 换出：就是把进程暂时不用的内存数据存储到磁盘中，并释放这些数据占用的内存
+* 换入：则是在进程再次访问这些内存的时候，把它们从磁盘读到内存中来
+
+笔记本电脑的休眠和快速开机的功能，也基于 Swap 。休眠时，把系统的内存存入磁盘，这样等到再次开机时，只要从磁盘中加载内存就可以。这样就省去了很多应用程序的初始化过程，加快了开机速度
+
+* 直接内存回收：有新的大块内存分配请求，但是剩余内存不足。这个时候系统就需要回收一部分内存（比如前面提到的缓存），进而尽可能地满足新内存请求
+* 定期回收内存：也就是 kswapd0。为了衡量内存的使用情况，kswapd0 定义了三个内存阈值（watermark，也称为水位），分别是页最小阈值（pages_min）、页低阈值（pages_low）和页高阈值（pages_high）。剩余内存，则使用 pages_free 表示
+
+![img](https://static001.geekbang.org/resource/image/c1/20/c1054f1e71037795c6f290e670b29120.png)
+
+* pages_free < pages_min：说明进程可用内存都耗尽了，只有内核才可以分配内存
+
+* pages_min < pages_free < pages_low：说明内存压力比较大，这时 kswapd0 会执行内存回收，直到剩余内存大于高阈值为止
+
+* pages_low < pages_free < pages_high：说明内存有一定压力，但还可以满足新内存请求
+* pages_free > pages_high：说明剩余内存比较多，没有内存压力
+
+页最小阈值，通过内核选项 /proc/sys/vm/min_free_kbytes 来间接设置。而其他两个阈值，都是根据页最小阈值计算生成的，计算方法如下 ：
+
+```
+pages_low = pages_min*5/4
+pages_high = pages_min*3/2
+```
+
+##### NUMA 与 Swap
+
+Swap 升高，可是在分析系统的内存使用时，却很可能发现，系统剩余内存还多着呢。为什么剩余内存很多的情况下，也会发生 Swap ？这正是处理器的 NUMA （Non-Uniform Memory Access）架构导致的。在 NUMA 架构下，多个处理器被划分到不同 Node 上，且每个 Node 都拥有自己的本地内存空间。而同一个 Node 内部的内存空间，又可以进一步分为不同的内存域（Zone），比如直接内存访问区（DMA）、普通内存区（NORMAL）、伪内存区（MOVABLE）等，如下图所示
+
+![img](https://static001.geekbang.org/resource/image/be/d9/be6cabdecc2ec98893f67ebd5b9aead9.png)
+
+分析工具：
+
+* numactl：查看处理器在 Node 的分布情况
+
+```
+numactl --hardware
+available: 1 nodes (0)
+node 0 cpus: 0 1 2 3
+node 0 size: 7977 MB
+node 0 free: 4416 MB
+...
+
+只有一个 Node 0 ，而且编号为 0 1 2 3 的四个 CPU， 都位于 Node 0 上，以及内存大小和剩余内存大小
+```
+
+三个内存阈值（页最小阈值、页低阈值和页高阈值），都可以通过内存域在 proc 文件系统中的接口 /proc/zoneinfo 来查看
+
+```
+cat /proc/zoneinfo
+...
+Node 0, zone   Normal
+ pages free     227894
+       min      14896
+       low      18620
+       high     22344
+...
+     nr_free_pages 227894
+     nr_zone_inactive_anon 11082
+     nr_zone_active_anon 14024
+     nr_zone_inactive_file 539024
+     nr_zone_active_file 923986
+...
+
+pages 处的 min、low、high，就是三个内存阈值，而 free 是剩余内存页数，它跟后面的 nr_free_pages 相同nr_zone_active_anon 和 nr_zone_inactive_anon，分别是活跃和非活跃的匿名页数
+nr_zone_active_file 和 nr_zone_inactive_file，分别是活跃和非活跃的文件页数
+
+剩余内存远大于页高阈值，所以此时的 kswapd0 不会回收内存
+```
+
+某个 Node 内存不足时，系统可以从其他 Node 寻找空闲内存，也可以从本地内存中回收内存。具体选哪种模式，可以通过 /proc/sys/vm/zone_reclaim_mode 来调整：
+
+* 默认的 0 ，也就是刚刚提到的模式，表示既可以从其他 Node 寻找空闲内存，也可以从本地回收内存
+* 1、2、4 都表示只回收本地内存，2 表示可以回写脏数据回收内存，4 表示可以用 Swap 方式回收内存
+
+##### swappiness
+
+回收的内存既包括了文件页，又包括了匿名页
+
+* 对文件页的回收，当然就是直接回收缓存，或者把脏页写回磁盘后再回收
+* 对匿名页的回收，其实就是通过 Swap 机制，把它们写入磁盘后再释放内存
+
+既然有两种不同的内存回收机制，在实际回收内存时Linux 提供了一个  /proc/sys/vm/swappiness 选项，用来调整使用 Swap 的积极程度：swappiness 的范围是 0-100，数值越大，越积极使用 Swap，也就是更倾向于回收匿名页；数值越小，越消极使用 Swap，也就是更倾向于回收文件页。虽然 swappiness 的范围是 0-100，这并不是内存的百分比，而是调整 Swap 积极程度的权重，即使把它设置成 0，当剩余内存 + 文件页小于页高阈值时，还是会发生 Swap
+
