@@ -425,3 +425,93 @@ $ opensnoop
 应用会动态生成一批文件，用来临时存储数据，用完就会删除它们。正是这些文件读写，引发了 I/O 的性能瓶颈，导致整个处理过程非常慢
 ```
 
+### 一个SQL查询要15秒，这是怎么回事？
+
+##### 案例分析
+
+```
+// 第一个终端
+$ curl http://127.0.0.1:10000/
+Index Page
+
+// 接着初始化数据库，并插入 10000 条商品信息
+$ make init
+docker exec -i mysql mysql -uroot -P3306 < tables.sql
+curl http://127.0.0.1:10000/db/insert/products/10000
+insert 10000 lines
+
+// 第二个终端，访问一下商品搜索的接口，看看能不能找到想要的商品
+$ curl http://192.168.0.10:10000/products/geektime
+Got data: () in 15.364538192749023 sec
+
+返回的是空数据，而且处理时间超过 15 秒
+
+// 第二个终端继续执行
+$ while true; do curl http://192.168.0.10:10000/products/geektime; sleep 5; done
+
+// 第一个终端
+$ top
+top - 12:02:15 up 6 days,  8:05,  1 user,  load average: 0.66, 0.72, 0.59
+Tasks: 137 total,   1 running,  81 sleeping,   0 stopped,   0 zombie
+%Cpu0  :  0.7 us,  1.3 sy,  0.0 ni, 35.9 id, 62.1 wa,  0.0 hi,  0.0 si,  0.0 st
+%Cpu1  :  0.3 us,  0.7 sy,  0.0 ni, 84.7 id, 14.3 wa,  0.0 hi,  0.0 si,  0.0 st
+KiB Mem :  8169300 total,  7238472 free,   546132 used,   384696 buff/cache
+KiB Swap:        0 total,        0 free,        0 used.  7316952 avail Mem
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+27458 999       20   0  833852  57968  13176 S   1.7  0.7   0:12.40 mysqld
+27617 root      20   0   24348   9216   4692 S   1.0  0.1   0:04.40 python
+ 1549 root      20   0  236716  24568   9864 S   0.3  0.3  51:46.57 python3
+22421 root      20   0       0      0      0 I   0.3  0.0   0:01.16 kworker/u
+
+两个 CPU 的 iowait 都比较高，特别是 CPU0
+
+// 在第一个终端，按下 Ctrl+C，停止 top 命令；然后，执行下面的 iostat 命令
+$ iostat -d -x 1
+Device            r/s     w/s     rkB/s     wkB/s   rrqm/s   wrqm/s  %rrqm  %wrqm r_await w_await aqu-sz rareq-sz wareq-sz  svctm  %util
+...
+sda            273.00    0.00  32568.00      0.00     0.00     0.00   0.00   0.00    7.90    0.00   1.16   119.30     0.00   3.56  97.20
+
+磁盘 sda 每秒的读数据为 32 MB， 而 I/O 使用率高达 97% ，接近饱和，磁盘 sda 的读取确实碰到了性能瓶颈
+
+// 按下 Ctrl+C 停止 iostat 命令，然后运行下面的 pidstat 命令，观察进程的 I/O 情况
+
+# -d选项表示展示进程的I/O情况
+$ pidstat -d 1
+12:04:11      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+12:04:12      999     27458  32640.00      0.00      0.00       0  mysqld
+12:04:12        0     27617      4.00      4.00      0.00       3  python
+12:04:12        0     27864      0.00      4.00      0.00       0  systemd-journal
+
+PID 为 27458 的 mysqld 进程正在进行大量的读，而且读取速度是 32 MB/s，跟刚才 iostat 的发现一致。磁盘 I/O 瓶颈的根源，即 mysqld 进程
+
+// 为了不漏掉这些线程的数据读取情况，加上 -f 参数
+$ strace -f -p 27458
+[pid 28014] read(38, "934EiwT363aak7VtqF1mHGa4LL4Dhbks"..., 131072) = 131072
+[pid 28014] read(38, "hSs7KBDepBqA6m4ce6i6iUfFTeG9Ot9z"..., 20480) = 20480
+[pid 28014] read(38, "NRhRjCSsLLBjTfdqiBRLvN9K6FRfqqLm"..., 131072) = 131072
+[pid 28014] read(38, "AKgsik4BilLb7y6OkwQUjjqGeCTQTaRl"..., 24576) = 24576
+[pid 28014] read(38, "hFMHx7FzUSqfFI22fQxWCpSnDmRjamaW"..., 131072) = 131072
+[pid 28014] read(38, "ajUzLmKqivcDJSkiw7QWf2ETLgvQIpfC"..., 20480) = 20480
+
+
+// 显示27458进程里面包含的线程，-t表示显示线程，-a表示显示命令行参数
+$ pstree -t -a -p 27458
+mysqld,27458 --log_bin=on --sync_binlog=1
+...
+  ├─{mysqld},27922
+  ├─{mysqld},27923
+  └─{mysqld},28014
+  
+
+$ lsof -p 27458
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+...
+​mysqld  27458      999   38u   REG    8,1 512440000 2601895 /var/lib/mysql/test/products.MYD
+
+mysqld 进程确实打开了大量文件，而根据文件描述符（FD）的编号，描述符为 38 的是一个路径为 /var/lib/mysql/test/products.MYD 的文件。38 后面的 u 表示， mysqld 以读写的方式访问文件
+没有索引导致的慢查询问题，需要添加索引
+```
+
+### Redis响应严重延迟，如何解决
+
