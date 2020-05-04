@@ -313,3 +313,115 @@ FD 表示文件描述符号，TYPE 表示文件类型，NAME 表示文件路径
 进程 18940 以每次 300MB 的速度，在“疯狂”写日志，而日志文件的路径是 /tmp/logtest.txt
 ```
 
+### 为什么我的磁盘I/O延迟很高？
+
+##### 案例分析
+
+分析工具：
+
+* filetop：bcc 软件包的一部分，主要跟踪内核中文件的读写情况，并输出线程 ID（TID）、读写大小、读写类型以及文件名称
+* opensnoop：同属于 bcc 软件包，可以动态跟踪内核中的 open 系统调用
+
+```
+// 第一个终端中执行
+$ docker run --name=app -p 10000:80 -itd feisky/word-pop 
+
+// 第二个终端中执行
+$ curl http://192.168.0.10:10000/ 
+hello world 
+// 继续访问，发现很长时间没有响应
+$ curl http://192.168.0.10:1000/popularity/word 
+// 为了避免分析过程中 curl 请求突然结束，把 curl 命令放到一个循环里执行；这次我们还要加一个 time 命令，观察每次的执行时间
+$ while true; do time curl http://192.168.0.10:10000/popularity/word; sleep 1; done 
+
+// 第一个终端
+$ top 
+top - 14:27:02 up 10:30,  1 user,  load average: 1.82, 1.26, 0.76 
+Tasks: 129 total,   1 running,  74 sleeping,   0 stopped,   0 zombie 
+%Cpu0  :  3.5 us,  2.1 sy,  0.0 ni,  0.0 id, 94.4 wa,  0.0 hi,  0.0 si,  0.0 st 
+%Cpu1  :  2.4 us,  0.7 sy,  0.0 ni, 70.4 id, 26.5 wa,  0.0 hi,  0.0 si,  0.0 st 
+KiB Mem :  8169300 total,  3323248 free,   436748 used,  4409304 buff/cache 
+KiB Swap:        0 total,        0 free,        0 used.  7412556 avail Mem 
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND 
+12280 root      20   0  103304  28824   7276 S  14.0  0.4   0:08.77 python 
+   16 root      20   0       0      0      0 S   0.3  0.0   0:09.22 ksoftirqd/1 
+1549 root      20   0  236712  24480   9864 S   0.3  0.3   3:31.38 python3 
+
+问题1. 两个 CPU 的 iowait 都非常高
+问题2.  python 进程的 CPU 使用率稍微有点高，达到了 14%
+
+// 第一个终端停止 top 命令；然后执行下面的 ps 命令
+$ ps aux | grep app.py 
+root     12222  0.4  0.2  96064 23452 pts/0    Ss+  14:37   0:00 python /app.py 
+root     12280 13.9  0.3 102424 27904 pts/0    Sl+  14:37   0:09 /usr/local/bin/python /app.py 
+
+CPU 使用率较高的进程正是12280
+
+// 第一个终端运行 iostat 命令，-d 显示出 I/O 的性能指标；-x 显示出扩展统计信息（即显示所有 I/O 指标）
+$ iostat -d -x 1
+Device            r/s     w/s     rkB/s     wkB/s   rrqm/s   wrqm/s  %rrqm  %wrqm r_await w_await aqu-sz rareq-sz wareq-sz  svctm  %util 
+loop0            0.00    0.00      0.00      0.00     0.00     0.00   0.00   0.00    0.00    0.00   0.00     0.00     0.00   0.00   0.00 
+sda              0.00   71.00      0.00  32912.00     0.00     0.00   0.00   0.00    0.00 18118.31 241.89     0.00   463.55  13.86  98.40 
+
+磁盘 sda 的 I/O 使用率已经达到 98% ，接近饱和了。而且，写请求的响应时间高达 18 秒，每秒的写数据为 32 MB，显然写磁盘碰到了瓶颈，这些 I/O 请求到底是哪些进程导致的呢？
+
+// 第一个终端运行
+$ pidstat -d 1 
+14:39:14      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command 
+14:39:15        0     12280      0.00 335716.00      0.00       0  python 
+
+先用 strace 确认它是不是在写文件，再用 lsof 找出文件描述符对应的文件即可
+
+// 第一个终端运行，strace -p PID后加上-f，多进程和多线程都可以跟踪
+$ strace -p 12280 
+strace: Process 12280 attached 
+select(0, NULL, NULL, NULL, {tv_sec=0, tv_usec=567708}) = 0 (Timeout) 
+stat("/usr/local/lib/python3.7/importlib/_bootstrap.py", {st_mode=S_IFREG|0644, st_size=39278, ...}) = 0 
+stat("/usr/local/lib/python3.7/importlib/_bootstrap.py", {st_mode=S_IFREG|0644, st_size=39278, ...}) = 0 
+
+// 没有write调用
+$ strace -p 12280 2>&1 | grep write 
+
+
+# 切换到工具目录 
+$ cd /usr/share/bcc/tools 
+
+# -C 选项表示输出新内容时不清空屏幕 
+$ ./filetop -C 
+
+TID    COMM             READS  WRITES R_Kb    W_Kb    T FILE 
+514    python           0      1      0       2832    R 669.txt 
+514    python           0      1      0       2490    R 667.txt 
+514    python           0      1      0       2685    R 671.txt 
+514    python           0      1      0       2392    R 670.txt 
+514    python           0      1      0       2050    R 672.txt 
+
+...
+
+TID    COMM             READS  WRITES R_Kb    W_Kb    T FILE 
+514    python           2      0      5957    0       R 651.txt 
+514    python           2      0      5371    0       R 112.txt 
+514    python           2      0      4785    0       R 861.txt 
+514    python           2      0      4736    0       R 213.txt 
+514    python           2      0      4443    0       R 45.txt 
+
+filetop 输出了 8 列内容，分别是线程 ID、线程命令行、读写次数、读写的大小（单位 KB）、文件类型以及读写的文件名称
+
+每隔一段时间，线程号为 514 的 python 应用就会先写入大量的 txt 文件，再大量地读
+
+// 第一个终端运行如下命令查看514线程属于哪个进程
+$ ps -efT | grep 514
+root     12280  514 14626 33 14:47 pts/0    00:00:05 /usr/local/bin/python /app.py 
+
+filetop 只给出了文件名称，却没有文件路径
+
+// opensnoop 动态跟踪内核中的 open 系统调用
+$ opensnoop 
+12280  python              6   0 /tmp/9046db9e-fe25-11e8-b13f-0242ac110002/650.txt 
+12280  python              6   0 /tmp/9046db9e-fe25-11e8-b13f-0242ac110002/651.txt 
+12280  python              6   0 /tmp/9046db9e-fe25-11e8-b13f-0242ac110002/652.txt 
+
+应用会动态生成一批文件，用来临时存储数据，用完就会删除它们。正是这些文件读写，引发了 I/O 的性能瓶颈，导致整个处理过程非常慢
+```
+
