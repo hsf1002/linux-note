@@ -515,3 +515,134 @@ mysqld 进程确实打开了大量文件，而根据文件描述符（FD）的�
 
 ### Redis响应严重延迟，如何解决
 
+
+
+
+
+##### 案例分析
+
+```
+// 第二个终端，使用 curl 工具，访问应用首页
+$ curl http://192.168.0.10:10000/
+hello redis
+
+// 继续插入5000条数据，可以根据磁盘的类型适当调整，比如使用SSD时可以调大，而HDD可以适当调小
+$ curl http://192.168.0.10:10000/init/5000
+{"elapsed_seconds":30.26814079284668,"keys_initialized":5000}
+
+// 访问应用的缓存查询接口
+$ curl http://192.168.0.10:10000/get_cache
+{"count":1677,"data":["d97662fa-06ac-11e9-92c7-0242ac110002",...],"elapsed_seconds":10.545469760894775,"type":"good"}
+
+调用居然要花 10 秒
+
+// 为了避免分析过程中客户端的请求结束，在进行性能分析前，我们先要把 curl 命令放到一个循环里来执行
+$ while true; do curl http://192.168.0.10:10000/get_cache; done
+
+// 终端一中执行 top 命令
+$ top
+top - 12:46:18 up 11 days,  8:49,  1 user,  load average: 1.36, 1.36, 1.04
+Tasks: 137 total,   1 running,  79 sleeping,   0 stopped,   0 zombie
+%Cpu0  :  6.0 us,  2.7 sy,  0.0 ni,  5.7 id, 84.7 wa,  0.0 hi,  1.0 si,  0.0 st
+%Cpu1  :  1.0 us,  3.0 sy,  0.0 ni, 94.7 id,  0.0 wa,  0.0 hi,  1.3 si,  0.0 st
+KiB Mem :  8169300 total,  7342244 free,   432912 used,   394144 buff/cache
+KiB Swap:        0 total,        0 free,        0 used.  7478748 avail Mem
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+ 9181 root      20   0  193004  27304   8716 S   8.6  0.3   0:07.15 python
+ 9085 systemd+  20   0   28352   9760   1860 D   5.0  0.1   0:04.34 redis-server
+  368 root      20   0       0      0      0 D   1.0  0.0   0:33.88 jbd2/sda1-8
+  149 root       0 -20       0      0      0 I   0.3  0.0   0:10.63 kworker/0:1H
+ 1549 root      20   0  236716  24576   9864 S   0.3  0.3  91:37.30 python3
+ 
+CPU0 的 iowait 比较高
+ 
+// 按下 Ctrl+C，停止 top 命令；然后，执行下面的 iostat 命令
+$ iostat -d -x 1
+Device            r/s     w/s     rkB/s     wkB/s   rrqm/s   wrqm/s  %rrqm  %wrqm r_await w_await aqu-sz rareq-sz wareq-sz  svctm  %util
+...
+sda              0.00  492.00      0.00   2672.00     0.00   176.00   0.00  26.35    0.00    1.76   0.00     0.00     5.43   0.00   0.00
+
+磁盘 sda 每秒的写数据（wkB/s）为 2.5MB，I/O 使用率（%util）是 0。虽然有些 I/O 操作，但并没导致磁盘的 I/O 瓶颈
+
+// 终端一中运行下面的 pidstat 命令，观察进程的 I/O 情况
+$ pidstat -d 1
+12:49:35      UID       PID   kB_rd/s   kB_wr/s kB_ccwr/s iodelay  Command
+12:49:36        0       368      0.00     16.00      0.00      86  jbd2/sda1-8
+12:49:36      100      9085      0.00    636.00      0.00       1  redis-server
+
+ redis-server 在进行磁盘写
+ 
+// 终端一中，执行 strace 命令，并且指定 redis-server 的进程号 9085
+# -f表示跟踪子进程和子线程，-T表示显示系统调用的时长，-tt表示显示跟踪时间
+$ strace -f -T -tt -p 9085
+[pid  9085] 14:20:16.826131 epoll_pwait(5, [{EPOLLIN, {u32=8, u64=8}}], 10128, 65, NULL, 8) = 1 <0.000055>
+[pid  9085] 14:20:16.826301 read(8, "*2\r\n$3\r\nGET\r\n$41\r\nuuid:5b2e76cc-"..., 16384) = 61 <0.000071>
+[pid  9085] 14:20:16.826477 read(3, 0x7fff366a5747, 1) = -1 EAGAIN (Resource temporarily unavailable) <0.000063>
+[pid  9085] 14:20:16.826645 write(8, "$3\r\nbad\r\n", 9) = 9 <0.000173>
+[pid  9085] 14:20:16.826907 epoll_pwait(5, [{EPOLLIN, {u32=8, u64=8}}], 10128, 65, NULL, 8) = 1 <0.000032>
+[pid  9085] 14:20:16.827030 read(8, "*2\r\n$3\r\nGET\r\n$41\r\nuuid:55862ada-"..., 16384) = 61 <0.000044>
+[pid  9085] 14:20:16.827149 read(3, 0x7fff366a5747, 1) = -1 EAGAIN (Resource temporarily unavailable) <0.000043>
+[pid  9085] 14:20:16.827285 write(8, "$3\r\nbad\r\n", 9) = 9 <0.000141>
+[pid  9085] 14:20:16.827514 epoll_pwait(5, [{EPOLLIN, {u32=8, u64=8}}], 10128, 64, NULL, 8) = 1 <0.000049>
+[pid  9085] 14:20:16.827641 read(8, "*2\r\n$3\r\nGET\r\n$41\r\nuuid:53522908-"..., 16384) = 61 <0.000043>
+[pid  9085] 14:20:16.827784 read(3, 0x7fff366a5747, 1) = -1 EAGAIN (Resource temporarily unavailable) <0.000034>
+[pid  9085] 14:20:16.827945 write(8, "$4\r\ngood\r\n", 10) = 10 <0.000288>
+[pid  9085] 14:20:16.828339 epoll_pwait(5, [{EPOLLIN, {u32=8, u64=8}}], 10128, 63, NULL, 8) = 1 <0.000057>
+[pid  9085] 14:20:16.828486 read(8, "*3\r\n$4\r\nSADD\r\n$4\r\ngood\r\n$36\r\n535"..., 16384) = 67 <0.000040>
+[pid  9085] 14:20:16.828623 read(3, 0x7fff366a5747, 1) = -1 EAGAIN (Resource temporarily unavailable) <0.000052>
+[pid  9085] 14:20:16.828760 write(7, "*3\r\n$4\r\nSADD\r\n$4\r\ngood\r\n$36\r\n535"..., 67) = 67 <0.000060>
+[pid  9085] 14:20:16.828970 fdatasync(7) = 0 <0.005415>
+[pid  9085] 14:20:16.834493 write(8, ":1\r\n", 4) = 4 <0.000250>
+
+epoll_pwait、read、write、fdatasync 这些系统调用都比较频繁。刚才的写磁盘，应该就是 write 或者 fdatasync 导致
+
+// 接着再来运行 lsof 命令，找出这些系统调用的操作对象
+$ lsof -p 9085
+redis-ser 9085 systemd-network    3r     FIFO   0,12      0t0 15447970 pipe
+redis-ser 9085 systemd-network    4w     FIFO   0,12      0t0 15447970 pipe
+redis-ser 9085 systemd-network    5u  a_inode   0,13        0    10179 [eventpoll]
+redis-ser 9085 systemd-network    6u     sock    0,9      0t0 15447972 protocol: TCP
+redis-ser 9085 systemd-network    7w      REG    8,1  8830146  2838532 /data/appendonly.aof
+redis-ser 9085 systemd-network    8u     sock    0,9      0t0 15448709 protocol: TCP
+
+7 号普通文件才会产生磁盘写，文件路径是 /data/appendonly.aof，相应的系统调用包括 write 和 fdatasync
+
+// 用 strace ，观察这个系统调用的执行情况。比如通过 -e 选项指定 fdatasync 
+$ strace -f -p 9085 -T -tt -e fdatasync
+strace: Process 9085 attached with 4 threads
+[pid  9085] 14:22:52.013547 fdatasync(7) = 0 <0.007112>
+[pid  9085] 14:22:52.022467 fdatasync(7) = 0 <0.008572>
+[pid  9085] 14:22:52.032223 fdatasync(7) = 0 <0.006769>
+...
+[pid  9085] 14:22:52.139629 fdatasync(7) = 0 <0.008183>
+
+每隔 10ms 左右，就会有一次 fdatasync 调用，并且每次调用本身也要消耗 7~8ms
+
+// 为什么查询时会有磁盘写呢？按理来说不应该只有数据的读取吗？ strace -f -T -tt -p 9085 的结果
+read(8, "*2\r\n$3\r\nGET\r\n$41\r\nuuid:53522908-"..., 16384)
+write(8, "$4\r\ngood\r\n", 10)
+read(8, "*3\r\n$4\r\nSADD\r\n$4\r\ngood\r\n$36\r\n535"..., 16384)
+write(7, "*3\r\n$4\r\nSADD\r\n$4\r\ngood\r\n$36\r\n535"..., 67)
+write(8, ":1\r\n", 4)
+
+文件描述符编号为 7 的是一个普通文件 /data/appendonly.aof，而编号为 8 的是 TCP socket。8 号对应的 TCP 读写，是一个标准的“请求 - 响应”格式：
+从 socket 读取 GET uuid:53522908-… 后，响应 good
+再从 socket 读取 SADD good 535… 后，响应 1
+观察更多的 strace 结果，每当 GET 返回 good 时，随后都会有一个 SADD 操作，这也就导致了，明明是查询接口，Redis 却有大量的磁盘写
+
+
+# 由于这两个容器共享同一个网络命名空间，所以我们只需要进入app的网络命名空间即可
+$ PID=$(docker inspect --format {{.State.Pid}} app)
+# -i表示显示网络套接字信息
+$ nsenter --target $PID --net -- lsof -i
+COMMAND    PID            USER   FD   TYPE   DEVICE SIZE/OFF NODE NAME
+redis-ser 9085 systemd-network    6u  IPv4 15447972      0t0  TCP localhost:6379 (LISTEN)
+redis-ser 9085 systemd-network    8u  IPv4 15448709      0t0  TCP localhost:6379->localhost:32996 (ESTABLISHED)
+python    9181            root    3u  IPv4 15448677      0t0  TCP *:http (LISTEN)
+python    9181            root    5u  IPv4 15449632      0t0  TCP localhost:32996->localhost:6379 (ESTABLISHED)
+
+1. Redis 配置的 appendfsync 是 always，这就导致 Redis 每次的写操作，都会触发 fdatasync 系统调用。今天的案例，没必要用这么高频的同步写，使用默认的 1s 时间间隔，就足够了
+2. Python 应用在查询接口中会调用 Redis 的 SADD 命令，这是不合理使用Redis缓存导致，替换为内存即可
+```
+
