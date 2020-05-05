@@ -646,3 +646,40 @@ python    9181            root    5u  IPv4 15449632      0t0  TCP localhost:3299
 2. Python 应用在查询接口中会调用 Redis 的 SADD 命令，这是不合理使用Redis缓存导致，替换为内存即可
 ```
 
+### 如何迅速分析出系统I/O的瓶颈在哪里？
+
+##### 性能指标
+
+![img](https://static001.geekbang.org/resource/image/9e/38/9e42aaf53ff4a544b9a7b03b6ce63f38.png)
+
+##### 文件系统 I/O 性能指标
+
+* 存储空间的使用情况：包括容量、使用量以及剩余空间等，这些只是文件系统向外展示的空间使用，而非在磁盘空间的真实用量，因为文件系统的元数据也会占用磁盘空间。索引节点的使用情况，它包括容量、使用量以及剩余量等三个指标。如果文件系统中存储过多的小文件，就可能碰到索引节点容量已满的问题
+* 缓存使用情况：包括页缓存、目录项缓存、索引节点缓存以及各个具体文件系统（如 ext4、XFS 等）的缓存。这些缓存会使用速度更快的内存，用来临时存储文件数据或者文件系统的元数据，从而可以减少访问慢速磁盘的次数
+* 文件 I/O：包括 IOPS（包括 r/s 和 w/s）、响应时间（延迟）以及吞吐量（B/s）等
+
+##### 磁盘 I/O 性能指标
+
+使用率、IOPS（Input/Output Per Second）、吞吐量、响应时间、缓冲区（Buffer）
+
+![img](https://static001.geekbang.org/resource/image/b6/20/b6d67150e471e1340a6f3c3dc3ba0120.png)
+
+##### 性能工具
+
+![img](https://static001.geekbang.org/resource/image/6f/98/6f26fa18a73458764fcda00212006698.png)
+
+![img](https://static001.geekbang.org/resource/image/c4/e9/c48b6664c6d334695ed881d5047446e9.png)
+
+##### 如何迅速分析 I/O 的性能瓶颈
+
+分析思路：
+
+* 先用 iostat 发现磁盘 I/O 性能瓶颈
+* 再借助 pidstat ，定位出导致瓶颈的进程
+* 随后分析进程的 I/O 行为
+* 结合应用程序的原理，分析这些 I/O 的来源
+
+为了缩小排查范围，通常会先运行那几个支持指标较多的工具，如 iostat、vmstat、pidstat 等。然后再根据观察到的现象，结合系统和应用程序的原理，寻找下一步的分析方向
+
+![img](https://static001.geekbang.org/resource/image/18/8a/1802a35475ee2755fb45aec55ed2d98a.png)
+
