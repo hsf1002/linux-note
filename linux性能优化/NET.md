@@ -230,3 +230,245 @@ rtt min/avg/max/mdev = 244.023/244.070/244.105/0.034 ms
 * 第一部分，是每个 ICMP 请求的信息，包括 ICMP 序列号（icmp_seq）、TTL（生存时间，或者跳数）以及往返延时
 * 第二部分，则是三次 ICMP 请求的汇总：发送了 3 个网络包，接收到 3 个响应，没有丢包发生，这说明测试主机到 114.114.114.114 是连通的；平均往返延时（RTT）是 244ms，也就是从发送 ICMP 开始，到接收到 114.114.114.114 回复的确认，总共经历 244ms
 
+### C10K 和 C1000K 
+
+C10K 就是单机同时处理 1 万个请求（并发连接 1 万）的问题，而 C1000K 也就是单机支持处理 100 万个请求（并发连接 100 万）的问题
+
+##### I/O 模型优化
+
+* 水平触发：只要文件描述符可以非阻塞地执行 I/O ，就会触发通知。应用程序可以随时检查文件描述符的状态，然后再根据状态，进行 I/O 操作。select 和 poll 需要从文件描述符列表中，找出哪些可以执行 I/O ，然后进行真正的网络 I/O 读写。由于 I/O 是非阻塞的，一个线程中就可以同时监控一批套接字的文件描述符，这样就达到了单线程处理多请求的目的
+  * 优点：是对应用程序比较友好，它的 API 非常简单
+  * 缺陷：需要对这些文件描述符列表进行轮询，请求数多的时候就会比较耗时。并且，select 和 poll 还有一些其他的限制，如文件描述符个数上限限制
+* 边缘触发：只有在文件描述符的状态发生改变（也就是 I/O 请求达到）时，才发送一次通知。这时候，应用程序需要尽可能多地执行 I/O，直到无法继续读写，才可以停止。如果 I/O 没执行完，或者因为某种原因没来得及处理，那么这次通知也就丢失了。 epoll 很好地解决了select/poll的问题。epoll 使用红黑树，在内核中管理文件描述符的集合，就不需要应用程序在每次操作时都传入、传出这个集合。epoll 使用事件驱动的机制，只关注有 I/O 事件发生的文件描述符，不需要轮询扫描整个集合
+* 异步 I/O（Asynchronous I/O，简称为 AIO）：要使用的话，一定要小心设计，使用难度比较高
+
+##### 工作模型优化
+
+* 主进程 + 多个 worker 子进程：最常用的一种模型。一个通用工作模式就是：主进程执行 bind() + listen() 后，创建多个子进程；在每个子进程中，都通过 accept() 或 epoll_wait() ，来处理相同的套接字。最常用的反向代理服务器 Nginx 就是这么工作的。accept() 和 epoll_wait() 调用，存在一个惊群的问题。当网络 I/O 事件发生时，多个进程被同时唤醒，但实际上只有一个进程来响应这个事件，其他被唤醒的进程都会重新休眠。其中，accept() 的惊群问题，已经在 Linux 2.6 中解决了；而 epoll 的问题，到了 Linux 4.5 ，才通过 EPOLLEXCLUSIVE 解决
+
+![img](https://static001.geekbang.org/resource/image/45/7e/451a24fb8f096729ed6822b1615b097e.png)
+
+* 监听到相同端口的多进程模型：在这种方式下，所有的进程都监听相同的接口，并且开启 SO_REUSEPORT 选项，由内核负责将请求负载均衡到这些监听进程中去，内核确保了只有一个进程被唤醒，就不会出现惊群问题
+
+![img](https://static001.geekbang.org/resource/image/90/bd/90df0945f6ce5c910ae361bf2b135bbd.png)
+
+##### C1000K
+
+基于 I/O 多路复用和请求处理的优化，C10K 问题很容易就可以解决
+
+* 首先从物理资源使用上来说，100 万个请求需要大量的系统资源。假设每个请求需要 16KB 内存，总共需要大约 15 GB 内存。而从带宽上来说，假设只有 20% 活跃连接，即使每个连接只需要 1KB/s 的吞吐量，总共也需要 1.6 Gb/s 的吞吐量。千兆网卡显然满足不了这么大的吞吐量，所以还需要配置万兆网卡，或者基于多网卡 Bonding 承载更大的吞吐量
+* 从软件资源上来说，大量的连接也会占用大量的软件资源，比如文件描述符的数量、连接状态的跟踪（CONNTRACK）、网络协议栈的缓存大小（比如套接字读写缓存、TCP 读写缓存）等等
+* 最后，大量请求带来的中断处理，也会带来非常高的处理成本
+
+C1000K 的解决方法，本质上还是构建在 epoll 的非阻塞 I/O 模型上。只不过，除了 I/O 模型之外，还需要从应用程序到 Linux 内核、再到 CPU、内存和网络等各个层次的深度优化
+
+##### C10M
+
+在 C1000K 问题中，各种软件、硬件的优化很可能都已经做到头了。特别是当升级完硬件（比如足够多的内存、带宽足够大的网卡、更多的网络功能卸载等）后，无论怎么优化应用程序和内核中的各种网络参数，想实现 1000 万请求的并发，都是极其困难的。要解决这个问题，最重要就是跳过内核协议栈的冗长路径，把网络包直接送到要处理的应用程序那里去。这里有两种常见的机制
+
+* DPDK：是用户态网络的标准。它跳过内核协议栈，直接由用户态进程通过轮询的方式，来处理网络接收，说起轮询，它的低效主要体现在哪里呢？是查询时间明显多于实际工作时间！换个角度来想，如果每时每刻都有新的网络包需要处理，轮询的优势就很明显了
+* XDP： Linux 内核提供的一种高性能网络数据路径。它允许网络包，在进入内核协议栈之前，就进行处理，也可以带来更高的性能。XDP 底层跟 bcc-tools 一样，都是基于 Linux 内核的 eBPF 机制实现的
+
+### 怎么评估系统的网络性能？
+
+##### 网络基准测试
+
+* 基于 HTTP 或者 HTTPS 的 Web 应用程序，显然属于应用层，需要测试 HTTP/HTTPS 的性能
+* 大多数游戏服务器来说，为了支持更大的同时在线人数，通常会基于 TCP 或 UDP ，与客户端进行交互，需要测试 TCP/UDP 的性能
+* 把 Linux 作为一个软交换机或者路由器用。更关注网络包的处理能力（即 PPS），重点关注网络层的转发性能
+
+低层协议是其上的各层网络协议的基础。自然，低层协议的性能，也就决定了高层的网络性能
+
+##### 各协议层的性能测试
+
+1. 转发性能
+
+网络接口层和网络层，它们主要负责网络包的封装、寻址、路由以及发送和接收。在这两个网络协议层中，每秒可处理的网络包数 PPS，就是最重要的性能指标。特别是 64B 小包的处理能力，值得特别关注
+
+分析工具：
+
+* hping3 ：不仅可以作为一个 SYN 攻击的工具来使用。还是一个测试网络包处理能力的性能工具
+* pktgen：Linux 内核自带的高性能网络测试工具 。支持丰富的自定义选项，方便根据实际需要构造所需网络包，从而更准确地测试出目标服务器的性能
+
+不能直接找到 pktgen 命令。因为 pktgen 作为一个内核线程来运行，需要你加载 pktgen 内核模块后，再通过 /proc 文件系统来交互
+
+```
+$ modprobe pktgen
+$ ps -ef | grep pktgen | grep -v grep
+root     26384     2  0 06:17 ?        00:00:00 [kpktgend_0]
+root     26385     2  0 06:17 ?        00:00:00 [kpktgend_1]
+$ ls /proc/net/pktgen/
+kpktgend_0  kpktgend_1  pgctrl
+// 说明有两个CPU
+// 如果 modprobe 命令执行失败，说明内核没有配置 CONFIG_NET_PKTGEN 选项
+// pktgen 在每个 CPU 上启动一个内核线程，并可以通过 /proc/net/pktgen 下面的同名文件，跟这些线程交互；而 pgctrl 则主要用来控制这次测试的开启和停止
+```
+
+```
+// 如下所有拷贝到shell中运行，或者放置到一个shell脚本中去
+# 定义一个工具函数，方便后面配置各种测试选项
+function pgset() {
+    local result
+    echo $1 > $PGDEV
+
+    result=`cat $PGDEV | fgrep "Result: OK:"`
+    if [ "$result" = "" ]; then
+         cat $PGDEV | fgrep Result:
+    fi
+}
+
+# 为0号线程绑定eth0网卡
+PGDEV=/proc/net/pktgen/kpktgend_0
+pgset "rem_device_all"   # 清空网卡绑定
+pgset "add_device eth0"  # 添加eth0网卡
+
+# 配置eth0网卡的测试选项
+PGDEV=/proc/net/pktgen/eth0
+pgset "count 1000000"    # 总发包数量
+pgset "delay 5000"       # 不同包之间的发送延迟(单位纳秒)
+pgset "clone_skb 0"      # SKB包复制
+pgset "pkt_size 64"      # 网络包大小
+pgset "dst 192.168.0.30" # 目的IP
+pgset "dst_mac 11:11:11:11:11:11"  # 目的MAC
+
+# 启动测试
+PGDEV=/proc/net/pktgen/pgctrl
+pgset "start"
+```
+
+测试完成后，结果可以从 /proc 文件系统中获取
+
+```
+$ cat /proc/net/pktgen/eth0
+Params: count 1000000  min_pkt_size: 64  max_pkt_size: 64
+     frags: 0  delay: 0  clone_skb: 0  ifname: eth0
+     flows: 0 flowlen: 0
+...
+Current:
+     pkts-sofar: 1000000  errors: 0
+     started: 1534853256071us  stopped: 1534861576098us idle: 70673us
+...
+Result: OK: 8320027(c8249354+d70673) usec, 1000000 (64byte,0frags)
+  120191pps 61Mb/sec (61537792bps) errors: 0
+  
+第一部分的 Params 是测试选项
+第二部分的 Current 是测试进度，packts so far（pkts-sofar）表示已经发送了 100 万个包，表明测试已完成
+第三部分的 Result 是测试结果，包含测试所用时间、网络包数量和分片、PPS、吞吐量以及错误数  
+
+千兆交换机的 PPS。交换机可以达到线速（满负载时，无差错转发），它的 PPS 就是 1000Mbit 除以以太网帧的大小，即 1000Mbps/((64+20)*8bit) = 1.5 Mpps（其中，20B 为以太网帧前导和帧间距的大小）。千兆交换机的 PPS，可以达到 150 万 PPS，比12 万大多了。现在的多核服务器和万兆网卡已经很普遍了，稍做优化就可以达到数百万的 PPS。而且，如果用 DPDK 或 XDP ，还能达到千万数量级
+```
+
+2. TCP/UDP 性能
+
+分析工具：
+
+* iperf 和 netperf 都是最常用的网络性能测试工具，测试 TCP 和 UDP 的吞吐量。它们都以客户端和服务器通信的方式，测试一段时间内的平均吞吐量
+
+```
+# Ubuntu
+apt-get install iperf3
+
+
+# 服务器端：-s表示启动服务端，-i表示汇报间隔，-p表示监听端口
+$ iperf3 -s -i 1 -p 10000
+
+# 客户端：-c表示启动客户端，192.168.0.30为目标服务器的IP
+# -b表示目标带宽(单位是bits/s)
+# -t表示测试时间
+# -P表示并发数，-p表示目标服务器监听端口
+$ iperf3 -c 192.168.0.30 -b 1G -t 15 -P 2 -p 10000
+
+# 查看 iperf 的报告
+[ ID] Interval           Transfer     Bandwidth
+...
+[SUM]   0.00-15.04  sec  0.00 Bytes  0.00 bits/sec                  sender
+[SUM]   0.00-15.04  sec  1.51 GBytes   860 Mbits/sec                  receiver
+
+汇总结果，包括测试时间、数据传输量以及带宽等。按照发送和接收，又分为了 sender 和 receiver 两行。从测试结果可以看到，这台机器 TCP 接收的带宽（吞吐量）为 860 Mb/s， 跟目标的 1Gb/s 相比，还是有些差距
+```
+
+3. HTTP 性能
+
+分析工具：
+
+* ab、webbench：都是常用的 HTTP 压力测试工具。ab 是 Apache 自带的 HTTP 压测工具，主要测试 HTTP 服务的每秒请求数、请求延迟、吞吐量以及请求延迟的分布情况
+
+```
+# Ubuntu
+$ apt-get install -y apache2-utils
+
+# 使用 Docker 启动一个 Nginx 服务，然后用 ab 来测试它的性能
+$ docker run -p 80:80 -itd nginx
+
+# 另一台机器上，运行 ab 命令，测试 Nginx 的性能
+# -c表示并发请求数为1000，-n表示总的请求数为10000
+$ ab -c 1000 -n 10000 http://192.168.0.30/
+...
+Server Software:        nginx/1.15.8
+Server Hostname:        192.168.0.30
+Server Port:            80
+
+...
+
+Requests per second:    1078.54 [#/sec] (mean)
+Time per request:       927.183 [ms] (mean)
+Time per request:       0.927 [ms] (mean, across all concurrent requests)
+Transfer rate:          890.00 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0   27 152.1      1    1038
+Processing:     9  207 843.0     22    9242
+Waiting:        8  207 843.0     22    9242
+Total:         15  233 857.7     23    9268
+
+Percentage of the requests served within a certain time (ms)
+  50%     23
+  66%     24
+  75%     24
+  80%     26
+  90%    274
+  95%   1195
+  98%   2335
+  99%   4663
+ 100%   9268 (longest request)
+ 
+ab 的测试结果分为三个部分，分别是请求汇总、连接时间汇总还有请求延迟汇总
+请求汇总部分：Requests per second 为 1074；每个请求的延迟（Time per request）分为两行，第一行的 927 ms 表示平均延迟，包括了线程运行的调度时间和网络请求响应时间，而下一行的 0.927ms ，则表示实际请求的响应时间；Transfer rate 表示吞吐量（BPS）为 890 KB/s
+连接时间汇总部分：展示了建立连接、请求、等待以及汇总等的各类时间，包括最小、最大、平均以及中值处理时间
+请求延迟汇总部分：给出了不同时间段内处理请求的百分比，比如， 90% 的请求，都可以在 274ms 内完成
+```
+
+4. 应用负载性能
+
+用 iperf 或者 ab 等测试工具，得到 TCP、HTTP 等的性能数据后，这些无法代表应用程序的实际性能。为了得到应用程序的实际性能，就要求性能工具本身可以模拟用户的请求负载，而 iperf、ab 这类工具就无能为力了。幸运的是，可以用 wrk、TCPCopy、Jmeter 或者 LoadRunner 等实现这个目标
+
+分析工具：
+
+* wrk：一个 HTTP 性能测试工具，内置了 LuaJIT，方便根据实际需求，生成所需的请求负载，或者自定义响应的处理方法，wrk 工具本身不提供 yum 或 apt 的安装方法，需要通过源码编译来安装
+
+```
+$ git clone https://github.com/wg/wrk
+$ cd wrk
+$ apt-get install build-essential -y
+$ make
+$ sudo cp wrk /usr/local/bin/
+```
+
+```
+# 用 wrk ，来重新测一下前面已经启动的 Nginx 的性能
+# -c表示并发连接数1000，-t表示线程数为2
+$ wrk -c 1000 -t 2 http://192.168.0.30/
+Running 10s test @ http://192.168.0.30/
+  2 threads and 1000 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    65.83ms  174.06ms   1.99s    95.85%
+    Req/Sec     4.87k   628.73     6.78k    69.00%
+  96954 requests in 10.06s, 78.59MB read
+  Socket errors: connect 0, read 0, write 0, timeout 179
+Requests/sec:   9641.31
+Transfer/sec:      7.82MB
+
+使用 2 个线程、并发 1000 连接，重新测试了 Nginx 的性能。每秒请求数为 9641，吞吐量为 7.82MB，平均延迟为 65ms，比前面 ab 的测试结果要好很多。说明性能工具本身的性能，对性能测试也是至关重要的。不合适的性能工具，并不能准确测出应用程序的最佳性能
+```
+
