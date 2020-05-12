@@ -479,3 +479,210 @@ DNS（Domain Name System），即域名系统，是互联网中最基础的一�
 ##### 域名与 DNS 解析
 
 DNS 协议在 TCP/IP 栈中属于应用层，不过实际传输还是基于 UDP 或者 TCP 协议（UDP 居多） ，并且域名服务器一般监听在端口 53 上。域名解析是用递归的方式（从顶级开始，以此类推），发送给每个层级的域名服务器，直到得到解析结果。递归查询的过程 DNS 服务器会完成，需要预先配置一个可用的 DNS 服务器。当然，通常来说，每级 DNS 服务器，都会有最近解析记录的缓存。当缓存命中时，直接用缓存中的记录应答就可以了。如果缓存过期或者不存在，才需要用刚刚提到的递归方式查询。系统管理员在配置 Linux 系统的网络时，除了需要配置 IP 地址，还需要给它配置 DNS 服务器，这样它才可以通过域名来访问外部服务
+
+```
+// 查询系统配置
+$ cat /etc/resolv.conf
+nameserver 114.114.114.114
+```
+
+DNS 服务通过资源记录的方式，来管理所有数据，它支持 A、CNAME、MX、NS、PTR 等多种类型的记录。比如：A 记录，用来把域名转换成 IP 地址；CNAME 记录，用来创建别名；而 NS 记录，则表示该域名对应的域名服务器地址
+
+```
+
+$ nslookup time.geekbang.org
+# 域名服务器及端口信息
+Server:    114.114.114.114
+Address:  114.114.114.114#53
+
+# 非权威查询结果
+Non-authoritative answer:
+Name:  time.geekbang.org
+Address: 39.106.233.17
+```
+
+分析工具：
+
+* nslookup：可以查询到这个域名的 A 记录
+* dig：提供了 trace 功能，可以展示递归查询的整个过程
+
+```
+# +trace表示开启跟踪查询
+# +nodnssec表示禁止DNS安全扩展
+$ dig +trace +nodnssec time.geekbang.org
+
+; <<>> DiG 9.11.3-1ubuntu1.3-Ubuntu <<>> +trace +nodnssec time.geekbang.org
+;; global options: +cmd
+.      322086  IN  NS  m.root-servers.net.
+.      322086  IN  NS  a.root-servers.net.
+.      322086  IN  NS  i.root-servers.net.
+.      322086  IN  NS  d.root-servers.net.
+.      322086  IN  NS  g.root-servers.net.
+.      322086  IN  NS  l.root-servers.net.
+.      322086  IN  NS  c.root-servers.net.
+.      322086  IN  NS  b.root-servers.net.
+.      322086  IN  NS  h.root-servers.net.
+.      322086  IN  NS  e.root-servers.net.
+.      322086  IN  NS  k.root-servers.net.
+.      322086  IN  NS  j.root-servers.net.
+.      322086  IN  NS  f.root-servers.net.
+;; Received 239 bytes from 114.114.114.114#53(114.114.114.114) in 1340 ms
+
+org.      172800  IN  NS  a0.org.afilias-nst.info.
+org.      172800  IN  NS  a2.org.afilias-nst.info.
+org.      172800  IN  NS  b0.org.afilias-nst.org.
+org.      172800  IN  NS  b2.org.afilias-nst.org.
+org.      172800  IN  NS  c0.org.afilias-nst.info.
+org.      172800  IN  NS  d0.org.afilias-nst.org.
+;; Received 448 bytes from 198.97.190.53#53(h.root-servers.net) in 708 ms
+
+geekbang.org.    86400  IN  NS  dns9.hichina.com.
+geekbang.org.    86400  IN  NS  dns10.hichina.com.
+;; Received 96 bytes from 199.19.54.1#53(b0.org.afilias-nst.org) in 1833 ms
+
+time.geekbang.org.  600  IN  A  39.106.233.176
+;; Received 62 bytes from 140.205.41.16#53(dns10.hichina.com) in 4 ms
+
+dig trace 的输出，主要包括四部分
+第一部分，是从 114.114.114.114 查到的一些根域名服务器（.）的 NS 记录
+第二部分，是从 NS 记录结果中选一个（h.root-servers.net），并查询顶级域名 org. 的 NS 记录
+第三部分，是从 org. 的 NS 记录中选择一个（b0.org.afilias-nst.org），并查询二级域名 geekbang.org. 的 NS 服务器
+最后一部分，是从 geekbang.org. 的 NS 服务器（dns10.hichina.com）查询最终主机 time.geekbang.org. 的 A 记录
+```
+
+![img](https://static001.geekbang.org/resource/image/5f/d3/5ffda41ec62fc3c9e0de3fa3443c9cd3.png)
+
+不仅仅是发布到互联网的服务需要域名，很多时候，我们也希望能对局域网内部的主机进行域名解析（即内网域名，大多数情况下为主机名）。Linux 支持这种行为。所以，可以把主机名和 IP 地址的映射关系，写入本机的 /etc/hosts 文件中。这样，指定的主机名就可以在本地直接找到目标 IP。比如，可以执行下面的命令来操作
+
+```
+$ cat /etc/hosts
+127.0.0.1   localhost localhost.localdomain
+::1         localhost6 localhost6.localdomain6
+192.168.0.100 domain.com
+```
+
+还可以在内网中，搭建自定义的 DNS 服务器，专门用来解析内网中的域名。而内网 DNS 服务器，一般还会设置一个或多个上游 DNS 服务器，用来解析外网的域名
+
+##### 案例分析
+
+1. DNS 解析失败
+
+```
+# nslookup time.geekbang.org
+;; connection timed out; no servers could be reached
+
+# ping -c3 114.114.114.114
+PING 114.114.114.114 (114.114.114.114): 56 data bytes
+64 bytes from 114.114.114.114: icmp_seq=0 ttl=56 time=31.116 ms
+64 bytes from 114.114.114.114: icmp_seq=1 ttl=60 time=31.245 ms
+64 bytes from 114.114.114.114: icmp_seq=2 ttl=68 time=31.128 ms
+--- 114.114.114.114 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 31.116/31.163/31.245/0.058 ms
+
+网络是通的。知道 nslookup 命令失败的原因:
+# nslookup -debug time.geekbang.org
+;; Connection to 127.0.0.1#53(127.0.0.1) for time.geekbang.org failed: connection refused.
+;; Connection to ::1#53(::1) for time.geekbang.org failed: address not available.
+
+nslookup 连接环回地址（127.0.0.1 和 ::1）的 53 端口失败。为什么会去连接环回地址，而不是先前看到的 114.114.114.114，可能没有配置 DNS 服务器
+
+# cat /etc/resolv.conf
+没有任何输出，果然没有配置 DNS 服务器
+```
+
+```
+# 加一个 time 命令，输出解析所用时间
+# time nslookup time.geekbang.org
+Server:    8.8.8.8
+Address:  8.8.8.8#53
+
+Non-authoritative answer:
+Name:  time.geekbang.org
+Address: 39.106.233.176
+
+real  0m10.349s
+user  0m0.004s
+sys  0m0.0
+
+解析非常慢，居然用了 10 秒，多次运行上面的 nslookup 命令，可能偶尔还会碰到下面这种错误：NS 解析的结果不但比较慢，而且还会发生超时失败的情况
+# time nslookup time.geekbang.org
+;; connection timed out; no servers could be reached
+
+real  0m15.011s
+user  0m0.006s
+sys  0m0.006s
+
+可能的原因：
+DNS 服务器本身有问题，响应慢并且不稳定
+客户端到 DNS 服务器的网络延迟比较大
+DNS 请求或者响应包，在某些情况下被链路中的网络设备弄丢了
+
+客户端连接的 DNS 是 8.8.8.8，这是 Google 提供的 DNS 服务。出问题的概率应该比较小
+ping 可以用来测试服务器的延迟
+# ping -c3 8.8.8.8
+PING 8.8.8.8 (8.8.8.8): 56 data bytes
+64 bytes from 8.8.8.8: icmp_seq=0 ttl=31 time=137.637 ms
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=31 time=144.743 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=31 time=138.576 ms
+--- 8.8.8.8 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 137.637/140.319/144.743/3.152 ms
+
+延迟已经达到了 140ms，多次运行上面的 ping 测试，还会看到偶尔出现的丢包现象，这进一步解释了，为什么 nslookup 偶尔会失败，正是网络链路中的丢包导致的，换一个延迟更小的 DNS 服务器，比如电信提供的 114.114.114.114
+
+# ping -c3 114.114.114.114
+PING 114.114.114.114 (114.114.114.114): 56 data bytes
+64 bytes from 114.114.114.114: icmp_seq=0 ttl=67 time=31.130 ms
+64 bytes from 114.114.114.114: icmp_seq=1 ttl=56 time=31.302 ms
+64 bytes from 114.114.114.114: icmp_seq=2 ttl=56 time=31.250 ms
+--- 114.114.114.114 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 31.130/31.227/31.302/0.072 ms
+
+延迟的确小了很多。继续执行下面的命令，更换 DNS 服务器，然后，再次执行 nslookup 解析命令
+# echo nameserver 114.114.114.114 > /etc/resolv.conf
+# time nslookup time.geekbang.org
+Server:    114.114.114.114
+Address:  114.114.114.114#53
+
+Non-authoritative answer:
+Name:  time.geekbang.org
+Address: 39.106.233.176
+
+real    0m0.064s
+user    0m0.007s
+sys     0m0.006s
+
+只需要 64ms 就可以完成解析，比刚才的 10s 要好很多，如果多次运行 nslookup 命令，估计就不是每次都有好结果了。有时候需要 1s 甚至更多的时间，1s 的 DNS 解析时间太长了，对很多应用来说也是不可接受的。需要使用 DNS 缓存
+
+启动 dnsmasq，修改 /etc/resolv.conf，将 DNS 服务器改为 dnsmasq 的监听地址，这儿是 127.0.0.1。接着，重新执行多次 nslookup 命令
+# echo nameserver 127.0.0.1 > /etc/resolv.conf
+# time nslookup time.geekbang.org
+Server:    127.0.0.1
+Address:  127.0.0.1#53
+
+Non-authoritative answer:
+Name:  time.geekbang.org
+Address: 39.106.233.176
+
+real  0m0.492s
+user  0m0.007s
+sys  0m0.006s
+
+# time nslookup time.geekbang.org
+Server:    127.0.0.1
+Address:  127.0.0.1#53
+
+Non-authoritative answer:
+Name:  time.geekbang.org
+Address: 39.106.233.176
+
+real  0m0.011s
+user  0m0.008s
+sys  0m0.003s
+只有第一次的解析很慢，需要 0.5s，以后的每次解析都很快，只需要 11ms。后面每次 DNS 解析需要的时间也都很稳定
+```
+
+dnsmasq 是最常用的 DNS 缓存服务之一，还经常作为 DHCP 服务来使用。它的安装和配置都比较简单，性能也可以满足绝大多数应用程序对 DNS 缓存的需求，主流 Linux 发行版，除了最新版本的 Ubuntu （如 18.04 或者更新版本）外，其他版本并没有自动配置 DNS 缓存
+
