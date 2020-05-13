@@ -565,7 +565,7 @@ $ cat /etc/hosts
 
 ##### 案例分析
 
-1. DNS 解析失败
+DNS 解析失败
 
 ```
 # nslookup time.geekbang.org
@@ -685,4 +685,171 @@ sys  0m0.003s
 ```
 
 dnsmasq 是最常用的 DNS 缓存服务之一，还经常作为 DHCP 服务来使用。它的安装和配置都比较简单，性能也可以满足绝大多数应用程序对 DNS 缓存的需求，主流 Linux 发行版，除了最新版本的 Ubuntu （如 18.04 或者更新版本）外，其他版本并没有自动配置 DNS 缓存
+
+### 怎么使用 tcpdump 和 Wireshark 分析网络流量？
+
+分析工具：
+
+* tcpdump：仅支持命令行格式使用，常用在服务器中抓取和分析网络包
+* Wireshark：除了可以抓包外，还提供了强大的图形界面和汇总分析工具，在分析复杂的网络情景时，尤为简单和实用
+
+##### 案例分析
+
+```
+# 禁止接收从DNS服务器发送过来并包含googleusercontent的包
+$ iptables -I INPUT -p udp --sport 53 -m string --string googleusercontent --algo bm -j DROP
+
+# ping 3 次（默认每次发送间隔1秒）
+# 假设DNS服务器还是上一期配置的114.114.114.114
+$ ping -c3 geektime.org
+PING geektime.org (35.190.27.188) 56(84) bytes of data.
+64 bytes from 35.190.27.188 (35.190.27.188): icmp_seq=1 ttl=43 time=36.8 ms
+64 bytes from 35.190.27.188 (35.190.27.188): icmp_seq=2 ttl=43 time=31.1 ms
+64 bytes from 35.190.27.188 (35.190.27.188): icmp_seq=3 ttl=43 time=31.2 ms
+
+--- geektime.org ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 11049ms
+rtt min/avg/max/mdev = 31.146/33.074/36.809/2.649 ms
+
+3 次发送，3 次响应，没有丢包，但三次发送和接受的总时间居然超过了 11s（11049ms）,可能是 DNS 解析缓慢的问题
+$ time nslookup geektime.org
+Server:    114.114.114.114
+Address:  114.114.114.114#53
+
+Non-authoritative answer:
+Name:  geektime.org
+Address: 35.190.27.188
+
+real  0m0.044s
+user  0m0.006s
+sys  0m0.003s
+
+域名解析还是很快的，只需要 44ms，显然比 11s 短了很多
+# 另一个终端执行
+$ tcpdump -nn udp port 53 or host 35.190.27.188
+
+$ ping -c3 geektime.org
+...
+--- geektime.org ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 11095ms
+rtt min/avg/max/mdev = 81.473/81.572/81.757/0.130 ms
+
+# 查看 tcpdump 的输出
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+14:02:31.100564 IP 172.16.3.4.56669 > 114.114.114.114.53: 36909+ A? geektime.org. (30)
+14:02:31.507699 IP 114.114.114.114.53 > 172.16.3.4.56669: 36909 1/0/0 A 35.190.27.188 (46)
+14:02:31.508164 IP 172.16.3.4 > 35.190.27.188: ICMP echo request, id 4356, seq 1, length 64
+14:02:31.539667 IP 35.190.27.188 > 172.16.3.4: ICMP echo reply, id 4356, seq 1, length 64
+14:02:31.539995 IP 172.16.3.4.60254 > 114.114.114.114.53: 49932+ PTR? 188.27.190.35.in-addr.arpa. (44)
+14:02:36.545104 IP 172.16.3.4.60254 > 114.114.114.114.53: 49932+ PTR? 188.27.190.35.in-addr.arpa. (44)
+14:02:41.551284 IP 172.16.3.4 > 35.190.27.188: ICMP echo request, id 4356, seq 2, length 64
+14:02:41.582363 IP 35.190.27.188 > 172.16.3.4: ICMP echo reply, id 4356, seq 2, length 64
+14:02:42.552506 IP 172.16.3.4 > 35.190.27.188: ICMP echo request, id 4356, seq 3, length 64
+14:02:42.583646 IP 35.190.27.188 > 172.16.3.4: ICMP echo reply, id 4356, seq 3, length 64
+
+第一行的记录：
+36909+ 表示查询标识值，它也会出现在响应中，加号表示启用递归查询
+A? 表示查询 A 记录
+geektime.org. 表示待查询的域名
+30 表示报文长度
+
+第二行是从 114.114.114.114 发送回来的 DNS 响应——域名 geektime.org. 的 A 记录值为 35.190.27.188
+第三行和第四行，是 ICMP echo request 和 ICMP echo reply，响应包的时间戳 14:02:31.539667，减去请求包的时间戳 14:02:31.508164 ，就可以得到，这次 ICMP 所用时间为 30ms。看起来并没有问题
+
+随后的两条反向地址解析 PTR 请求，比较可疑。只看到了请求包，却没有应答包。这两条记录都是发出后 5s 才出现下一个网络包，两条 PTR 记录就消耗了 10s
+
+最后的四个包，则是两次正常的 ICMP 请求和响应，根据时间戳计算其延迟，也是 30ms
+
+根源，两次 PTR 请求没有得到响应而超时导致的。PTR 反向地址解析的目的，是从 IP 地址反查出域名，但事实上，并非所有 IP 地址都会定义 PTR 记录，所以 PTR 查询很可能会失败。所以，在使用 ping 时，如果发现结果中的延迟并不大，而 ping 命令本身却很慢，有可能是背后的 PTR 在搞鬼。只要禁止 PTR 就可以
+
+$ ping -n -c3 geektime.org
+PING geektime.org (35.190.27.188) 56(84) bytes of data.
+64 bytes from 35.190.27.188: icmp_seq=1 ttl=43 time=33.5 ms
+64 bytes from 35.190.27.188: icmp_seq=2 ttl=43 time=39.0 ms
+64 bytes from 35.190.27.188: icmp_seq=3 ttl=43 time=32.8 ms
+
+--- geektime.org ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+rtt min/avg/max/mdev = 32.879/35.160/39.030/2.755 ms
+
+现在只需要 2s 就可以结束，比刚才的 11s 快多了
+
+开始时，执行了 iptables 命令，那也不要忘了删掉它
+$ iptables -D INPUT -p udp --sport 53 -m string --string googleusercontent --algo bm -j DROP
+
+如果换一个 DNS 服务器，就可以用 PTR 反查到 35.190.27.188 所对应的域名
+$ nslookup -type=PTR 35.190.27.188 8.8.8.8
+Server:  8.8.8.8
+Address:  8.8.8.8#53
+Non-authoritative answer:
+188.27.190.35.in-addr.arpa  name = 188.27.190.35.bc.googleusercontent.com.
+Authoritative answers can be found from:
+
+结果并非 geekbang.org，而是 188.27.190.35.bc.googleusercontent.com。这也是为什么，开始时将包含 googleusercontent 的丢弃后，ping 就慢了。因为 iptables ，实际上是把 PTR 响应给丢了，所以导致 PTR 请求超时
+```
+
+##### tcpdump
+
+tcpdump 的输出格式
+
+```
+时间戳 协议 源地址.源端口 > 目的地址.目的端口 网络包详细信息
+```
+
+![img](https://static001.geekbang.org/resource/image/85/ff/859d3b5c0071335429620a3fcdde4fff.png)
+
+![img](https://static001.geekbang.org/resource/image/48/b3/4870a28c032bdd2a26561604ae2f7cb3.png)
+
+##### Wireshark
+
+执行下面的命令，把抓取的网络包保存到 ping.pcap 文件中：
+
+```
+$ tcpdump -nn udp port 53 or host 35.190.27.188 -w ping.pcap
+```
+
+把它拷贝到你安装有 Wireshark 的机器中：
+
+```
+$ scp host-ip/path/ping.pcap .
+```
+
+再用 Wireshark 打开它
+
+![img](https://static001.geekbang.org/resource/image/6b/2c/6b854703dcfcccf64c0a69adecf2f42c.png)
+
+它不仅以更规整的格式，展示了各个网络包的头部信息；还用了不同颜色，展示 DNS 和 ICMP 这两种不同的协议。可以一眼看出，中间的两条 PTR 查询并没有响应包
+
+在网络包列表中选择某一个网络包后，在其下方的网络包详情中，还可以看到，这个包在协议栈各层的详细信息
+
+![img](https://static001.geekbang.org/resource/image/59/25/59781a5dc7b1b9234643991365bfc925.png)
+
+##### 案例分析
+
+```
+// 终端一，执行下面的命令，首先查出 example.com 的 IP。然后，执行 tcpdump 命令，过滤得到的 IP 地址，并将结果保存到 web.pcap 中
+$ dig +short example.com
+93.184.216.34
+$ tcpdump -nn host 93.184.216.34 -w web.pcap  // 或者 tcpdump -nn host example.com -w web.pcap
+
+// 换到终端二，执行下面的 curl 命令
+$ curl http://example.com
+
+// 回到终端一，按下 Ctrl+C 停止 tcpdump，查看
+```
+
+![img](https://static001.geekbang.org/resource/image/07/9d/07bcdba5b563ebae36f5b5b453aacd9d.png)
+
+点击 Statistics -> Flow Graph，然后，在弹出的界面中的 Flow type 选择 TCP Flows，你可以更清晰的看到，整个过程中 TCP 流的执行过程
+
+![img](https://static001.geekbang.org/resource/image/4e/bb/4ec784752fdbc0cc5ead036a6419cbbb.png)
+
+作为对比， 通常看到的 TCP 三次握手和四次挥手的流程，基本是这样的：
+
+![img](https://static001.geekbang.org/resource/image/52/e8/5230fb678fcd3ca6b55d4644881811e8.png)
+
+这里抓到的包跟上面的四次挥手，并不完全一样，实际挥手过程只有三个包，而不是四个。其实，是因为服务器端收到客户端的 FIN 后，服务器端同时也要关闭连接，这样就可以把 ACK 和 FIN 合并到一起发送，节省了一个包，变成了“三次挥手”。通常情况下，服务器端收到客户端的 FIN 后，很可能还没发送完数据，所以就会先回复客户端一个 ACK 包。稍等一会儿，完成所有数据包的发送后，才会发送 FIN 包。这也就是四次挥手了
+
+![img](https://static001.geekbang.org/resource/image/0e/99/0ecb6d11e5e7725107c0291c45aa7e99.png)
 
