@@ -1148,3 +1148,251 @@ net.ipv4.ip_forward = 1
 
 为了避免重启后配置丢失，不要忘记将配置写入 /etc/sysctl.conf 文件中
 
+分析工具：
+
+* SystemTap：Linux 的一种动态追踪框架，它把用户提供的脚本，转换为内核模块来执行，用来监测和跟踪内核的行为
+
+```
+# Ubuntu
+apt-get install -y systemtap-runtime systemtap
+# Configure ddebs source
+echo "deb http://ddebs.ubuntu.com $(lsb_release -cs) main restricted universe multiverse
+deb http://ddebs.ubuntu.com $(lsb_release -cs)-updates main restricted universe multiverse
+deb http://ddebs.ubuntu.com $(lsb_release -cs)-proposed main restricted universe multiverse" | \
+sudo tee -a /etc/apt/sources.list.d/ddebs.list
+# Install dbgsym
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F2EDC64DC5AEE1F6B9C621F0C8CAB6595FDFF622
+apt-get update
+apt install ubuntu-dbgsym-keyring
+stap-prep
+apt-get install linux-image-`uname -r`-dbgsym
+```
+
+首先运行一个不用 NAT 的 Nginx 服务，并用 ab 测试它的性能
+
+```
+# 在终端一中，执行下面的命令，启动 Nginx，选项 --network=host ，表示容器使用 Host 网络模式，即不使用 NAT
+$ docker run --name nginx-hostnet --privileged --network=host -itd feisky/nginx:80
+
+# 终端二中，执行 curl 命令，确认 Nginx 正常启动
+$ curl http://192.168.0.30/
+
+# 在终端二中，执行 ab 命令，对 Nginx 进行压力测试。Linux 默认允许打开的文件描述数比较小，比如默认只有 1024
+$ ulimit -n
+1024
+
+# 临时增大当前会话的最大文件描述符数
+$ ulimit -n 65536
+
+# -c表示并发请求数为5000，-n表示总的请求数为10万
+# -r表示套接字接收错误时仍然继续执行，-s表示设置每个请求的超时时间为2s
+$ ab -c 5000 -n 100000 -r -s 2 http://192.168.0.30/
+...
+Requests per second:    6576.21 [#/sec] (mean)
+Time per request:       760.317 [ms] (mean)
+Time per request:       0.152 [ms] (mean, across all concurrent requests)
+Transfer rate:          5390.19 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0  177 714.3      9    7338
+Processing:     0   27  39.8     19     961
+Waiting:        0   23  39.5     16     951
+Total:          1  204 716.3     28    7349
+...
+
+每秒请求数（Requests  per second）为 6576；每个请求的平均延迟（Time per request）为 760ms；建立连接的平均延迟（Connect）为 177ms。这几个数值，这将是接下来案例的基准指标
+
+# 回到终端一，停止这个未使用 NAT 的 Nginx 应用：
+$ docker rm -f nginx-hostnet
+# 使用了 DNAT ，来实现 Host 的 8080 端口，到容器的 8080 端口的映射关系
+$ docker run --name nginx --privileged -p 8080:8080 -itd feisky/nginx:nat
+
+# 可以执行 iptables 命令，确认 DNAT 规则已经创建
+$ iptables -nL -t nat
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+DOCKER     all  --  0.0.0.0/0            0.0.0.0/0            ADDRTYPE match dst-type LOCAL
+
+...
+
+Chain DOCKER (2 references)
+target     prot opt source               destination
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0
+DNAT       tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:8080 to:172.17.0.2:8080
+
+在 PREROUTING 链中，目的为本地的请求，会转到 DOCKER 链；而在 DOCKER 链中，目的端口为 8080 的 tcp 请求，会被 DNAT 到 172.17.0.2 的 8080 端口。其中，172.17.0.2 就是 Nginx 容器的 IP 地址
+
+# 切换到终端二中，执行 curl 命令，确认 Nginx 已经正常启动
+$ curl http://192.168.0.30:8080/
+# 再次执行上述的 ab 命令，不过这次注意，要把请求的端口号换成 8080
+# -c表示并发请求数为5000，-n表示总的请求数为10万
+# -r表示套接字接收错误时仍然继续执行，-s表示设置每个请求的超时时间为2s
+$ ab -c 5000 -n 100000 -r -s 2 http://192.168.0.30:8080/
+...
+apr_pollset_poll: The timeout specified has expired (70007)
+Total of 5602 requests completed
+
+刚才正常运行的 ab ，现在失败了，还报了连接超时的错误。运行 ab 时的 -s 参数，设置了每个请求的超时时间为 2s，而从输出可以看到，这次只完成了 5602 个请求
+
+# 不妨把超时时间延长到 30s。意味着要等更长时间，为了快点得到结果，同时把总测试次数，也减少到 10000:
+$ ab -c 5000 -n 10000 -r -s 30 http://192.168.0.30:8080/
+...
+Requests per second:    76.47 [#/sec] (mean)
+Time per request:       65380.868 [ms] (mean)
+Time per request:       13.076 [ms] (mean, across all concurrent requests)
+Transfer rate:          44.79 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0 1300 5578.0      1   65184
+Processing:     0 37916 59283.2      1  130682
+Waiting:        0    2   8.7      1     414
+Total:          1 39216 58711.6   1021  130682
+...
+
+每秒请求数（Requests per second）为 76；每个请求的延迟（Time per request）为 65s；建立连接的延迟（Connect）为 1300ms。显然，每个指标都比前面差了很多
+知道 NAT 是罪魁祸首。所以，有理由怀疑，内核中发生了丢包现象
+
+# 回到终端一中，创建一个 dropwatch.stp 的脚本文件，并写入下面的内容
+#! /usr/bin/env stap
+
+############################################################
+# Dropwatch.stp
+# Author: Neil Horman <nhorman@redhat.com>
+# An example script to mimic the behavior of the dropwatch utility
+# http://fedorahosted.org/dropwatch
+############################################################
+
+# Array to hold the list of drop points we find
+global locations
+
+# Note when we turn the monitor on and off
+probe begin { printf("Monitoring for dropped packets\n") }
+probe end { printf("Stopping dropped packet monitor\n") }
+
+# increment a drop counter for every location we drop at
+probe kernel.trace("kfree_skb") { locations[$location] <<< 1 }
+
+# Every 5 seconds report our drop locations
+probe timer.sec(5)
+{
+  printf("\n")
+  foreach (l in locations-) {
+    printf("%d packets dropped at %s\n",
+           @count(locations[l]), symname(l))
+  }
+  delete locations
+}
+
+这个脚本，跟踪内核函数 kfree_skb() 的调用，并统计丢包的位置。文件保存好后，执行下面的 stap 命令，就可以运行丢包跟踪脚本。stap，是 SystemTap 的命令行工具
+$ stap --all-modules dropwatch.stp
+Monitoring for dropped packets
+
+# 切换到终端二中，再次执行 ab 命令
+$ ab -c 5000 -n 10000 -r -s 30 http://192.168.0.30:8080/
+
+# 再次回到终端一中，观察 stap 命令的输出
+10031 packets dropped at nf_hook_slow
+676 packets dropped at tcp_v4_rcv
+
+7284 packets dropped at nf_hook_slow
+268 packets dropped at tcp_v4_rcv
+
+大量丢包都发生在 nf_hook_slow 位置。这是在 Netfilter Hook 的钩子函数中，出现丢包问题了。但是不是 NAT，还不能确定。还得再跟踪  nf_hook_slow 的执行过程，这一步可以通过 perf 来完成
+
+# 切换到终端二中，再次执行 ab 命令
+$ ab -c 5000 -n 10000 -r -s 30 http://192.168.0.30:8080/
+# 再次切换回终端一，执行 perf record 和 perf report 命令
+# 记录一会（比如30s）后按Ctrl+C结束
+$ perf record -a -g -- sleep 30
+# 输出报告
+$ perf report -g graph,0
+
+在 perf report 界面中，输入查找命令 / 然后，在弹出的对话框中，输入 nf_hook_slow，发现
+nf_hook_slow 调用最多的有三个地方，分别是 ipv4_conntrack_in、br_nf_pre_routing 以及 iptable_nat_ipv4_in。换言之，nf_hook_slow 主要在执行三个动作
+第一，接收网络包时，在连接跟踪表中查找连接，并为新的连接分配跟踪对象（Bucket）
+第二，在 Linux 网桥中转发包。这是因为案例 Nginx 是一个 Docker 容器，而容器的网络通过网桥来实现
+第三，接收网络包时，执行 DNAT，即把 8080 端口收到的包转发给容器
+
+DNAT 的基础是 conntrack，所以先看看，内核提供了哪些 conntrack 的配置选项。在终端一中，继续执行下面的命令
+$ sysctl -a | grep conntrack
+net.netfilter.nf_conntrack_count = 180
+net.netfilter.nf_conntrack_max = 1000
+net.netfilter.nf_conntrack_buckets = 65536
+net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 60
+net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 120
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 120
+...
+
+net.netfilter.nf_conntrack_count，表示当前连接跟踪数
+net.netfilter.nf_conntrack_max，表示最大连接跟踪数
+net.netfilter.nf_conntrack_buckets，表示连接跟踪表的大小
+
+当前连接跟踪数是 180，最大连接跟踪数是 1000，连接跟踪表的大小，则是 65536。回想一下前面的 ab 命令，并发请求数是 5000，而请求数是 100000。显然，跟踪表设置成，只记录 1000 个连接，是远远不够的
+
+# 内核在工作异常时，会把异常信息记录到日志中
+$ dmesg | tail
+[104235.156774] nf_conntrack: nf_conntrack: table full, dropping packet
+[104243.800401] net_ratelimit: 3939 callbacks suppressed
+[104243.800401] nf_conntrack: nf_conntrack: table full, dropping packet
+[104262.962157] nf_conntrack: nf_conntrack: table full, dropping packet
+
+net_ratelimit 表示有大量的日志被压缩掉了，这是内核预防日志攻击的一种措施。而当你看到 “nf_conntrack: table full” 的错误时，就表明 nf_conntrack_max 太小了。nf_conntrack_buckets，就是哈希表的大小。哈希表中的每一项，都是一个链表（称为 Bucket），而链表长度，就等于 nf_conntrack_max 除以 nf_conntrack_buckets。比如，可以估算一下，上述配置的连接跟踪表占用的内存大小
+
+# 连接跟踪对象大小为376，链表项大小为16
+nf_conntrack_max*连接跟踪对象大小+nf_conntrack_buckets*链表项大小 
+= 1000*376+65536*16 B
+= 1.4 MB
+
+# 将 nf_conntrack_max 改大一些，比如改成 131072（即 nf_conntrack_buckets 的 2 倍）
+$ sysctl -w net.netfilter.nf_conntrack_max=131072
+$ sysctl -w net.netfilter.nf_conntrack_buckets=65536
+
+# 再切换到终端二中，重新执行 ab 命令。注意，这次我们把超时时间也改回原来的 2s
+$ ab -c 5000 -n 100000 -r -s 2 http://192.168.0.30:8080/
+...
+Requests per second:    6315.99 [#/sec] (mean)
+Time per request:       791.641 [ms] (mean)
+Time per request:       0.158 [ms] (mean, across all concurrent requests)
+Transfer rate:          4985.15 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0  355 793.7     29    7352
+Processing:     8  311 855.9     51   14481
+Waiting:        0  292 851.5     36   14481
+Total:         15  666 1216.3    148   14645
+
+每秒请求数（Requests per second）为 6315（不用 NAT 时为 6576）
+每个请求的延迟（Time per request）为 791ms（不用 NAT 时为 760ms）
+建立连接的延迟（Connect）为 355ms（不用 NAT 时为 177ms）
+
+# 可以用 conntrack 命令行工具，来查看连接跟踪表的内容
+# -L表示列表，-o表示以扩展格式显示
+$ conntrack -L -o extended | head
+ipv4     2 tcp      6 7 TIME_WAIT src=192.168.0.2 dst=192.168.0.96 sport=51744 dport=8080 src=172.17.0.2 dst=192.168.0.2 sport=8080 dport=51744 [ASSURED] mark=0 use=1
+ipv4     2 tcp      6 6 TIME_WAIT src=192.168.0.2 dst=192.168.0.96 sport=51524 dport=8080 src=172.17.0.2 dst=192.168.0.2 sport=8080 dport=51524 [ASSURED] mark=0 use=1
+
+# 在终端二启动 ab 命令后，再回到终端一中，执行下面的命令
+# 统计总的连接跟踪数
+$ conntrack -L -o extended | wc -l
+14289
+
+# 统计TCP协议各个状态的连接跟踪数
+$ conntrack -L -o extended | awk '/^.*tcp.*$/ {sum[$6]++} END {for(i in sum) print i, sum[i]}'
+SYN_RECV 4
+CLOSE_WAIT 9
+ESTABLISHED 2877
+FIN_WAIT 3
+SYN_SENT 2113
+TIME_WAIT 9283
+
+# 统计各个源IP的连接跟踪数
+$ conntrack -L -o extended | awk '{print $7}' | cut -d "=" -f 2 | sort | uniq -c | sort -nr | head -n 10
+  14116 192.168.0.2
+    172 192.168.0.96
+```
+
+### 网络性能优化的几个思路
+
