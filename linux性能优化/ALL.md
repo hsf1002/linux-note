@@ -205,3 +205,104 @@ TcpExt:
 TCP 协议有多次超时和失败重试，并且主要错误是半连接重置。主要的失败，都是三次握手失败  
 ```
 
+##### iptables
+
+除了网络层和传输层的各种协议，iptables 和内核的连接跟踪机制也可能会导致丢包
+
+```
+# 容器终端中执行exit
+root@nginx:/# exit
+exit
+
+# 主机终端中查询内核配置
+$ sysctl net.netfilter.nf_conntrack_max
+net.netfilter.nf_conntrack_max = 262144
+$ sysctl net.netfilter.nf_conntrack_count
+net.netfilter.nf_conntrack_count = 182
+
+接跟踪数只有 182，而最大连接跟踪数则是 262144。这里的丢包，不可能是连接跟踪导致
+```
+
+iptables 规则，统一管理在一系列的表中，包括 filter（用于过滤）、nat（用于 NAT）、mangle（用于修改分组数据） 和 raw（用于原始数据包）等。而每张表又可以包括一系列的链，用于对 iptables 规则进行分组管理。对于丢包问题来说，最大的可能就是被 filter 表中的规则给丢弃了。需要确认，那些目标为 DROP 和 REJECT 等会弃包的规则，有没有被执行到。简单的方法，就是直接查询 DROP 和 REJECT 等规则的统计信息，看看是否为 0。如果统计值不是 0，再把相关的规则拎出来进行分析，可以通过 iptables -nvL 命令，查看各条规则的统计信息
+
+```
+
+# 在主机中执行
+$ docker exec -it nginx bash
+
+# 在容器中执行
+root@nginx:/# iptables -t filter -nvL
+Chain INPUT (policy ACCEPT 25 packets, 1000 bytes)
+ pkts bytes target     prot opt in     out     source               destination
+    6   240 DROP       all  --  *      *       0.0.0.0/0            0.0.0.0/0            statistic mode random probability 0.29999999981
+
+Chain FORWARD (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination
+
+Chain OUTPUT (policy ACCEPT 15 packets, 660 bytes)
+ pkts bytes target     prot opt in     out     source               destination
+    6   264 DROP       all  --  *      *       0.0.0.0/0            0.0.0.0/0            statistic mode random probability 0.29999999981
+    
+两条 DROP 规则的统计数值不是 0，分别在 INPUT 和 OUTPUT 链中。这两条规则实际上是一样的，指的是使用 statistic 模块，进行随机 30% 的丢包。它们的匹配规则。0.0.0.0/0 表示匹配所有的源 IP 和目的 IP，也就是会对所有包都进行随机 30% 的丢包。这应该就是导致部分丢包的原因
+
+// 执行下面的两条 iptables 命令，删除这两条 DROP 规则
+root@nginx:/# iptables -t filter -D INPUT -m statistic --mode random --probability 0.30 -j DROP
+root@nginx:/# iptables -t filter -D OUTPUT -m statistic --mode random --probability 0.30 -j DROP
+
+$ hping3 -c 10 -S -p 80 192.168.0.30
+HPING 192.168.0.30 (eth0 192.168.0.30): S set, 40 headers + 0 data bytes
+len=44 ip=192.168.0.30 ttl=63 DF id=0 sport=80 flags=SA seq=0 win=5120 rtt=11.9 ms
+len=44 ip=192.168.0.30 ttl=63 DF id=0 sport=80 flags=SA seq=1 win=5120 rtt=7.8 ms
+...
+len=44 ip=192.168.0.30 ttl=63 DF id=0 sport=80 flags=SA seq=9 win=5120 rtt=15.0 ms
+
+--- 192.168.0.30 hping statistic ---
+10 packets transmitted, 10 packets received, 0% packet loss
+round-trip min/avg/max = 3.3/7.9/15.0 ms
+
+已经没有丢包了，并且延迟的波动变化也很小。丢包问题应该已经解决了，hping3 工具，只能验证 80 端口处于正常监听状态，却还没有访问 Nginx 的 HTTP 服务
+
+$ curl --max-time 3 http://192.168.0.30
+curl: (28) Operation timed out after 3000 milliseconds with 0 bytes received
+
+用 hping3 验证了端口正常，现在却发现 HTTP 连接超时
+```
+
+##### tcpdump
+
+```
+// 另一终端执行curl的时候此终端抓包
+root@nginx:/# tcpdump -i eth0 -nn port 80
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+
+// curl执行完毕后，查看 tcpdump 的输出
+14:40:00.589235 IP 10.255.255.5.39058 > 172.17.0.2.80: Flags [S], seq 332257715, win 29200, options [mss 1418,sackOK,TS val 486800541 ecr 0,nop,wscale 7], length 0
+14:40:00.589277 IP 172.17.0.2.80 > 10.255.255.5.39058: Flags [S.], seq 1630206251, ack 332257716, win 4880, options [mss 256,sackOK,TS val 2509376001 ecr 486800541,nop,wscale 7], length 0
+14:40:00.589894 IP 10.255.255.5.39058 > 172.17.0.2.80: Flags [.], ack 1, win 229, options [nop,nop,TS val 486800541 ecr 2509376001], length 0
+14:40:03.589352 IP 10.255.255.5.39058 > 172.17.0.2.80: Flags [F.], seq 76, ack 1, win 229, options [nop,nop,TS val 486803541 ecr 2509376001], length 0
+14:40:03.589417 IP 172.17.0.2.80 > 10.255.255.5.39058: Flags [.], ack 1, win 40, options [nop,nop,TS val 2509379001 ecr 486800541,nop,nop,sack 1 {76:77}], length 0
+
+前三个包是正常的 TCP 三次握手，没问题；但第四个包却是在 3 秒以后了，并且还是客户端（VM2）发送过来的 FIN 包，客户端的连接关闭了，curl 设置的 3 秒超时选项，超时后退出
+
+// 执行 netstat -i 命令，确认一下网卡有没有丢包，接收丢包数（RX-DRP）是 344，果然是在网卡接收时丢包了
+root@nginx:/# netstat -i
+Kernel Interface table
+Iface      MTU    RX-OK RX-ERR RX-DRP RX-OVR    TX-OK TX-ERR TX-DRP TX-OVR Flg
+eth0       100      157      0    344 0            94      0      0      0 BMRU
+lo       65536        0      0      0 0             0      0      0      0 LRU
+
+第二列正是每个网卡的 MTU 值。eth0 的 MTU 只有 100，而以太网的 MTU 默认值是 1500
+```
+
+![img](https://static001.geekbang.org/resource/image/a8/c2/a81bd7639a1f81c23bc6d2e030af97c2.png)
+
+hping3：实际上只发送了 SYN 包
+
+curl：在发送 SYN 包后，还会发送 HTTP GET 请求。HTTP GET ，本质上也是一个 TCP 包，但跟 SYN 包相比，它还携带了 HTTP GET 的数据
+
+```
+// 把容器 eth0 的 MTU 改成 1500，再次执行 curl 命令，确认问题真的解决了
+root@nginx:/# ifconfig eth0 mtu 1500
+```
+
