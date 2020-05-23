@@ -306,3 +306,139 @@ curl：在发送 SYN 包后，还会发送 HTTP GET 请求。HTTP GET ，本质�
 root@nginx:/# ifconfig eth0 mtu 1500
 ```
 
+### 内核线程 CPU 利用率太高，该怎么办？
+
+##### 内核线程
+
+在 Linux 中，用户态进程的“祖先”，都是 PID 号为 1 的 init 进程。现在主流的 Linux 发行版中，init 都是 systemd 进程；而其他的用户态进程，会通过 systemd 来进行管理。Linux 在启动过程中，有三个特殊的进程，也就是 PID 号最小的三个进程：
+
+* 0 号进程为 idle 进程，系统创建的第一个进程，它在初始化 1 号和 2 号进程后，演变为空闲任务。当 CPU 上没有其他任务执行时，就会运行它
+* 1 号进程为 init 进程，通常是 systemd 进程，在用户态运行，用来管理其他用户态进程
+* 2 号进程为 kthreadd 进程，在内核态运行，用来管理内核线程
+
+```
+// 要查找内核线程，从 2 号进程开始，查找它的子孙进程即可。使用 ps 命令，来查找 kthreadd 的子进程
+$ ps -f --ppid 2 -p 2
+UID         PID   PPID  C STIME TTY          TIME CMD
+root          2      0  0 12:02 ?        00:00:01 [kthreadd]
+root          9      2  0 12:02 ?        00:00:21 [ksoftirqd/0]
+root         10      2  0 12:02 ?        00:11:47 [rcu_sched]
+root         11      2  0 12:02 ?        00:00:18 [migration/0]
+...
+root      11094      2  0 14:20 ?        00:00:00 [kworker/1:0-eve]
+root      11647      2  0 14:27 ?        00:00:00 [kworker/0:2-cgr]
+
+内核线程的名称（CMD）都在中括号里，更简单的方法，就是直接查找名称包含中括号的进程
+$ ps -ef | grep "\[.*\]"
+root         2     0  0 08:14 ?        00:00:00 [kthreadd]
+root         3     2  0 08:14 ?        00:00:00 [rcu_gp]
+root         4     2  0 08:14 ?        00:00:00 [rcu_par_gp]
+...
+```
+
+除了 kthreadd 和 ksoftirqd 外，还有很多常见的内核线程，在性能分析中都经常会碰到，比如
+
+* kswapd0：用于内存回收
+* kworker：用于执行内核工作队列，分为绑定 CPU （名称格式为 kworker/CPU86330）和未绑定 CPU（名称格式为 kworker/uPOOL86330）两类
+* migration：在负载均衡过程中，把进程迁移到 CPU 上。每个 CPU 都有一个 migration 内核线程
+* jbd2/sda1-8：jbd 是 Journaling Block Device 的缩写，用来为文件系统提供日志功能，以保证数据的完整性；名称中的 sda1-8，表示磁盘分区名称和设备号。每个使用了 ext4 文件系统的磁盘分区，都会有一个 jbd2 内核线程
+* pdflush：用于将内存中的脏页（被修改过，但还未写入磁盘的文件页）写入磁盘（已经在 3.10 中合并入了 kworker 中）
+
+```
+// 第二个终端
+$ curl http://192.168.0.30/
+// 第二个终端
+# -S参数表示设置TCP协议的SYN（同步序列号），-p表示目的端口为80
+# -i u10表示每隔10微秒发送一个网络帧
+# 注：如果你在实践过程中现象不明显，可以尝试把10调小，比如调成5甚至1
+$ hping3 -S -p 80 -i u10 192.168.0.30
+
+// 回到第一个终端，就会发现异常——系统的响应明显变慢了。执行 top，观察一下系统和进程的 CPU 使用情况
+$ top
+top - 08:31:43 up 17 min,  1 user,  load average: 0.00, 0.00, 0.02
+Tasks: 128 total,   1 running,  69 sleeping,   0 stopped,   0 zombie
+%Cpu0  :  0.3 us,  0.3 sy,  0.0 ni, 66.8 id,  0.3 wa,  0.0 hi, 32.4 si,  0.0 st
+%Cpu1  :  0.0 us,  0.3 sy,  0.0 ni, 65.2 id,  0.0 wa,  0.0 hi, 34.5 si,  0.0 st
+KiB Mem :  8167040 total,  7234236 free,   358976 used,   573828 buff/cache
+KiB Swap:        0 total,        0 free,        0 used.  7560460 avail Mem
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+    9 root      20   0       0      0      0 S   7.0  0.0   0:00.48 ksoftirqd/0
+   18 root      20   0       0      0      0 S   6.9  0.0   0:00.56 ksoftirqd/1
+ 2489 root      20   0  876896  38408  21520 S   0.3  0.5   0:01.50 docker-containe
+ 3008 root      20   0   44536   3936   3304 R   0.3  0.0   0:00.09 top
+    1 root      20   0   78116   9000   6432 S   0.0  0.1   0:11.77 systemd
+ ...
+ 
+两个 CPU 的软中断使用率都超过了 30%；CPU 使用率最高的进程，是软中断内核线程 ksoftirqd/0 和 ksoftirqd/1 
+```
+
+对于普通进程，观察其行为有很多方法，比如 strace、pstack、lsof 等等。但这些工具并不适合内核线程，比如，如果用 pstack ，或者通过 /proc/pid/stack 查看 ksoftirqd/0（进程号为 9）的调用栈时，分别可以得到以下输出
+
+```
+$ pstack 9
+Could not attach to target 9: Operation not permitted.
+detach: No such process
+
+$ cat /proc/9/stack
+[<0>] smpboot_thread_fn+0x166/0x170
+[<0>] kthread+0x121/0x140
+[<0>] ret_from_fork+0x35/0x40
+[<0>] 0xffffffffffffffff
+
+pstack 报出的是不允许挂载进程的错误；而 /proc/9/stack 方式虽然有输出，但输出中并没有详细的调用栈情况
+
+// 终端一中执行下面的 perf record 命令；并指定进程号 9 ，以便记录 ksoftirqd 的行为
+# 采样30s后退出
+$ perf record -a -g -p 9 -- sleep 30
+
+继续执行 perf report命令，得到 perf 的汇总报告。按上下方向键以及回车键，展开比例最高的 ksoftirqd 后，可以得到调用关系链图，更好的方法，来查看整个调用栈的信息的方式是火焰图
+```
+
+##### 火焰图
+
+针对 perf 汇总数据的展示问题，Brendan Gragg 发明了火焰图，通过矢量图的形式，更直观展示汇总结果
+
+* 横轴表示采样数和采样比例。一个函数占用的横轴越宽，就代表它的执行时间越长。同一层的多个函数，则是按照字母来排序
+* 纵轴表示调用栈，由下往上根据调用关系逐个展开。上下相邻的两个函数中，下面的函数，是上面函数的父函数。调用栈越深，纵轴就越高
+
+火焰图可以分为下面这几种
+
+* on-CPU 火焰图：表示 CPU 的繁忙情况，用在 CPU 使用率比较高的场景中
+* off-CPU 火焰图：表示 CPU 等待 I/O、锁等各种资源的阻塞情况
+* 内存火焰图：表示内存的分配和释放情况
+* 热 / 冷火焰图：表示将 on-CPU 和 off-CPU 结合在一起综合展示
+* 差分火焰图：表示两个火焰图的差分情况，红色表示增长，蓝色表示衰减。差分火焰图常用来比较不同场景和不同时期的火焰图，以便分析系统变化前后对性能的影响情况
+
+```
+// 安装火焰图工具
+$ git clone https://github.com/brendangregg/FlameGraph
+$ cd FlameGraph
+```
+
+生成火焰图，其实主要需要三个步骤：
+
+1. 执行 perf script ，将 perf record 的记录转换成可读的采样记录
+2. 执行 stackcollapse-perf.pl 脚本，合并调用栈信息
+3. 执行 flamegraph.pl 脚本，生成火焰图
+
+或者利用管道简化：
+
+```
+// 假设刚才用 perf record 生成的文件路径为 /root/perf.data
+$ perf script -i /root/perf.data | ./stackcollapse-perf.pl --all |  ./flamegraph.pl > ksoftirqd.svg
+```
+
+使用浏览器打开 ksoftirqd.svg ，你就可以看到生成的火焰图了
+
+![img](https://static001.geekbang.org/resource/image/6d/cd/6d4f1fece12407906aacedf5078e53cd.png)
+
+顺着调用栈由下往上看（顺着图中蓝色箭头），就可以得到跟刚才 perf report 中一样的结果，到了 ip_forward 这里，已经看不清函数名称了。需要点击 ip_forward，展开最上面这一块调用栈
+
+![img](https://static001.geekbang.org/resource/image/41/a3/416291ba2f9c039a0507f913572a21a3.png)
+
+进一步看到 ip_forward 后的行为，也就是把网络包发送出去。根据这个调用过程，再结合网络收发和 TCP/IP 协议栈原理，这个流程中的网络接收、网桥以及 netfilter 调用等，都是导致软中断 CPU 升高的重要因素，也就是影响网络性能的潜在瓶颈。
+
+火焰图中的颜色，并没有特殊含义，只是用来区分不同的函数，整个火焰图不包含任何时间的因素，所以并不能看出横向各个函数的执行次序
+
+实际上，火焰图方法同样适用于普通进程
