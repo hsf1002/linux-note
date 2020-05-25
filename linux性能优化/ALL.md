@@ -709,3 +709,241 @@ BBC支持的特性：
 
 ![img](https://static001.geekbang.org/resource/image/5a/25/5a2b2550547d5eaee850bfb806f76625.png)
 
+### 服务吞吐量下降很厉害，怎么分析？
+
+```
+# 默认测试时间为10s，请求超时2s
+$ wrk --latency -c 1000 http://192.168.0.30
+Running 10s test @ http://192.168.0.30
+  2 threads and 1000 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    14.82ms   42.47ms 874.96ms   98.43%
+    Req/Sec   550.55      1.36k    5.70k    93.10%
+  Latency Distribution
+     50%   11.03ms
+     75%   15.90ms
+     90%   23.65ms
+     99%  215.03ms
+  1910 requests in 10.10s, 573.56KB read
+  Non-2xx or 3xx responses: 1910
+Requests/sec:    189.10
+Transfer/sec:     56.78KB
+
+吞吐量（也就是每秒请求数）只有 189，并且所有 1910 个请求收到的都是异常响应（非 2xx 或 3xx）。这些数据显然表明，吞吐量太低了，并且请求处理都失败了
+```
+
+##### 连接数优化
+
+查看 TCP 连接数的汇总情况，首选工具自然是 ss 命令
+
+```
+# 测试时间30分钟
+$ wrk --latency -c 1000 -d 1800 http://192.168.0.30
+```
+
+终端一中，观察 TCP 连接数
+
+```
+$ ss -s
+Total: 177 (kernel 1565)
+TCP:   1193 (estab 5, closed 1178, orphaned 0, synrecv 0, timewait 1178/0), ports 0
+
+Transport Total     IP        IPv6
+*    1565      -         -
+RAW    1         0         1
+UDP    2         2         0
+TCP    15        12        3
+INET    18        14        4
+FRAG    0         0         0
+
+wrk 并发 1000 请求时，建立连接数只有 5，而 closed 和 timewait 状态的连接则有 1100 多 。两个问题：一个是建立连接数太少了；另一个是 timewait 状态连接太多了
+```
+
+查看系统日志
+
+```
+$ dmesg | tail
+[88356.354329] nf_conntrack: nf_conntrack: table full, dropping packet
+[88356.354374] nf_conntrack: nf_conntrack: table full, dropping packet
+
+连接跟踪导致的问题
+```
+
+连接跟踪数的最大限制 nf_conntrack_max ，以及当前的连接跟踪数 nf_conntrack_count
+
+```
+$ sysctl net.netfilter.nf_conntrack_max
+net.netfilter.nf_conntrack_max = 200
+$ sysctl net.netfilter.nf_conntrack_count
+net.netfilter.nf_conntrack_count = 200
+
+# 将连接跟踪限制增大到1048576
+$ sysctl -w net.netfilter.nf_conntrack_max=1048576
+```
+
+重新测试 Nginx 的性能
+
+```
+# 默认测试时间为10s，请求超时2s
+$ wrk --latency -c 1000 http://192.168.0.30
+...
+  54221 requests in 10.07s, 15.16MB read
+  Socket errors: connect 0, read 7, write 0, timeout 110
+  Non-2xx or 3xx responses: 45577
+Requests/sec:   5382.21
+Transfer/sec:      1.50MB
+
+吞吐量已经从刚才的 189 增大到了 5382。看起来性能提升了将近 30 倍，不过，10s 内的总请求数虽然增大到了 5 万，但是有 4 万多响应异常，真正成功的只有 8000 多个（54221-45577=8644）
+```
+
+##### 工作进程优化
+
+响应的状态码并不是我们期望的 2xx （表示成功）或 3xx（表示重定向），max_children 表示 php-fpm 子进程的最大数量
+
+##### 套接字优化
+
+观察有没有发生套接字的丢包现象
+
+```
+# 终端二，测试时间30分钟
+$ wrk --latency -c 1000 -d 1800 http://192.168.0.30
+
+# 只关注套接字统计
+$ netstat -s | grep socket
+    73 resets received for embryonic SYN_RECV sockets
+    308582 TCP sockets finished time wait in fast timer
+    8 delayed acks further delayed because of locked socket
+    290566 times the listen queue of a socket overflowed
+    290566 SYNs to LISTEN sockets dropped
+
+# 稍等一会，再次运行
+$ netstat -s | grep socket
+    73 resets received for embryonic SYN_RECV sockets
+    314722 TCP sockets finished time wait in fast timer
+    8 delayed acks further delayed because of locked socket
+    344440 times the listen queue of a socket overflowed
+    344440 SYNs to LISTEN sockets dropped
+    
+丢包都是套接字队列溢出导致    
+```
+
+查看套接字的队列大小
+
+```
+$ ss -ltnp
+State     Recv-Q     Send-Q            Local Address:Port            Peer Address:Port
+LISTEN    10         10                      0.0.0.0:80                   0.0.0.0:*         users:(("nginx",pid=10491,fd=6),("nginx",pid=10490,fd=6),("nginx",pid=10487,fd=6))
+LISTEN    7          10                            *:9000                       *:*         users:(("php-fpm",pid=11084,fd=9),...,("php-fpm",pid=10529,fd=7))
+
+Nginx 和 php-fpm 的监听队列 （Send-Q）只有 10，而 nginx 的当前监听队列长度 （Recv-Q）已经达到了最大值，php-fpm 也已经接近了最大值，除了Nginx 和 somaxconn 的配置都是 10，php-fpm 的配置是511
+
+# somaxconn是系统级套接字监听队列上限
+$ sysctl net.core.somaxconn
+net.core.somaxconn = 10
+```
+
+终端二中，重新测试 Nginx 的性能
+
+```
+$ wrk --latency -c 1000 http://192.168.0.30
+...
+  62247 requests in 10.06s, 18.25MB read
+  Non-2xx or 3xx responses: 62247
+Requests/sec:   6185.65
+Transfer/sec:      1.81MB
+
+吞吐量已经增大到了 6185，在测试的时候，如果在终端一中重新执行 netstat -s | grep socket，已经没有套接字丢包问题了。不过，这次 Nginx 的响应，再一次全部失败了，都是 Non-2xx or 3xx。再去终端一中，查看 Nginx 日志
+
+$ docker logs nginx --tail 10
+2019/03/15 16:52:39 [crit] 15#15: *999779 connect() to 127.0.0.1:9000 failed (99: Cannot assign requested address) while connecting to upstream, client: 192.168.0.2, server: localhost, request: "GET / HTTP/1.1", upstream: "fastcgi://127.0.0.1:9000", host: "192.168.0.30"
+
+Cannot assign requested address。错误代码为 EADDRNOTAVAIL，表示 IP 地址或者端口号不可用。显然只能是端口号的问题
+```
+
+##### 端口号优化
+
+查询系统配置的临时端口号范围
+
+```
+$ sysctl net.ipv4.ip_local_port_range
+net.ipv4.ip_local_port_range=20000 20050
+
+临时端口的范围只有 50 个，将其增大
+$ sysctl -w net.ipv4.ip_local_port_range="10000 65535"
+net.ipv4.ip_local_port_range = 10000 65535
+
+$ wrk --latency -c 1000 http://192.168.0.30/
+...
+  32308 requests in 10.07s, 6.71MB read
+  Socket errors: connect 0, read 2027, write 0, timeout 433
+  Non-2xx or 3xx responses: 30
+Requests/sec:   3208.58
+Transfer/sec:    682.15KB
+
+异常的响应少多了 ，不过，吞吐量也下降到了 3208。并且，这次还出现了很多 Socket read errors
+```
+
+##### 火焰图
+
+优化了很多配置。这些配置在优化网络的同时，却也会带来其他资源使用的上升。是不是说明其他资源遇到瓶颈了呢？
+
+```
+# 终端二中测试时间30分钟
+$ wrk --latency -c 1000 -d 1800 http://192.168.0.30
+
+# 终端一中，执行 top ，观察 CPU 和内存的使用
+$ top
+...
+%Cpu0  : 30.7 us, 48.7 sy,  0.0 ni,  2.3 id,  0.0 wa,  0.0 hi, 18.3 si,  0.0 st
+%Cpu1  : 28.2 us, 46.5 sy,  0.0 ni,  2.0 id,  0.0 wa,  0.0 hi, 23.3 si,  0.0 st
+KiB Mem :  8167020 total,  5867788 free,   490400 used,  1808832 buff/cache
+KiB Swap:        0 total,        0 free,        0 used.  7361172 avail Mem
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+20379 systemd+  20   0   38068   8692   2392 R  36.1  0.1   0:28.86 nginx
+20381 systemd+  20   0   38024   8700   2392 S  33.8  0.1   0:29.29 nginx
+ 1558 root      20   0 1118172  85868  39044 S  32.8  1.1  22:55.79 dockerd
+20313 root      20   0   11024   5968   3956 S  27.2  0.1   0:22.78 docker-containe
+13730 root      20   0       0      0      0 I   4.0  0.0   0:10.07 kworker/u4:0-ev
+
+系统 CPU 使用率（sy）比较高，两个 CPU 的系统 CPU 使用率都接近 50%，且空闲 CPU 使用率只有 2%。CPU 主要被两个 Nginx 进程和两个 docker 相关的进程占用，使用率都是 30% 左右
+
+
+# 终端二中的 wrk 继续运行, 在终端一中，执行 perf 和 flamegraph 脚本，生成火焰图：
+# 执行perf记录事件
+$ perf record -g
+
+# 切换到FlameGraph安装路径执行下面的命令生成火焰图
+$ perf script -i ~/perf.data | ./stackcollapse-perf.pl --all | ./flamegraph.pl > nginx.svg
+```
+
+![img](https://static001.geekbang.org/resource/image/89/c6/8933557b5eb8c8f41a629e751fd7f0c6.png)
+
+do_syscall_64、tcp_v4_connect、inet_hash_connect 这个堆栈，很明显就是最需要关注的地方。inet_hash_connect() 是 Linux 内核中负责分配临时端口号的函数。瓶颈应该还在临时端口的分配上
+
+终端一中运行 ss 命令， 查看连接状态统计
+
+```
+$ ss -s
+TCP:   32775 (estab 1, closed 32768, orphaned 0, synrecv 0, timewait 32768/0), ports 0
+...
+
+大量连接（这儿是 32768）处于 timewait 状态，而 timewait 状态的连接，本身会继续占用端口号。如果这些端口号可以重用，那么自然就可以缩短 __init_check_established 的过程。而 Linux 内核中，tcp_tw_reuse 选项，用来控制端口号的重用
+
+$ sysctl net.ipv4.tcp_tw_reuse
+net.ipv4.tcp_tw_reuse = 0
+```
+
+将tcp_tw_reuse改为1后切换到终端二中，再次测试优化后的效果
+
+```
+$ wrk --latency -c 1000 http://192.168.0.30/
+...
+  52119 requests in 10.06s, 10.81MB read
+  Socket errors: connect 0, read 850, write 0, timeout 0
+Requests/sec:   5180.48
+Transfer/sec:      1.07MB
+
+吞吐量已经达到了 5000 多，只有少量的 Socket errors，也不再有 Non-2xx or 3xx 的响应。说明一切终于正常了
+```
+
