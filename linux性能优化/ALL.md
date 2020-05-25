@@ -549,3 +549,163 @@ $ trace-cmd record -p function_graph -g do_sys_open -O funcgraph-proc ls
 $ trace-cmd report
 ```
 
+##### perf
+
+1. 内核函数 do_sys_open
+
+通过 perf list ，查询所有支持的事件
+
+```
+$ perf list
+```
+
+在 perf 的各个子命令中添加 --event 选项，设置追踪感兴趣的事件。如果这些预定义的事件不满足实际需要，还可以使用 perf probe 来动态添加。除了追踪内核事件外，perf 还可以用来跟踪用户空间的函数
+
+```
+// 可以执行 perf probe 命令，添加 do_sys_open 探针
+$ perf probe --add do_sys_open
+Added new event:
+  probe:do_sys_open    (on do_sys_open)
+You can now use it in all perf tools, such as:
+    perf record -e probe:do_sys_open -aR sleep 1
+    
+// 可以对 10s 内的 do_sys_open 进行采样
+$ perf record -e probe:do_sys_open -aR sleep 10
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.148 MB perf.data (19 samples) ]
+
+// 采样成功后，就可以执行 perf script ，来查看采样结果
+$ perf script
+            perf 12886 [000] 89565.879875: probe:do_sys_open: (ffffffffa807b290)
+           sleep 12889 [000] 89565.880362: probe:do_sys_open: (ffffffffa807b290)
+           sleep 12889 [000] 89565.880382: probe:do_sys_open: (ffffffffa807b290)
+           sleep 12889 [000] 89565.880635: probe:do_sys_open: (ffffffffa807b290)
+           sleep 12889 [000] 89565.880669: probe:do_sys_open: (ffffffffa807b290)
+           
+// 执行下面的命令，你就可以知道 do_sys_open 的所有参数  
+$ perf probe -V do_sys_open
+Available variables at do_sys_open
+        @<do_sys_open+0>
+                char*   filename
+                int     dfd
+                int     flags
+                struct open_flags       op
+                umode_t mode
+                
+// 参数名称为 filename。如果这个命令执行失败，就说明调试符号表还没有安装。执行下面的命令，安装调试信息后重试 
+$ apt-get install linux-image-`uname -r`-dbgsym          
+
+# 先删除旧的探针
+perf probe --del probe:do_sys_open
+
+# 添加带参数的探针
+$ perf probe --add 'do_sys_open filename:string'
+Added new event:
+  probe:do_sys_open    (on do_sys_open with filename:string)
+You can now use it in all perf tools, such as:
+    perf record -e probe:do_sys_open -aR sleep 1
+    
+// 重新执行 record 和 script 子命令，采样并查看记录
+# 重新采样记录
+$ perf record -e probe:do_sys_open -aR ls
+
+# 查看结果
+$ perf script
+            perf 13593 [000] 91846.053622: probe:do_sys_open: (ffffffffa807b290) filename_string="/proc/13596/status"
+              ls 13596 [000] 91846.053995: probe:do_sys_open: (ffffffffa807b290) filename_string="/etc/ld.so.cache"
+              ls 13596 [000] 91846.054011: probe:do_sys_open: (ffffffffa807b290) filename_string="/lib/x86_64-linux-gnu/libselinux.so.1"
+              ls 13596 [000] 91846.054066: probe:do_sys_open: (ffffffffa807b290) filename_string="/lib/x86_64-linux-gnu/libc.so.6”
+              ...
+# 使用完成后不要忘记删除探针
+$ perf probe --del probe:do_sys_open    
+```
+
+strace 也能得到类似结果，本身又容易操作，从原理上来说，strace 基于系统调用 ptrace 实现，这就带来了两个问题：
+
+* ptrace 是系统调用，要在内核态和用户态切换。当事件数量比较多时，繁忙的切换必然会影响原有服务性能
+* ptrace 需要借助 SIGSTOP 信号挂起目标进程。这种信号控制和进程挂起，会影响目标进程的行为
+
+```
+$ strace ls
+...
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory)
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+...
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libselinux.so.1", O_RDONLY|O_CLOEXEC) = 3
+...
+```
+
+在 strace 的启发下，结合内核中的 utrace 机制， perf 也提供了一个 trace 子命令，是取代 strace 的首选工具。相对于 ptrace 机制来说，perf trace 基于内核事件，自然要比进程跟踪的性能好很多
+
+```
+$ perf trace ls
+         ? (         ): ls/14234  ... [continued]: execve()) = 0
+     0.177 ( 0.013 ms): ls/14234 brk(                                                                  ) = 0x555d96be7000
+     0.224 ( 0.014 ms): ls/14234 access(filename: 0xad98082                                            ) = -1 ENOENT No such file or directory
+     0.248 ( 0.009 ms): ls/14234 access(filename: 0xad9add0, mode: R                                   ) = -1 ENOENT No such file or directory
+     0.267 ( 0.012 ms): ls/14234 openat(dfd: CWD, filename: 0xad98428, flags: CLOEXEC                  ) = 3
+     0.288 ( 0.009 ms): ls/14234 fstat(fd: 3</usr/lib/locale/C.UTF-8/LC_NAME>, statbuf: 0x7ffd2015f230 ) = 0
+     0.305 ( 0.011 ms): ls/14234 mmap(len: 45560, prot: READ, flags: PRIVATE, fd: 3                    ) = 0x7efe0af92000
+     0.324 Dockerfile  test.sh
+( 0.008 ms): ls/14234 close(fd: 3</usr/lib/locale/C.UTF-8/LC_NAME>                          ) = 0
+     ...
+```
+
+2. 用户空间的库函数readline
+
+通过 -x 指定 bash 二进制文件的路径，就可以动态跟踪库函数。这其实就是跟踪了所有用户在 bash 中执行的命令
+
+```
+# 为/bin/bash添加readline探针
+$ perf probe -x /bin/bash 'readline%return +0($retval):string’
+
+# 采样记录
+$ perf record -e probe_bash:readline__return -aR sleep 5
+
+# 查看结果
+$ perf script
+    bash 13348 [000] 93939.142576: probe_bash:readline__return: (5626ffac1610 <- 5626ffa46739) arg1="ls"
+
+# 跟踪完成后删除探针
+$ perf probe --del probe_bash:readline__return
+```
+
+如果不确定探针格式，也可以通过下面的命令，查询所有支持的函数和函数参数
+
+```
+# 查询所有的函数
+$ perf probe -x /bin/bash —funcs
+
+# 查询函数的参数
+$ perf probe -x /bin/bash -V readline
+Available variables at readline
+        @<readline+0>
+                char*   prompt
+```
+
+##### eBPF 和 BCC 
+
+ftrace 和 perf 的功能已经比较丰富了，不过，它们有一个共同的缺陷，那就是不够灵活，没法像 DTrace 那样通过脚本自由扩展。而 eBPF 就是 Linux 版的 DTrace，可以通过 C 语言自由扩展（这些扩展通过 LLVM 转换为 BPF 字节码后，加载到内核中执行）。从使用上来说，eBPF 要比 ftrace 和 perf ，都更加繁杂。在 eBPF 执行过程中，编译、加载还有 maps 等操作，对所有的跟踪程序来说都是通用的。把这些过程通过 Python 抽象起来，也就诞生了 BCC（BPF Compiler Collection）。BCC 把 eBPF 中的各种事件源（比如 kprobe、uprobe、tracepoint 等）和数据操作（称为 Maps），也都转换成了 Python 接口（也支持 lua）。使用 BCC 进行动态追踪时，编写简单的脚本就可以了
+
+BBC支持的工具：
+
+![img](https://static001.geekbang.org/resource/image/fc/21/fc5f387a982db98c49c7cefb77342c21.png)
+
+BBC支持的特性：
+
+![img](https://static001.geekbang.org/resource/image/61/e8/61abce1affc770a15dae7d489e50a8e8.png)
+
+##### SystemTap 和 sysdig
+
+* SystemTap：可以通过脚本进行自由扩展的动态追踪技术。在 eBPF 出现之前，SystemTap 是 Linux 系统中，功能最接近 DTrace 的动态追踪机制。不过SystemTap 在很长时间以来都游离于内核之外（而 eBPF 自诞生以来，一直根植在内核中）
+* sysdig：随着容器技术的普及而诞生的，主要用于容器的动态追踪。sysdig 汇集了一些列性能工具的优势，可以说是集百家之所长。sysdig 的特点： sysdig = strace + tcpdump + htop + iftop + lsof + docker inspect
+
+##### 如何选择追踪工具
+
+* 在不需要很高灵活性的场景中，使用 perf 对性能事件进行采样，然后再配合火焰图辅助分析，就是最常用的一种方法
+* 需要对事件或函数调用进行统计分析（比如观察不同大小的 I/O 分布）时，就要用 SystemTap 或者 eBPF，通过一些自定义的脚本来进行数据处理
+
+![img](https://static001.geekbang.org/resource/image/5a/25/5a2b2550547d5eaee850bfb806f76625.png)
+
