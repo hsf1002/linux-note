@@ -129,6 +129,8 @@
 
 - 线程相关操作
 
+  ![img](https://static001.geekbang.org/resource/image/e3/bd/e38c28b0972581d009ef16f1ebdee2bd.jpg)
+
   - pthread_exit(A), A 是线程退出的返回值
   - pthread_attr_t 线程属性, 用辅助函数初始化并设置值; 用完需要销毁
   - pthread_create 创建线程, 四个参数(线程对象, 属性, 运行函数, 运行参数)
@@ -136,6 +138,8 @@
   - 一个线程退出, 会发送信号给 其他所有同进程的线程
 
 - 线程中有三类数据
+
+  ![img](https://static001.geekbang.org/resource/image/e7/3f/e7b06dcf431f388170ab0a79677ee43f.jpg)
 
   - 线程栈本地数据, 栈大小默认 8MB(通过命令 ulimit -a 查看， ulimit -s 修改); 线程栈之间有保护间隔, 若误入会引发段错误
 
@@ -156,7 +160,7 @@
     int pthread_setspecific(pthread_key_t key, const void *value)
     
     获取：
-    void *pthread_getspecific(pthread_key_t key
+    void *pthread_getspecific(pthread_key_t key)
     ```
 
 - 数据保护
@@ -177,8 +181,6 @@
     pthread_mutex_destroy(&g_task_lock);
     ```
 
-    
-
   - 条件变量(通知), 收到通知, 还是要抢锁(由 wait 函数执行); 因此条件变量与互斥锁配合使用
 
     ```
@@ -193,8 +195,9 @@
     
     销毁：
     pthread_cond_destroy(&g_task_cv);
-    
     ```
+
+![img](https://static001.geekbang.org/resource/image/1d/f7/1d4e17fdb1860f7ca7f23bbe682d93f7.jpeg)
 
 #### 内核任务
 
@@ -226,7 +229,6 @@
 
       ```
       #define TASK_KILLABLE           (TASK_WAKEKILL | TASK_UNINTERRUPTIBLE)
-      
       ```
 
   - 停止状态 TASK_STOPPED, 由信号 SIGSTOP, SIGTTIN, SIGTSTP 与 SIGTTOU 触发进入
