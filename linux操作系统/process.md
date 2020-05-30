@@ -201,6 +201,8 @@
 
 #### 内核任务
 
+![img](https://static001.geekbang.org/resource/image/75/2d/75c4d28a9d2daa4acc1107832be84e2d.jpeg)
+
 内核中进程, 线程统一为任务, 由 taks_struct 表示，它是一个链表
 
 - task_struct 中包含: 任务ID; 任务状态; 信号处理相关字段; 调度相关字段; 亲缘关系; 权限相关; 运行统计; 内存管理; 文件与文件系统; 内核栈
@@ -216,6 +218,8 @@
   - 通过 pending/shared_pending 区分进程和线程的信号
 
 - 任务状态; 包含 state; exit_state; flags
+
+  ![img](https://static001.geekbang.org/resource/image/e2/88/e2fa348c67ce41ef730048ff9ca4c988.jpeg)
 
   - 准备运行状态 TASK_RUNNING
 
@@ -356,6 +360,8 @@
   struct files_struct             *files;
   ```
 
+![img](https://static001.geekbang.org/resource/image/01/e8/016ae7fb63f8b3fd0ca072cb9964e3e8.jpeg)
+
 ### 用户态函数栈
 
 - 用户态/内核态切换如何关联：
@@ -368,12 +374,21 @@ void  *stack;
 - 用户态函数栈
 
   - 通过 JMP + 参数 + 返回地址 调用函数
+
   - 栈内存空间从高到低增长
+
   - 32位栈结构: 栈帧包含 前一个帧的 EBP + 局部变量 + N个参数 + 返回地址
+
+    ![img](https://static001.geekbang.org/resource/image/ae/2e/aec865abccf0308155f4138cc905972e.jpg)
+
     - ESP: 栈顶指针，push和pop操作后会自动调整
     - EBP: 栈基指针(栈帧最底部, 局部变量起始)
     - EAX: 保存返回结果
+
   - 64位栈结构: 结构类似
+
+    ![img](https://static001.geekbang.org/resource/image/77/c0/770b0036a8b2695463cd95869f5adec0.jpg)
+
     - rsp: 栈顶指针
     - rbp: 栈基指针
     - rax: 保存返回结果
@@ -382,6 +397,8 @@ void  *stack;
   ### 内核栈
 
 - 内核栈结构
+
+  ![img](https://static001.geekbang.org/resource/image/31/2d/31d15bcd2a053235b5590977d12ffa2d.jpeg)
 
   - Linux 为每个 task 分配了内核栈, 32位(8K), 64位(16K)
   - 栈结构: [预留8字节 +] pt_regs + 内核栈 + 头部 thread_info
@@ -414,6 +431,8 @@ void  *stack;
 
   - 32位 直接由 thread_info 中的指针得到
   - 64位 每个 CPU 当前运行进程的 task_struct 的指针存放到 Per CPU 变量 current_task 中; 可调用 this_cpu_read_stable 进行读取
+
+![img](https://static001.geekbang.org/resource/image/82/5c/82ba663aad4f6bd946d48424196e515c.jpeg)
 
 ### 调度策略与调度类
 
