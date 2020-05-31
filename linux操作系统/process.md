@@ -497,7 +497,11 @@ task_struct 中 * sched_class 指向封装了调度策略执行逻辑的类(有5
 - 每个 CPU 都有 rq 结构体, 里面有 rt_rq 和 cfs_rq 调度队列以及其他信息; 队列描述该 CPU 所运行的所有进程
 - 先在 rt_rq 中找进程运行, 若没有再到 cfs_rq 中找; cfs_rq 中 rb_root 指向红黑树根节点, rb_leftmost指向最左节点
 
+![img](https://static001.geekbang.org/resource/image/c2/93/c2b86e79f19d811ce10774688fc0c093.jpeg)
+
 #### 调度类如何工作
+
+![img](https://static001.geekbang.org/resource/image/ac/fd/ac043a08627b40b85e624477d937f3fd.jpeg)
 
 ```
 struct sched_class {
@@ -524,8 +528,10 @@ const struct sched_class fair_sched_class = {
 
 - 调度类中有一个成员指向下一个调度类(按优先级顺序串起来)
 - 找下一个运行任务时, 按 stop-dl-rt-fair-idle 依次调用调度类, 不同调度类操作不同调度队列
-- 对于同样的 pick_next_task 选取下一个要运行的任务这个动作，不同的调度类有自己的实现。fair_sched_class 的实现是 pick_next_task_fair，rt_sched_class 的实现是 pick_next_task_rt。我们会发现这两个函数是操作不同的队列，pick_next_task_rt 操作的是 rt_rq，pick_next_task_fair 操作的是 cfs_rq
+- 对于同样的 pick_next_task 选取下一个要运行的任务这个动作，不同的调度类有自己的实现。fair_sched_class 的实现是 pick_next_task_fair，rt_sched_class 的实现是 pick_next_task_rt。这两个函数是操作不同的队列，pick_next_task_rt 操作的是 rt_rq，pick_next_task_fair 操作的是 cfs_rq
 - 在每个 CPU 上都有一个队列 rq，这个队列里面包含多个子队列，例如 rt_rq 和 cfs_rq，不同的队列有不同的实现方式。某个 CPU 需要找下一个任务执行的时候，会按照优先级依次调度类，不同的调度类操作不同的队列。当然 rt_sched_class 先被调用，它会在 rt_rq 上找下一个任务，只有找不到的时候，才轮到 fair_sched_class 被调用，它会在 cfs_rq 上找下一个任务。这样保证了实时任务的优先级永远大于普通任务
+
+![img](https://static001.geekbang.org/resource/image/10/af/10381dbafe0f78d80beb87560a9506af.jpeg)
 
 ### 主动调度
 
@@ -579,6 +585,8 @@ static void btrfs_wait_for_no_snapshoting_writes(struct btrfs_root *root)
     - 内核栈: 由切换的 task_struct 中的 stack 指针指向
     - 内核栈顶指针: __switch_to_asm 修改 sp 后加载到 TTS
     - 内核指令指针: ((last) = __switch_to_asm((pre), (next)))
+
+![img](https://static001.geekbang.org/resource/image/9f/64/9f4433e82c78ed5cd4399b4b116a9064.png)
 
 ### 抢占式调度
 
@@ -647,6 +655,8 @@ asmlinkage __visible void __sched preempt_schedule_irq(void)
 		__schedule(true);
 ...
 ```
+
+![img](https://static001.geekbang.org/resource/image/93/7f/93588d71abd7f007397979f0ba7def7f.png)
 
 ### 进程创建
 
