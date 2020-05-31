@@ -660,6 +660,8 @@ asmlinkage __visible void __sched preempt_schedule_irq(void)
 
 ### 进程创建
 
+![img](https://static001.geekbang.org/resource/image/9d/58/9d9c5779436da40cabf8e8599eb85558.jpeg)
+
 fork是一个系统调用，最后会在 sys_call_table 找到相应的系统调用 sys_fork()->`_do_fork`
 
 创建进程做两件事: 复制初始化 task_struct; 唤醒新进程
@@ -736,7 +738,7 @@ long _do_fork(...)
 
 ### 线程的创建
 
-线程是由内核态和用户态合作完成的，pthread_create 是 Glibc 库的一个函数，而非系统调用，pthread_create 中，会做以下事情：
+![img](https://static001.geekbang.org/resource/image/14/4b/14635b1613d04df9f217c3508ae8524b.jpeg)线程是由内核态和用户态合作完成的，pthread_create 是 Glibc 库的一个函数，而非系统调用，pthread_create 中，会做以下事情：
 
 1. 设置线程属性参数，如线程栈大小，没有传入，就取默认值
 
