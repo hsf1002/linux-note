@@ -815,3 +815,122 @@ cat /proc/$pid/map		// mac下不行
 
 ![img](https://static001.geekbang.org/resource/image/4e/9d/4ed91c744220d8b4298237d2ab2eda9d.jpeg)
 
+- 分段
+    
+    ![img](https://static001.geekbang.org/resource/image/7c/04/7c82068d2d6bdb601084a07569ac8b04.jpg)
+    
+    - 虚拟地址 = 段选择子(段寄存器) + 段内偏移量
+    - 段选择子 = 段号(段表索引) + 标识位
+    - 段表 = 物理基地址 + 段界限(偏移量范围) + 特权等级
+    
+- Linux 分段实现
+    - 段表称为段描述符表, 放在全局标识符表GDT（Global Descriptor Table）中
+    - Linux 将段基地址都初始化为 0, 不用于地址映射，Linux 倾向于另外一种从虚拟地址到物理地址的转换方式，称为分页（Paging）
+    - Linux 分段功能主要用于权限检查
+    
+- Linux 通过分页实现映射
+    
+    ![img](https://static001.geekbang.org/resource/image/ab/40/abbcafe962d93fac976aa26b7fcb7440.jpg)
+    
+    - 物理内存被换分为大小固定(4KB)的页, 物理页可在内存与硬盘间换出/换入
+    
+    - 页表 = 虚拟页号 + 物理页号; 用于定位页
+    
+    - 虚拟地址 = 虚拟页号 + 页内偏移
+    
+      ![img](https://static001.geekbang.org/resource/image/84/eb/8495dfcbaed235f7500c7e11149b2feb.jpg)
+    
+      ![img](https://static001.geekbang.org/resource/image/b6/b8/b6960eb0a7eea008d33f8e0c4facc8b8.jpg)
+    
+    - 若采用单页表, 32位系统中一个页表将有 1M 页表项, 占用 4MB(每项 4B)
+    
+      ![img](https://static001.geekbang.org/resource/image/42/0b/42eff3e7574ac8ce2501210e25cd2c0b.jpg)
+    
+    - Linux 32位系统采用两级页表: 页表目录(1K项, 10bit) + 页表(1K项, 10bit)(页大小(4KB, 12bit))
+    
+    - 映射 4GB 内存理论需要 1K 个页表目录项 + 1K\*1K=1M 页表项, 将占用 4KB+4MB 空间
+    
+    - 因为完整的页表目录可以满足所有地址的查询, 因此页表只需在对应地址有内存分配时才生成
+    
+    - 64 为系统采用 4 级页表
+
+![img](https://static001.geekbang.org/resource/image/7d/91/7dd9039e4ad2f6433aa09c14ede92991.jpg)
+
+
+
+### 用户态和内核态的虚拟内存空间
+
+- 内存管理信息在 task_struct 的 mm_struct 中
+- task_size 指定用户态虚拟地址大小
+    - 32 位系统：3G 用户态, 1G 内核态
+    - 64 位系统(只利用 48 bit 地址): 128T 用户态; 128T 内核态
+
+![img](https://static001.geekbang.org/resource/image/89/59/89723dc967b59f6f49419082f6ab7659.jpg)
+
+- 用户态地址空间布局和管理
+
+    ```
+    // 表示虚拟地址空间中用于内存映射的起始地址。一般情况下，这个空间是从高地址到低地址增长的。malloc 申请一大块内存的时候，就是通过 mmap 在这里映射一块区域到物理内存。加载动态链接库 so 文件，也是在这个区域里面，映射一块区域到 so 文件
+    unsigned long mmap_base;  /* base of mmap area */
+    // 总共映射的页的数目
+    unsigned long total_vm;    /* Total pages mapped */
+    // 被锁定不能换出
+    unsigned long locked_vm;  /* Pages that have PG_mlocked set */
+    // 不能换出，也不能移动
+    unsigned long pinned_vm;  /* Refcount permanently increased */
+    // 存放数据的页的数目
+    unsigned long data_vm;    /* VM_WRITE & ~VM_SHARED & ~VM_STACK */
+    // 存放可执行文件的页的数目
+    unsigned long exec_vm;    /* VM_EXEC & ~VM_WRITE & ~VM_STACK */
+    // 栈所占的页的数目
+    unsigned long stack_vm;    /* VM_STACK */
+    // start_code 和 end_code 表示可执行代码的开始和结束位置，start_data 和 end_data 表示已初始化数据的开始位置和结束位置
+    unsigned long start_code, end_code, start_data, end_data;
+    // start_brk 是堆的起始位置，brk 是堆当前的结束位置，start_stack 是栈的起始位置，栈的结束位置在寄存器的栈顶指针中
+    unsigned long start_brk, brk, start_stack;
+    // arg_start 和 arg_end 是参数列表的位置， env_start 和 env_end 是环境变量的位置。都位于栈中最高地址的地方
+    unsigned long arg_start, arg_end, env_start, env_end;
+    ```
+
+    - mm_struct 中有映射页的统计信息(总页数, 锁定页数, 数据/代码/栈映射页数等)以及各区域地址
+    - 有 vm_area_struct 描述各个区域(代码/数据/栈等)的属性(包含起始/终止地址, 可做的操作等), 通过链表和红黑树管理
+    - 在 load_elf_bianry 时做 vm_area_struct 与各区域的映射, 并将 elf 映射到内存, 将依赖 so 添加到内存映射
+
+    ![img](https://static001.geekbang.org/resource/image/7a/4c/7af58012466c7d006511a7e16143314c.jpeg)
+
+    - 在函数调用时会修改栈顶指针; malloc 分配内存时会修改对应的区域信息(调用 brk 堆; 或调用 mmap 内存映射)
+    - brk 判断是否需要分配新页, 并做对应操作; 需要分配新页时需要判断能否与其他 vm_area_struct 合并
+
+- 内核地址空间布局和管理
+    - 所有进程看到的内核虚拟地址空间是同一个
+    
+    ![img](https://static001.geekbang.org/resource/image/83/04/83a6511faf802014fbc2c02afc397a04.jpg)
+    
+    - 32 位系统, 内核态虚拟地址空间一共就 1G, 前 896MB 为直接映射区(虚拟地址 - 3G = 物理地址)
+        
+        - 直接映射区也需要建立页表, 通过虚拟地址访问(除了内存管理模块)
+        
+        ```
+        在内核里面，有两个宏:
+        __pa(vaddr) 返回与虚拟地址 vaddr 相关的物理地址
+        __va(paddr) 则计算出对应于物理地址 paddr 的虚拟地址
+        
+        具体的物理内存布局可以查看: /proc/iomem
+        ```
+        
+        - 直接映射区组成: 1MB 启动时占用; 然后是内核代码/全局变量/BSS等,即 内核 ELF文件内容; 进程 task_struct 即内核栈也在其中
+        - 896MB 也称为高端内存(指物理内存)
+        - 剩余虚拟空间组成: 8MB 空余; 内核动态映射空间(动态分配内存, 映射放在内核页表中); 持久内存映射(储存物理页信息); 固定内存映射; 临时内存映射(例如为进程映射文件时使用)
+        
+    - 64 位系统: 8T 空余; 64T 直接映射区域; 32T(动态映射); 1T(物理页描述结构 struct page); 512MB(内核代码, 也采用直接映射)
+
+![img](https://static001.geekbang.org/resource/image/7e/f6/7eaf620768c62ff53e5ea2b11b4940f6.jpg)
+
+进程运行状态在 32 位下对应关系:
+
+![img](https://static001.geekbang.org/resource/image/28/e8/2861968d1907bc314b82c34c221aace8.jpeg)
+
+进程运行状态在 64 位下对应关系:
+
+![img](https://static001.geekbang.org/resource/image/2a/ce/2ad275ff8fdf6aafced4a7aeea4ca0ce.jpeg)
+
