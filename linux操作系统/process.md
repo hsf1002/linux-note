@@ -934,3 +934,65 @@ cat /proc/$pid/map		// mac下不行
 
 ![img](https://static001.geekbang.org/resource/image/2a/ce/2ad275ff8fdf6aafced4a7aeea4ca0ce.jpeg)
 
+### 物理内存的组织方式
+
+
+
+ - 每个物理页由 struct page 表示
+    
+    ![img](https://static001.geekbang.org/resource/image/8f/49/8f158f58dda94ec04b26200073e15449.jpeg)
+    
+    - 物理页连续, page 放入一个数组中, 称为平坦内存模型
+    - 多个 CPU 通过总线访问内存, 称为 SMP 对称多处理器(采用平坦内存模型, 总线成为瓶颈)
+    - 每个 CPU 都有本地内存, 访问内存不用总线, 称为 NUMA 非一致内存访问
+    - 本地内存称为 NUMA 节点, 本地内存不足可以向其他节点申请
+    - NUMA 采用非连续内存模型，页号不连续
+    - 另外若内存支持热插拔，则采用稀疏内存模型
+    
+- 节点
+    - 用 pglist_data 表示 NUMA 节点，多个节点信息保存在 node_data 数组中
+    - pglist_data 包括 id，page 数组,起始页号, 总页数, 可用页数
+    - 节点分为多个区域 zone, 包括 DMA; 直接映射区; 高端内存区; 可移动区(避免内存碎片)
+    
+    ```
+    enum zone_type {
+    #ifdef CONFIG_ZONE_DMA
+    // CPU 只需向 DMA 控制器下达指令，让 DMA 控制器来处理数据的传送，数据传送完毕再把信息反馈给 CPU，这样就可以解放 CPU
+      ZONE_DMA,
+    #endif
+    #ifdef CONFIG_ZONE_DMA32
+    // 对于 64 位系统，有两个 DMA 区域。除了上面说的 ZONE_DMA，还有 ZONE_DMA32
+      ZONE_DMA32,
+    #endif
+    // 直接映射区
+      ZONE_NORMAL,
+    #ifdef CONFIG_HIGHMEM
+    // 高端内存区
+      ZONE_HIGHMEM,
+    #endif
+    // 可移动区域，通过将物理内存划分为可移动分配区域和不可移动分配区域来避免内存碎片
+      ZONE_MOVABLE,
+      __MAX_NR_ZONES
+    };
+    ```
+    
+- 区域 zone
+    
+    - 用 zone 表示; 包含第一个页页号; 区域总页数; 区域实际页数; 被伙伴系统管理的页数; 用 per_cpu_pageset 区分冷热页(热页, 被 CPU 缓存的页)
+    - 内存分成了节点，把节点分成了区域
+    
+- 页
+    - 组成物理内存的基本单位, 用 struct page 表示, 有多种使用模式, 因此 page 结构体多由 union 组成
+    - 使用一整个页: 1) 直接和虚拟地址映射(匿名页); 2) 与文件关联再与虚拟地址映射(内存映射文件)
+        - page 记录: 标记用于内存映射; 指向该页的页表数; 换出页的链表; 复合页, 用于合成大页;
+    - 分配小块内存:
+        - Linux 采用 slab allocator 技术; 申请一整页, 分为多个小块存储池, 用队列维护其状态(较复杂)
+        - slub allocator 更简单
+        - slob allocator 用于嵌入式
+        - page 记录: 第一个 slab 对象; 空闲列表; 待释放列表
+    
+- 页分配
+    - 分配较大内存(页级别), 使用伙伴系统
+    - Linux 把空闲页分组为 11 个页块链表, 链表管理大小不同的页块(页大小 2^i * 4KB)
+    - 分配大页剩下的内存, 插入对应空闲链表
+    - alloc_pages->alloc_pages_current 用 gfp 指定在哪个 zone 分配
