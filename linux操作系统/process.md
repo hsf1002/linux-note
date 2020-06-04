@@ -936,8 +936,6 @@ cat /proc/$pid/map		// mac下不行
 
 ### 物理内存的组织方式
 
-
-
  - 每个物理页由 struct page 表示
     
     ![img](https://static001.geekbang.org/resource/image/8f/49/8f158f58dda94ec04b26200073e15449.jpeg)
@@ -993,6 +991,62 @@ cat /proc/$pid/map		// mac下不行
     
 - 页分配
     - 分配较大内存(页级别), 使用伙伴系统
-    - Linux 把空闲页分组为 11 个页块链表, 链表管理大小不同的页块(页大小 2^i * 4KB)
+    - Linux 中的内存管理的“页”大小为 4KB。把所有的空闲页分组为 11 个页块链表，每个块链表分别包含很多个大小的页块，有 1、2、4、8、16、32、64、128、256、512 和 1024 个连续页的页块。最大可以申请 1024 个连续页，对应 4MB 大小的连续内存。每个页块的第一个页的物理地址是该页块大小的整数倍
+    
+    ![img](https://static001.geekbang.org/resource/image/27/cf/2738c0c98d2ed31cbbe1fdcba01142cf.jpeg)
+    
     - 分配大页剩下的内存, 插入对应空闲链表
     - alloc_pages->alloc_pages_current 用 gfp 指定在哪个 zone 分配
+
+如果有多个 CPU，就有多个节点。每个节点用 struct pglist_data 表示，放在一个数组里面。每个节点分为多个区域，每个区域用 struct zone 表示，也放在一个数组里面。每个区域分为多个页。为了方便分配，空闲页放在 struct free_area 里面，使用伙伴系统进行管理和分配，每一页用 struct page 表示
+
+![img](https://static001.geekbang.org/resource/image/3f/4f/3fa8123990e5ae2c86859f70a8351f4f.jpeg)
+
+### 小内存的分配
+
+- 小内存分配, 例如分配 task_struct 对象
+    - 会调用 kmem_cache_alloc_node 函数, 从 task_struct 缓存区域 task_struct_cachep(在系统初始化时, 由 kmem_cache_create 创建) 分配一块内存
+    - 使用 task_struct 完毕后, 调用 kmem_cache_free 回收到缓存池中
+    - struct kmem_cache 用于表示缓存区信息, 缓存区即分配连续几个页的大块内存, 再切成小内存
+    - 小内存即缓存区的每一项, 都由对象和指向下一项空闲小内存的指针组成(随机插入/删除+快速查找空闲)
+    - struct kmem_cache 中三个 kmem_cache_order_objects 表示不同的需要分配的内存块大小的阶数和对象数
+    
+    ![img](https://static001.geekbang.org/resource/image/45/0a/45f38a0c7bce8c98881bbe8b8b4c190a.jpeg)
+    
+    - 分配缓存的小内存块由两个路径 fast path 和 slow path , 分别对应 struct kmem_cache 中的 kmem_cache_cpu 和 kmem_cache_node, 分配时先从 kmem_cache_cpu 分配, 若其无空闲, 再从 kmem_cache_node 分配, 还没有就从伙伴系统申请新内存块
+    - struct kmem_cache_cpu 中
+        - page 指向大内存块的第一个页, freelist 指向大内存块中第一个空闲项, partial 指向另一个大内存块的第一个页, 但该内存块有部分已分配出去, 当 page 满后, 在 partial 中找
+    - struct kmem_cache_node
+        - 也有 partial, 是一个链表, 存放部分空闲的多个大内存块, 若 kmem_cacche_cpu 中的 partial 也无空闲, 则在这找
+    - 分配过程
+        - kmem_cache_alloc_node->slab_alloc_node
+        - 快速通道, 取出 kmem_cache_cpu 的 freelist , 若有空闲直接返回
+        - 普通通道, 若 freelist 无空闲, 调用 `__slab_alloc`
+        - `__slab_alloc` 会重新查看 freelist, 若还不满足, 查看 kmem_cache_cpu 的 partial
+        - 若 partial 不为空, 用其替换 page, 并重新检查是否有空闲
+        - 若还是无空闲, 调用 new_slab_objects
+        - new_slab_objects 根据节点 id 找到对应 kmem_cache_node , 调用 get_partial_node
+        - 首先从 kmem_cache_node 的 partial 链表拿下一大块内存, 替换 kmem_cache_cpu 的 page, 再取一块替换 kmem_cache_cpu 的 partial
+        - 若 kmem_cache_node 也没有空闲, 则在 new_slab_objects 中调用 new_slab->allocate_slab->alloc_slab_page 根据某个 kmem_cache_order_objects 设置申请大块内存
+- 页面换出
+    - 触发换出:
+        * 分配内存时发现没有空闲; 调用 `get_page_from_freelist->node_reclaim->__node_reclaim->shrink_node`
+        * 内存管理主动换出, 由内核线程 kswapd 实现, kswapd 在内存不紧张时休眠, 在内存紧张时检测内存 调用 balance_pgdat->kswapd_shrink_node->shrink_node
+    - 页面都挂在 lru 链表中, 页面有两种类型: 匿名页; 文件内存映射页
+    - 每一类有两个列表: active 和 inactive 列表, 要换出时, 从 inactive 列表中找到最不活跃的页换出
+    - 更新列表, shrink_list 先缩减 active 列表, 再缩减不活跃列表
+    - 缩减不活跃列表时对页面进行回收:
+        - 匿名页回收: 分配 swap, 将内存也写入文件系统
+        - 文件内存映射页: 将内存中的文件修改写入文件中
+
+![img](https://static001.geekbang.org/resource/image/52/54/527e5c861fd06c6eb61a761e4214ba54.jpeg)
+
+对于物理内存来讲，从下层到上层的关系及分配模式如下：
+
+1. 物理内存分 NUMA 节点，分别进行管理
+2. 每个 NUMA 节点分成多个内存区域
+3. 每个内存区域分成多个物理页面
+4. 伙伴系统将多个连续的页面作为一个大的内存块分配给上层
+5. kswapd 负责物理页面的换入换出
+6. Slub Allocator 将从伙伴系统申请的大内存块切成小块，分配给其他系统
+
