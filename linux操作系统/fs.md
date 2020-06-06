@@ -182,3 +182,48 @@ do_last() 在查找 dentry 的时候，先从缓存中查找，调用的是 look
 
 ### 文件缓存
 
+##### 系统调用层和虚拟文件系统层
+
+` read -> vfs_read -> __vfs_read,  write -> vfs_write->__vfs_write`
+
+清除缓存：
+
+```
+sync; echo 1 > /proc/sys/vm/drop_caches
+```
+
+##### ext4 文件系统层
+
+`ext4_file_read_iter -> generic_file_read_iter，ext4_file_write_iter -> __generic_file_write_iter`
+
+根据是否使用内存做缓存，可以把文件的 I/O 操作分为两种类型：
+
+* 第一种类型是缓存 I/O：大多数文件系统的默认 I/O 操作都是缓存 I/O。对于读操作来讲，操作系统会先检查，内核的缓冲区有没有需要的数据。如果已经缓存了，那就直接从缓存中返回；否则从磁盘中读取，然后缓存在操作系统的缓存中。对于写操作来讲，操作系统会先将数据从用户空间复制到内核空间的缓存中。这时对用户程序来说，写操作就已经完成。至于什么时候再写到磁盘中由操作系统决定，除非显式地调用了 sync 同步命令
+* 第二种类型是直接 IO：应用程序直接访问磁盘数据，而不经过内核缓冲区，从而减少了在内核缓存和用户程序之间数据复制
+
+##### 带缓存的写入操作
+
+generic_perform_write是一个 while 循环。找出这次写入影响的所有的页，然后依次写入。对于每一个循环，主要做四件事情：
+
+1. 对于每一页，先调用 address_space 的 write_begin 做一些准备
+   * 日志**（Journal）**模式：日志文件系统比非日志文件系统多了一个 Journal 区域。文件在 ext4 中分两部分存储，一部分是文件的元数据，另一部分是数据。元数据和数据的操作日志 Journal 也是分开管理的。可以在挂载 ext4 的时候，选择 Journal 模式。这种模式在将数据写入文件系统前，必须等待元数据和数据的日志已经落盘才能发挥作用。性能比较差，但是最安全
+   * order 模式：不记录数据的日志，只记录元数据的日志，但是在写元数据的日志前，必须先确保数据已经落盘。这个折中，是默认模式
+   * writeback：不记录数据的日志，仅记录元数据的日志，并且不保证数据比元数据先落盘。性能最好，但是最不安全
+2. 调用 iov_iter_copy_from_user_atomic，将写入的内容从用户态拷贝到内核态的页中
+3. 调用 address_space 的 write_end 完成写操作
+4. 调用 balance_dirty_pages_ratelimited，看脏页是否太多，需要写回硬盘。所谓脏页，就是写入到缓存，但是还没有写入到硬盘的页面
+
+触发回写的场景：
+
+1. 调用 write 的最后，发现缓存的数据太多
+2. 用户主动调用 sync，将缓存刷到硬盘上去，最终会调用 wakeup_flusher_threads，同步脏页
+3. 当内存十分紧张，以至于无法分配页面的时候，会调用 free_more_memory，最终会调用 wakeup_flusher_threads，释放脏页
+4. 脏页已经更新了较长时间，时间上超过了 timer，需要及时回写，保持内存和磁盘上数据一致性
+
+##### 带缓存的读操作
+
+generic_file_buffered_read，需要先找到 page cache 里面是否有缓存页。如果没有找到，不但读取这一页，还要进行预读，需要在 page_cache_sync_readahead 函数中实现。预读完了以后，再试一把查找缓存页，应该能找到了。如果第一次找缓存页就找到了，还是要判断，是不是应该继续预读；如果需要，就调用 page_cache_async_readahead 发起一个异步预读。最后，copy_page_to_iter 会将内容从内核缓存页拷贝到用户内存空间
+
+![img](https://static001.geekbang.org/resource/image/0c/65/0c49a870b9e6441381fec8d9bf3dee65.png)
+
+在系统调用层调用 read 和 write。在 VFS 层调用的是 vfs_read 和 vfs_write 并且调用 file_operation。在 ext4 层调用的是 ext4_file_read_iter 和 ext4_file_write_iter。接下来就是分叉。缓存 I/O 和直接 I/O。直接 I/O 读写的流程是一样的，调用 ext4_direct_IO，再往下就调用块设备层。缓存 I/O 读写的流程不一样。对于读，从块设备读取到缓存中，然后从缓存中拷贝到用户态。对于写，从用户态拷贝到缓存，设置缓存页为脏，然后启动一个线程写入块设备
