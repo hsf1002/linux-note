@@ -1107,3 +1107,47 @@ cat /proc/$pid/map		// mac下不行
 * 如果是匿名映射则分配物理内存；如果是 swap，则将 swap 文件读入；如果是文件映射，则将文件读入
 
 ![img](https://static001.geekbang.org/resource/image/78/44/78d351d0105c8e5bf0e49c685a2c1a44.jpg)
+
+### 内核页表
+
+    - 内存映射函数 vmalloc, kmap_atomic
+    - 内核态页表存放位置和工作流程
+    - 内核态缺页异常处理
+- 内核态页表, 系统初始化时就创建
+    - swapper_pg_dir 指向内核顶级页目录 pgd
+        - xxx_ident/kernel/fixmap_pgt 分别是直接映射/内核代码/固定映射的 xxx 级页表目录
+    - 创建内核态页表
+        - swapper_pg_dir 指向 init_top_pgt, 是 ELF 文件的全局变量, 因此在内存管理初始化之前就存在
+        - init_top_pgt 先初始化了三项
+            - 第一项指向 level3_ident_pgt (内核代码段的某个虚拟地址) 减去 __START_KERNEL_MAP (内核代码起始虚拟地址) 得到实际物理地址
+            - 第二项也是指向 level3_ident_pgt
+            - 第三项指向 level3_kernel_pgt 内核代码区
+    
+    ![img](https://static001.geekbang.org/resource/image/78/6d/78c8d44d7d8c08c03eee6f7a94652d6d.png)
+    
+    - 初始化各页表项, 指向下一集目录
+        - 页表覆盖范围较小, 内核代码 512MB, 直接映射区 1GB
+        - 内核态也定义 mm_struct 指向 swapper_pg_dir
+        - 初始化内核态页表, start_kernel→ setup_arch
+            - load_cr3(swapper_pg_dir) 并刷新 TLB
+            - 调用 init_mem_mapping→kernel_physical_mapping_init, 用 __va 将物理地址映射到虚拟地址, 再创建映射页表项
+            - CPU 在保护模式下访问虚拟地址都必须通过 cr3, 系统只能照做，在 load_cr3 之前, 通过 early_top_pgt 完成映射
+- vmalloc 和 kmap_atomic
+    - 内核的虚拟地址空间 vmalloc 区域用于映射
+    - kmap_atomic 临时映射
+        - 32 位, 调用 set_pte 通过内核页表临时映射
+        - 64 位, 调用 page_address→lowmem_page_address 进行映射
+- 内核态缺页异常
+    - kmap_atomic 直接创建页表进行映射
+    - vmalloc 只分配内核虚拟地址, 访问时触发缺页中断, 调用 do_page_fault→vmalloc_fault 用于关联内核页表项
+- kmem_cache 和 kmalloc 用于保存内核数据结构, 不会被换出; 而内核 vmalloc 会被换出
+
+整个内存管理的体系：
+
+* 物理内存根据 NUMA 架构分节点。每个节点再分区域。每个区域再分页。物理页面通过伙伴系统进行分配。分配的物理页面要变成虚拟地址让上层可以访问，kswapd 可以根据物理页面的使用情况对页面进行换入换出
+* 对于内存的分配需求，可能来自内核态，也可能来自用户态
+* 对于内核态，kmalloc 在分配大内存的时候，以及 vmalloc 分配不连续物理页的时候，直接使用伙伴系统，分配后转换为虚拟地址，访问的时候需要通过内核页表进行映射。对于 kmem_cache 以及 kmalloc 分配小内存，则使用 slub 分配器，将伙伴系统分配出来的大块内存切成一小块一小块进行分配。kmem_cache 和 kmalloc 的部分不会被换出，因为用这两个函数分配的内存多用于保持内核关键的数据结构。内核态中 vmalloc 分配的部分会被换出，因而当访问的时候，发现不在，就会调用 do_page_fault
+* 对于用户态的内存分配，或者直接调用 mmap 系统调用分配，或者调用 malloc。调用 malloc 的时候，如果分配小的内存，就用 sys_brk 系统调用；如果分配大的内存，还是用 sys_mmap 系统调用。正常情况下，用户态的内存都是可以换出的，因而一旦发现内存中不存在，就会调用 do_page_fault
+
+![img](https://static001.geekbang.org/resource/image/27/9a/274e22b3f5196a4c68bb6813fb643f9a.png)
+
