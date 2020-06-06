@@ -124,3 +124,61 @@ ln [参数][源文件或目录][目标文件或目录]
 * 软链接：相当于重新创建了一个文件。也有独立的 inode，打开这个文件看里面内容的时候指向另外的一个文件。可以跨文件系统，甚至目标文件被删除了，链接文件还是在的，只不过指向的文件找不到了而已
 
 ![img](https://static001.geekbang.org/resource/image/f8/38/f81bf3e5a6cd060c3225a8ae1803a138.png)
+
+### 虚拟文件系统
+
+![img](https://static001.geekbang.org/resource/image/3c/73/3c506edf93b15341da3db658e9970773.jpg)
+
+##### 挂载文件系统
+
+内核是不是支持某种类型的文件系统，需要进行注册register_filesystem才能知道，如果一种文件系统的类型曾经在内核注册过，这就说明允许挂载并且使用这个文件系统，调用链为：do_mount->do_new_mount->vfs_kern_mount
+
+![img](https://static001.geekbang.org/resource/image/66/27/663b3c5903d15fd9ba52f6d049e0dc27.jpeg)
+
+1. 第一层：根目录 / 对应一个 dentry（虽然叫作 directory entry，但不仅仅表示文件夹，也表示文件），根目录是在根文件系统上的，根文件系统是系统启动的时候挂载的，因而有一个 mount 结构。这个 mount 结构的 mount point 指针和 mount root 指针都是指向根目录的 dentry。根目录对应的 file 的两个指针，一个指向根目录的 dentry，一个指向根目录的挂载结构 mount
+2. 第二层：目录 home 对应了两个 dentry，它们的 parent 都指向第一层的 dentry。因为文件系统 A 挂载到了这个目录下。这个目录有两个用处。一方面，home 是根文件系统的一个挂载点；另一方面，home 是文件系统 A 的根目录，因为还有一次挂载，又有了一个 mount 结构。 mount point 指针指向作为挂载点的那个 dentry。mount root 指针指向作为根目录的那个 dentry，同时 parent 指针指向第一层的 mount 结构。home 对应的 file 的两个指针，一个指向文件系统 A 根目录的 dentry，一个指向文件系统 A 的挂载结构 mount
+3. 第三层：目录 hello 又挂载了一个文件系统 B，第三层的结构和第二层几乎一样
+4. 第四层：目录 world 就是一个普通的目录。只要它的 dentry 的 parent 指针指向上一层就可以了。world 对应的 file 结构。由于挂载点不变，还是指向第三层的 mount 结构
+5. 第五层：对于文件 data，是一个普通的文件，它的 dentry 的 parent 指向第四层的 dentry。对于 data 对应的 file 结构，由于挂载点不变，还是指向第三层的 mount 结构
+
+##### 打开文件
+
+do_sys_open
+
+1. 首先要通过 get_unused_fd_flags 得到一个没有用的文件描述符
+
+2. do_sys_open 中调用 do_filp_open，就是创建这个 struct file 结构，然后 fd_install(fd, f) 是将文件描述符和这个结构关联起来
+
+3. 接下来就调用 path_openat，主要做了以下几件事情
+
+   * get_empty_filp 生成一个 struct file 结构
+   * path_init 初始化 nameidata，准备开始节点路径查找
+   * link_path_walk 对于路径名逐层进行节点路径查找，这里面有一个大的循环，用“/”分隔逐层处理
+   * do_last 获取文件对应的 inode 对象，并且初始化 file 对象
+
+   例如，文件“/root/hello/world/data”，link_path_walk 会解析前面的路径部分“/root/hello/world”，解析完毕的时候 nameidata 的 dentry 为路径名的最后一部分的父目录“/root/hello/world”，而 nameidata 的 filename 为路径名的最后一部分“data”
+
+4. do_last需要先查找文件路径最后一部分对应的 dentry。Linux 为了提高目录项对象的处理效率，设计与实现了目录项高速缓存 dentry cache，简称 dcache。主要由两个数据结构组成
+
+   * 哈希表 dentry_hashtable：dcache 中的所有 dentry 对象都通过 d_hash 指针链到相应的 dentry 哈希链表中
+   * 未使用的 dentry 对象链表 s_dentry_lru：dentry 对象通过其 d_lru 指针链入 LRU 链表中。有它，就说明长时间不使用，就应该释放了
+
+![img](https://static001.geekbang.org/resource/image/82/59/82dd76e1e84915206eefb8fc88385859.jpeg)
+
+这两个列表之间会产生复杂的关系：
+
+* 引用为 0：一个在散列表中的 dentry 变成没有引用了，就会被加到 LRU 表中去
+* 再次被引用：一个在 LRU 表中的 dentry 再次被引用了，则从 LRU 表中移除
+* 分配：当 dentry 在散列表中没有找到，则从 Slub 分配器中分配一个
+* 过期归还：当 LRU 表中最长时间没有使用的 dentry 应该释放回 Slub 分配器
+* 文件删除：文件被删除了，相应的 dentry 应该释放回 Slub 分配器
+* 结构复用：当需要分配一个 dentry，但是无法分配新的，就从 LRU 表中取出一个来复用
+
+do_last() 在查找 dentry 的时候，先从缓存中查找，调用的是 lookup_fast。如果缓存中没有找到，就需要真的到文件系统里面去找，lookup_open 会创建一个新的 dentry，并且调用上一级目录的 Inode 的 inode_operations 的 lookup 函数，对于 ext4 来讲，调用的是 ext4_lookup
+
+5. do_last() 的最后一步是调用 vfs_open 真正打开文件
+
+![img](https://static001.geekbang.org/resource/image/80/b9/8070294bacd74e0ac5ccc5ac88be1bb9.png)
+
+### 文件缓存
+
