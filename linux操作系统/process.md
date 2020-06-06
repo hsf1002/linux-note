@@ -1050,3 +1050,60 @@ cat /proc/$pid/map		// mac下不行
 5. kswapd 负责物理页面的换入换出
 6. Slub Allocator 将从伙伴系统申请的大内存块切成小块，分配给其他系统
 
+### 用户态内存映射
+
+- 申请小块内存用 brk; 申请大块内存或文件映射用 mmap
+- mmap 映射文件, 由 fd 得到 struct file，内存映射不仅仅是物理内存和虚拟内存之间的映射，还包括将文件中的内容映射到虚拟内存空间
+    - 调用 ...->do_mmap
+        - 调用 get_unmapped_area 找到一个可以进行映射的 vm_area_struct再调用 mmap_region 进行映射
+    - get_unmapped_area
+        - 匿名映射: 找到前一个 vm_area_struct
+        - 文件映射: 调用 file 中 file_operations 文件的相关操作, 最终也会调用到 get_unmapped_area
+    - mmap_region
+        - 通过 vm_area_struct 判断, 能否基于现有的块扩展(调用 vma_merge)
+        - 若不能, 调用 kmem_cache_alloc 在 slub 中得到一个 vm_area_struct 并进行设置
+        - 若是文件映射：则调用 file_operations 的 mmap 将 vm_area_struct 的内存操作设置为文件系统对应操作(读写内存就是读写文件系统)，通过 vma_link 将 vm_area_struct 插入红黑树，调用 __vma_link_file 建立文件到内存的反映射
+- 内存管理不直接分配内存, 在使用时才分配
+- 用户态缺页异常, 触发缺页中断, 调用 do_page_default
+- __do_page_fault 判断中断是否发生在内核
+    - 若发生在内核, 调用 vmalloc_fault, 使用内核页表进行映射
+    - 若不是, 找到对应 vm_area_struct 调用 handle_mm_fault
+    
+    ![img](https://static001.geekbang.org/resource/image/9b/f1/9b802943af4e3ae80ce4d0d7f2190af1.jpg)
+    
+    - 得到多级页表地址 pgd 等, pgd 存在 task_struct.mm_struct.pgd 中. pgd_t 用于全局页目录项，pud_t 用于上层页目录项，pmd_t 用于中间页目录项，pte_t 用于直接页表项
+    - 全局页目录项 pgd 在创建进程 task_struct 时创建并初始化, 会调用 pgd_ctor 拷贝内核页表到进程的页表
+- 进程被调度运行时, 通过 switch_mm_irqs_off->load_new_mm_cr3 切换内存上下文, cr3 是 cpu 寄存器, 存储进程 pgd 的物理地址(load_new_mm_cr3 加载时通过直接内存映射进行转换), cpu 访问进程虚拟内存时, 从 cr3 得到 pgd 页表, 最后得到进程访问的物理地址
+- 进程地址转换发生在用户态, 缺页时才进入内核态(调用__handle_mm_fault)
+- __handle_mm_fault 调用 pud_alloc, pmd_alloc创建相应的页目录项, handle_pte_fault 分配页表项
+    - 若不存在 pte(页表项)
+        - 匿名页: 调用 do_anonymous_page 分配物理页 ①
+        - 文件映射: 调用 do_fault ②
+    - 若存在 pte, 调用 do_swap_page 换入内存 ③
+    - ① 为匿名页分配内存
+        - 调用 pte_alloc 分配 pte 页表项
+        - 调用 ...->__alloc_pages_nodemask 分配物理页
+        - mk_pte 页表项指向物理页; set_pte_at 插入页表项
+    - ② 为文件映射分配内存 __do_fault
+        - 以 ext4 为例, 调用 ext4_file_fault->filemap_fault, 文件映射一般有物理页作为缓存 find_get_page 找缓存页
+        - 若有缓存页, 调用函数预读数据到内存
+        - 若无缓存页, 调用 page_cache_read 分配一个, 加入 lru 队列, 调用 readpage 读数据: 调用 kmap_atomic 将物理内存映射到内核临时映射空间, 由内核读取文件, 再调用 kunmap_atomic 解映射
+        - 本来把物理内存映射到用户虚拟地址空间，不需要在内核里面映射一把。现在因为要从文件里面读取数据并写入这个物理页面，又不能使用物理地址，只能使用虚拟地址，就需要在内核里面临时映射
+    - ③ do_swap_page
+        - 先检查对应 swap 有没有缓存页
+        - 没有, 读入 swap 文件(也是调用 readpage), 调用 mk_pte; set_pet_at; swap_free(清理 swap)
+- 避免每次都需要经过页表(存再内存中)访问内存
+    
+    - TLB 缓存部分页表项的副本, 称为快表，专门用来做地址映射的硬件设备。它不在内存中，可存储的数据比较少，但是比内存要快。所以 TLB 就是页表的 Cache
+
+![img](https://static001.geekbang.org/resource/image/94/b3/94efd92cbeb4d4ff155a645b93d71eb3.jpg)
+
+用户态的内存映射机制包含以下几个部分：
+
+* 用户态内存映射函数 mmap，包括用它来做匿名映射和文件映射
+
+* 用户态的页表结构，存储位置在 mm_struct 中
+* 在用户态访问没有映射的内存会引发缺页异常，分配物理页表、补齐页表
+* 如果是匿名映射则分配物理内存；如果是 swap，则将 swap 文件读入；如果是文件映射，则将文件读入
+
+![img](https://static001.geekbang.org/resource/image/78/44/78d351d0105c8e5bf0e49c685a2c1a44.jpg)
