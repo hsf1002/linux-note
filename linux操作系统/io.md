@@ -96,3 +96,138 @@ mknod filename type major minor
 
 ![img](https://static001.geekbang.org/resource/image/80/7f/80e152fe768e3cb4c84be62ad8d6d07f.jpg)
 
+### 字符设备
+
+输入字符设备，鼠标，代码 drivers/input/mouse/logibm
+
+输出字符设备，打印机，代码 drivers/char/lp.c 
+
+##### 内核模块
+
+设备驱动程序是一个内核模块，以 ko 的文件形式存在，可以通过 insmod 加载到内核中，主要步骤：
+
+1. 头文件部分。一般的内核模块，都需要 include 下面两个头文件：
+
+```
+#include <linux/module.h>
+#include <linux/init.h>
+```
+
+2. 定义一些用于处理内核模块的主要逻辑。例如打开、关闭、读取、写入设备的函数或者响应中断的函数
+3. 定义一个 file_operations 结构，lp.c 里面就定义了这样一个结构
+
+```
+static const struct file_operations lp_fops = {
+  .owner    = THIS_MODULE,
+  .write    = lp_write,
+  .unlocked_ioctl  = lp_ioctl,
+#ifdef CONFIG_COMPAT
+  .compat_ioctl  = lp_compat_ioctl,
+#endif
+  .open    = lp_open,
+  .release  = lp_release,
+#ifdef CONFIG_PARPORT_1284
+  .read    = lp_read,
+#endif
+  .llseek    = noop_llseek,
+};
+```
+
+在 logibm.c 里面，找不到这样的结构，是因为它属于众多输入设备的一种，而输入设备的操作被统一定义在 drivers/input/input.c 里面，logibm.c 只是定义了一些自己独有的操作
+
+```
+static const struct file_operations input_devices_fileops = {
+  .owner    = THIS_MODULE,
+  .open    = input_proc_devices_open,
+  .poll    = input_proc_devices_poll,
+  .read    = seq_read,
+  .llseek    = seq_lseek,
+  .release  = seq_release,
+};
+```
+
+4. 定义整个模块的初始化函数和退出函数，用于加载和卸载这个 ko 的时候调用
+5. 调用 module_init 和 module_exit，分别指向上面两个初始化函数和退出函数
+6. 声明一下 lisense，调用 MODULE_LICENSE
+
+##### 打开字符设备
+
+![img](https://static001.geekbang.org/resource/image/2e/e6/2e29767e84b299324ea7fc524a3dcee6.jpeg)
+
+字符设备可不是一个普通的内核模块，它有自己独特的行为，要使用一个字符设备：
+
+1. 首先要把写好的内核模块，通过 insmod 加载进内核。此时先调用的是 module_init 调用的初始化函数，注册这个字符设备。__register_chrdev_region，注册字符设备的主次设备号和名称，然后分配一个 struct cdev 结构，将 cdev 的 ops 成员变量指向这个模块声明的 file_operations。然后，cdev_add 会将这个字符设备添加到内核中一个叫作 struct kobj_map *cdev_map 的结构，来统一管理所有字符设备
+2. 接下来要通过 mknod 在 /dev 下面创建一个设备文件，有了这个设备文件，才能通过文件系统的接口，对这个设备文件进行操作，mknod 是一个系统调用，会在文件系统上，顺着路径找到 /dev/xxx 所在的文件夹，为这个新创建的设备文件创建一个 dentry。这是维护文件和 inode 之间的关联关系的结构。/dev 下面的文件系统的名称为 devtmpfs，在挂载的时候有两种模式， ramfs和shmem，都是基于内存的文件系统。最终调用init_special_inode
+3. 每一个打开的文件都有一个 struct file 结构，会指向一个 dentry 项。dentry 可以用来关联 inode。这个 dentry 就是mknod 的时候创建的。在进程里面调用 open 函数，最终会调用到这个特殊的 inode 的 open 函数，也就是 chrdev_open，这个 inode 的 i_cdev，是否已经关联到 cdev。如果第一次打开，当然没有。inode 里面有 i_rdev，即 dev_t。可以通过它在 cdev_map 中找 cdev。注册过了，所以肯定能够找到。找到后就将 inode 的 i_cdev，关联到找到的 cdev new，找到 cdev 里面有 file_operations，里面有 open 函数，真正打开设备
+
+##### 写入字符设备
+
+像打开一个文件一样打开一个字符设备之后，接下来就是对这个设备的读写。读写的过程是类似的，此处解析打印机的写入过程
+
+![img](https://static001.geekbang.org/resource/image/9b/e2/9bd3cd8a8705dbf69f889ba3b2b5c2e2.jpeg)
+
+1. 写入一个字符设备，就是用文件系统的标准接口 write，参数文件描述符 fd，在内核里面调用的 sys_write，在 sys_write 里面根据文件描述符 fd 得到 struct file 结构。接下来再调用 vfs_write，最终调用lp_write
+2. 先是调用 copy_from_user 将数据从用户态拷贝到内核态的缓存中，然后调用 parport_write 写入外部设备。还有一个 schedule 函数，也即写入的过程中，给其他线程抢占 CPU 的机会
+3. 如果 count 还是大于 0，也就是数据还没有写完，接着 copy_from_user 和 parport_write，直到写完为止
+
+##### 使用 IOCTL 控制设备
+
+ioctl 是一个系统调用
+
+![img](https://static001.geekbang.org/resource/image/c3/1d/c3498dad4f15712529354e0fa123c31d.jpeg)
+
+fd 是这个设备的文件描述符，cmd 是传给这个设备的命令，arg 是命令的参数。
+
+ cmd 看起来是一个 int，其实他的组成比较复杂：
+
+* 最低八位为 NR，是命令号
+* 然后八位是 TYPE，是类型
+* 然后十四位是参数的大小
+* 最高两位是 DIR，是方向，表示写入、读出，还是读写
+
+ioctl 中会调用 do_vfs_ioctl，对于已经定义好的 cmd，进行相应的处理。如果不是默认定义好的 cmd，则执行默认操作。对于普通文件，调用 file_ioctl；对于其他文件调用 vfs_ioctl，设备驱动程序，所以调用的是 vfs_ioctl，这里调用的是设备驱动的 unlocked_ioctl。对于打印机程序来讲，调用的是 lp_ioctl
+
+一个字符设备要能够工作，需要三部分配合：
+
+1. 第一，有一个设备驱动程序的 ko 模块，里面有模块初始化函数、中断处理函数、设备操作函数。这里面封装了对于外部设备的操作。加载设备驱动程序模块的时候，模块初始化函数会被调用。在内核维护所有字符设备驱动的数据结构 cdev_map 里面注册，就可以很容易根据设备号，找到相应的设备驱动程序
+2. 第二，在 /dev 目录下有一个文件表示这个设备，这个文件在特殊的 devtmpfs 文件系统上，也有相应的 dentry 和 inode。这里的 inode 是一个特殊的 inode，里面有设备号。通过它，可以在 cdev_map 中找到设备驱动程序，里面还有针对字符设备文件的默认操作 def_chr_fops
+3. 第三，打开一个字符设备文件和打开一个普通的文件有类似的数据结构，有文件描述符、有 struct file、指向字符设备文件的 dentry 和 inode。字符设备文件的相关操作 file_operations 一开始指向 def_chr_fops，在调用 def_chr_fops 里面的 chrdev_open 函数的时候，修改为指向设备操作函数，从而读写一个字符设备文件就会直接变成读写外部设备了
+
+![img](https://static001.geekbang.org/resource/image/fb/cd/fba61fe95e0d2746235b1070eb4c18cd.jpeg)
+
+##### 驱动中断程序
+
+鼠标就是通过中断，将自己的位置和按键信息，传递给设备驱动程序，logibm_interrupt
+
+```
+irqreturn_t (*irq_handler_t)(int irq, void * dev_id);
+```
+
+* irq 是一个整数，是中断信号
+
+* dev_id 是一个 void * 的通用指针，主要用于区分同一个中断处理函数对于不同设备的处理
+* 返回值有三种：IRQ_NONE 表示不是我的中断；IRQ_HANDLED 表示处理完了的中断；IRQ_WAKE_THREAD 表示有一个进程正在等待这个中断，中断处理完了，应该唤醒它
+
+1. 注册中断处理函数：
+
+```
+request_irq(logibm_irq, logibm_interrupt, 0, "logibm", NULL)
+```
+
+2. 每一个中断，都有一个对中断的描述结构 struct irq_desc。它有一个重要的成员变量是 struct irqaction，用于表示处理这个中断的动作。它里面有 next 指针，这是一个链表，对于这个中断的所有处理动作，都串在这个链表上。一般情况下，所有的 struct irq_desc 都放在一个数组里面，直接按下标查找就可以。如果配置了 CONFIG_SPARSE_IRQ，中断号是不连续的，就不适合用数组保存了，可以放在一棵基数树上。这种结构对于从某个整型 key 找到 value 速度很快，中断信号 irq 是这个整数。很快就能定位到对应的 struct irq_desc。为什么中断信号会有稀疏，也就是不连续的情况呢？这里的 irq 并不是真正的、物理的中断信号，而是一个抽象的、虚拟的中断信号。因为物理的中断信号和硬件关联比较大，中断控制器也是各种各样的。因而就需要有一层中断抽象层。这里虚拟中断信号到中断描述结构的映射，就是抽象中断层的主要逻辑。如果只有一个 CPU，一个中断控制器，则基本能够保证从物理中断信号到虚拟中断信号的映射是线性的，这样用数组表示就没啥问题，但是如果有多个 CPU，多个中断控制器，每个中断控制器各有各的物理中断信号，就没办法保证虚拟中断信号是连续的，所以就要用到基数树了
+
+3. request_irq就是根据中断信号 irq，找到基数树上对应的 irq_desc，然后将新的 irqaction 挂在链表上
+4. 真正中断的发生还是要从硬件开始，这里面有四个层次：
+   * 第一个层次是外部设备给中断控制器发送物理中断信号
+   * 第二个层次是中断控制器将物理中断信号转换成为中断向量 interrupt vector，发给各个 CPU
+   * 第三个层次是每个 CPU 都会有一个中断向量表，根据 interrupt vector 调用一个 IRQ 处理函数。注意这里的 IRQ 处理函数还不是上面指定的 irq_handler_t，到这一层还是 CPU 硬件的要求
+   * 第四个层次是在 IRQ 处理函数中，将 interrupt vector 转化为抽象中断层的中断信号 irq，调用中断信号 irq 对应的中断描述结构里面的 irq_handler_t
+
+![img](https://static001.geekbang.org/resource/image/dd/13/dd492efdcf956cb22ce3d51592cdc113.png)
+
+5. 从 CPU 收到中断向量开始分析。CPU 收到的中断向量定义在文件 arch/x86/include/asm/irq_vectors.h 中。CPU 能够处理的中断总共 256 个，用宏 NR_VECTOR 或者 FIRST_SYSTEM_VECTOR 表示。为了处理中断，CPU 硬件要求每一个 CPU 都有一个中断向量表，通过 load_idt 加载，里面记录着每一个中断对应的处理方法，这个中断向量表定义在文件 arch/x86/kernel/traps.c 中
+6. 一个 CPU 可以处理的中断被分为几个部分，第一部分 0 到 31 的前 32 位是系统陷入或者系统异常，这些错误无法屏蔽，一定要处理。这些中断的处理函数在系统初始化的时候，在 start_kernel 函数中调用过 trap_init()，当前 32 个中断都用 set_intr_gate 设置完毕。在中断向量表 idt_table 中填完了之后，trap_init 单独调用 set_intr_gate 来设置 32 位系统调用的中断，在 trap_init 的最后，将 idt_table 放在一个固定的虚拟地址上。在 start_kernel 调用完毕 trap_init 之后，还会调用 init_IRQ() 来初始化其他的设备中断，最终会调用到 native_init_IRQ。从第 32 个中断开始，到最后 NR_VECTORS 为止，对于 used_vectors 中没有标记为 1 的位置，都会调用 set_intr_gate 设置中断向量表
+7. 最终调用 do_IRQ，调用完毕后，就从中断返回。需要区分返回用户态还是内核态。这里会有一个机会触发抢占，do_IRQ 会根据中断向量 vector 得到对应的 irq_desc，然后调用 handle_irq。最终在__handle_irq_event_percpu 里面调用了 irq_desc 里每个 hander，这些 hander 在所有 action 列表中注册的，这才是设置的那个中断处理函数。如果返回值是 IRQ_HANDLED，就说明处理完毕；如果返回值是 IRQ_WAKE_THREAD 就唤醒线程
+
+![img](https://static001.geekbang.org/resource/image/26/8f/26bde4fa2279f66098856c5b2b6d308f.png)
+
