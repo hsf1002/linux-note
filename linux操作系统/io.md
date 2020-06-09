@@ -231,3 +231,69 @@ request_irq(logibm_irq, logibm_interrupt, 0, "logibm", NULL)
 
 ![img](https://static001.geekbang.org/resource/image/26/8f/26bde4fa2279f66098856c5b2b6d308f.png)
 
+### 块设备
+
+mknod 还是会创建在 /dev 路径下面，这一点和字符设备一样，块设备的打开往往不是直接调用设备文件的打开函数，而是调用 mount 来打开
+
+1. /dev 路径下面是 devtmpfs 文件系统。这是块设备遇到的第一个文件系统。为这个块设备文件分配一个特殊的 inode，这点和字符设备也一样。只不过字符设备走 S_ISCHR 这个分支，对应 inode 的 file_operations 是 def_chr_fops；而块设备走 S_ISBLK 这个分支，对应的 inode 的 file_operations 是 def_blk_fops
+
+2. 将这个块设备文件挂载到一个文件夹下面。如果这个块设备原来被格式化为一种文件系统的格式，例如 ext4，那调用的就是 ext4 相应的 mount 操作。这是块设备遇到的第二个文件系统，也是向这个块设备读写文件，需要基于的主流文件系统。ext4_mount->mount_bdev，mount_bdev 主要做了两件大事情
+
+   * 第一：blkdev_get_by_path 根据 /dev/xxx 这个名字，找到相应的设备并打开它，blkdev_get_by_path做两件事
+
+     * 调用lookup_bdev 根据设备路径 /dev/xxx 得到 block_device：lookup_bdev 这里的 pathname 是设备的文件名，例如 /dev/xxx是在 devtmpfs 文件系统中的，kern_path 可以在这个文件系统里面，一直找到它对应的 dentry。d_backing_inode 会获得 inode。这个 inode 就是那个 init_special_inode 生成的特殊 inode。bd_acquire 通过这个特殊的 inode，找到 struct block_device，bd_acquire 中最主要的就是调用 bdget，它的参数是特殊 inode 的 i_rdev。在 mknod 的时候，放的是设备号 dev_t，在 bdget 中，遇到了第三个文件系统，bdev 伪文件系统。bdget 函数根据传进来的 dev_t，在 blockdev_superblock 这个文件系统里面找到 inode。这个 inode 已经不是 devtmpfs 文件系统的 inode 了。所有表示块设备的 inode 都保存在伪文件系统 bdev 中，这些对用户层不可见，主要为了方便块设备的管理。Linux 将块设备的 block_device 和 bdev 文件系统的块设备的 inode，通过 struct bdev_inode 进行关联
+
+     ```
+     struct bdev_inode {
+       struct block_device bdev;
+       struct inode vfs_inode;
+     };
+     ```
+
+     设备文件 /dev/xxx 在 devtmpfs 文件系统中，找到 devtmpfs 文件系统中的 inode，里面有 dev_t。通过 dev_t，在伪文件系统 bdev 中找到对应的 inode，然后根据 struct bdev_inode 找到关联的 block_device
+
+     * 调用 blkdev_get打开这个设备，有一个磁盘 /dev/sda，既可以把它整个格式化成一个文件系统，也可以把它分成多个分区 /dev/sda1、 /dev/sda2，然后把每个分区格式化成不同的文件系统
+
+     ![img](https://static001.geekbang.org/resource/image/85/76/85f4d83e7ebf2aadf7ffcd5fd393b176.png)
+
+     struct gendisk 是用来描述整个设备的
+
+     ```
+     major 是主设备号
+     first_minor 表示第一个分区的从设备号
+     minors 表示分区的数目
+     disk_name 给出了磁盘块设备的名称
+     struct disk_part_tbl 结构里是一个 struct hd_struct 的数组，用于表示各个分区
+     struct block_device_operations fops 指向对于这个块设备的各种操作
+     struct request_queue queue 是表示在这个块设备上的请求队列
+     ```
+
+     ```
+     struct hd_struct 是用来表示某个分区的，有两个实例，分别指向 /dev/sda1、 /dev/sda2
+     较重要的成员变量保存了如下的信息：从磁盘的哪个扇区开始，到哪个扇区结束
+     ```
+
+     block_device 既可以表示整个块设备，也可以表示某个分区，如上block_device 有三个实例，分别指向 /dev/sda1、/dev/sda2、/dev/sda。block_device 的成员变量 bd_disk，指向的 gendisk 就是整个块设备。这三个实例都指向同一个 gendisk。bd_part 指向的某个分区的 hd_struct，bd_contains 指向的是整个块设备的 block_device。 __blkdev_get 函数中，先调用 get_gendisk，根据 block_device 获取 gendisk，关联的调用链：add_disk->device_add_disk->blk_register_region，将 dev_t 和 gendisk 关联起来
+
+     * 如果 partno 为 0，打开的是整个设备，调用 disk_get_part，获取 gendisk 中的分区数组，然后调用 block_device_operations 里面的 open 函数打开设备
+     * 如果 partno 不为 0，打开的是分区，获取整个设备的 block_device，赋值给变量 struct block_device *whole，然后调用递归 __blkdev_get，打开 whole 代表的整个设备，将 bd_contains 设置为变量 whole
+
+     block_device_operations 就是在驱动层了。例如在 drivers/scsi/sd.c 里面，MODULE_DESCRIPTION(“SCSI disk (sd) driver”) 中，此时block_device 相应的成员变量该填的都填上了
+
+   * 第二：sget 根据打开的设备文件，将 block_device填充 ext4 文件系统的 super_block，有了 ext4 文件系统的 super_block 之后，接下来对于文件的读写过程和之前一样
+
+open一个块设备，涉及两个文件系统：devtmpfs和伪文件系统bdev。通过devtmpfs中的设备号dev_t在伪文件系统bdev中找到block_device，然后打开，打开后再将block_device设置到主流文件系统的super_block中。设置到主流文件系统的super_block后，就可以通过主流文件系统（如ext4）的file_operations对块设备进行操作了。
+
+主要流程：
+
+1. 所有的块设备被一个 map 结构管理从 dev_t 到 gendisk 的映射
+2. 所有的 block_device 表示的设备或者分区都在 bdev 文件系统的 inode 列表中
+3. mknod 创建出来的块设备文件在 devtemfs 文件系统里面，特殊 inode 里面有块设备号
+4. mount 一个块设备上的文件系统，调用这个文件系统的 mount 接口
+5. 通过按照 /dev/xxx 在文件系统 devtmpfs 文件系统上搜索到特殊 inode，得到块设备号
+6. 根据特殊 inode 里面的 dev_t 在 bdev 文件系统里面找到 inode
+7. 根据 bdev 文件系统上的 inode 找到对应的 block_device，根据 dev_t 在 map 中找到 gendisk，将两者关联
+8. 找到 block_device 后打开设备，调用和 block_device 关联的 gendisk 里面的 block_device_operations 打开设备
+9. 创建被 mount 的文件系统的 super_block
+
+![img](https://static001.geekbang.org/resource/image/62/20/6290b73283063f99d6eb728c26339620.png)
