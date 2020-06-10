@@ -297,3 +297,42 @@ open一个块设备，涉及两个文件系统：devtmpfs和伪文件系统bdev�
 9. 创建被 mount 的文件系统的 super_block
 
 ![img](https://static001.geekbang.org/resource/image/62/20/6290b73283063f99d6eb728c26339620.png)
+
+##### 直接 I/O
+
+generic_file_direct_write -> mapping->a_ops->direct_IO-> ext4_direct_IO，往设备层写入数据。__blockdev_direct_IO，有个参数 inode->i_sb->s_bdev。通过当前文件的 inode，得到 super_block。这个 super_block 中的 s_bdev，就是之前填进去的那个 block_device。接着调用do_blockdev_direct_IO->submit_page_section->dio_bio_submit->submit_bio 向块设备层提交数据。参数 struct bio 是将数据传给块设备的通用传输对象
+
+##### 缓存 I/O
+
+将数据从应用拷贝到内存缓存中，但并不执行真正的 I/O 操作。只将整个页或其中部分标记为脏。写操作由一个 timer 触发，才调用 wb_workfn 往硬盘写入页面。接下来的调用链为：wb_workfn->wb_do_writeback->wb_writeback->writeback_sb_inodes->__writeback_single_inode->do_writepages->mapping->a_ops->writepages，但实际调用的是 ext4_writepages，往设备层写入数据。有个比较重要的数据结构是 struct mpage_da_data。里面有文件的 inode、要写入的页的偏移量，还有 struct ext4_io_submit，里面有通用传输对象 bio。接下来的调用链为：mpage_prepare_extent_to_map->mpage_process_page_bufs->mpage_submit_page->ext4_bio_write_page->io_submit_add_bh，此时的 bio 还是空的，调用 io_submit_init_bio，初始化 bio。回到 ext4_writepages 中。在 bio 初始化完之后，调用 ext4_io_submit，提交 I/O。又调用 submit_bio，向块设备层传输数据。
+
+##### 向块设备层提交请求
+
+不管是直接 I/O，还是缓存 I/O，最后都到了 submit_bio 里面，generic_make_request，先是获取一个请求队列 request_queue，然后调用make_request_fn。对于 struct block_device 结构和 struct gendisk 结构，每个块设备都有一个请求队列 struct request_queue，用于处理上层发来的请求。在每个块设备的驱动程序初始化的时候，会生成一个 request_queue。在request_queue 上，首先是有一个链表 list_head，保存请求 request。每个 request 包括一个链表的 struct bio，在 bio 中，bi_next 是链表中的下一项，struct bio_vec 指向一组页面。在请求队列 request_queue 上，除了 make_request_fn 用于生成 request；另一个 request_fn用于处理 request
+
+![img](https://static001.geekbang.org/resource/image/3c/0e/3c473d163b6e90985d7301f115ab660e.jpeg)
+
+##### 块设备的初始化
+
+以 scsi 驱动为例。在初始化设备驱动的时候，调用 scsi_alloc_queue，把 request_fn 设置为 scsi_request_fn。调用 blk_init_allocated_queue->blk_queue_make_request，把 make_request_fn 设置为 blk_queue_bio。除了初始化 make_request_fn 函数，还有初始化 I/O 的电梯算法，默认 iosched_cfq：
+
+* struct elevator_type elevator_noop：最简单的 IO 调度算法，它将 IO 请求放入到一个 FIFO 队列中，然后逐个执行这些 IO 请求
+* struct elevator_type iosched_deadline：保证每个 IO 请求在一定的时间内一定要被服务到，以此来避免某个请求饥饿
+* struct elevator_type iosched_cfq：完全公平调度算法。所有的请求会在多个队列中排序。同一个进程的请求，总是在同一队列中处理
+
+##### 请求提交与调度
+
+回到 generic_make_request 函数中。它处理两大逻辑：获取一个请求队列 request_queue 和调用这个队列的 make_request_fn 函数。调用队列的 make_request_fn 函数，其实就是调用 blk_queue_bio，首先调用 elv_merge 来判断，当前 bio 请求是否能够和目前已有的 request 合并起来，成为同一批 I/O 操作，从而提高读取和写入的性能。判断标准和 struct bio 的成员 struct bvec_iter 有关，里面有两个变量，一个是起始磁盘簇 bi_sector，另一个是大小 bi_size，elv_merge 尝试了三次合并
+
+* 第一次，判断和上一次合并的 request 能不能再次合并
+* 第二次，调用 elv_rqhash_find 然后按照 bio 的起始地址查找 request，看有没有能够合并的
+* 第三次，调用 elevator_merge_fn 试图合并，对于 iosched_cfq，调用 cfq_merge->cfq_find_rq_fmerge -> elv_rb_find 
+
+如果没有办法合并，就调用 get_request创建一个新的 request，调用 blk_init_request_from_bio，将 bio 放到新的 request 里面，然后调用 add_acct_request，把新的 request 加到 request_queue 队列中。generic_make_request 的逻辑。对于写入的数据来讲，其实仅仅是将 bio 请求放在请求队列上
+
+##### 请求的处理
+
+设备驱动程序往设备里面写，调用的是请求队列 request_queue 的另外一个函数 request_fn。对于 scsi 设备来讲，调用的是 scsi_request_fn，这里面是一个 for 无限循环，从 request_queue 中读取 request，然后封装更加底层的指令，给设备控制器下指令，实施真正的 I/O 操作
+
+![img](https://static001.geekbang.org/resource/image/c9/3c/c9f6a08075ba4eae3314523fa258363c.png)
+
