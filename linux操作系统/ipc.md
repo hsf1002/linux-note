@@ -94,3 +94,40 @@ struct sembuf
 ##### 信号
 
 可以在任何时候发送给某一进程，进程需要为信号配置信号处理函数。当信号发生的时候，就默认执行这个函数
+
+```
+// 查看所有的信号
+kill -l
+
+// 查看信号具体含义
+man signal
+```
+
+信号的处理方式：
+
+1. 执行默认操作。Linux 对每种信号都规定了默认操作，Term是终止进程。Core 是产生 Core Dump再终止进程
+2. 捕捉信号。执行相应的信号处理函数
+3. 忽略信号。有两个信号是应用进程无法捕捉和忽略的，即 SIGKILL 和 SEGSTOP
+
+信号处理函数的定义方式：
+
+1. signal，不推荐，signal 不是系统调用，而是 glibc 封装的一个函数
+
+1. ```
+   typedef void (*sighandler_t)(int);
+   sighandler_t signal(int signum, sighandler_t handler);
+   ```
+
+2. sigaction ，推荐
+
+   ```
+   int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
+   ```
+
+信号的到来时间是不可预期的，有可能程序正在调用某个漫长的系统调用的时候一个信号来了，会中断这个系统调用，去执行信号处理函数，执行完了以后，两种处理方式：
+
+1. SA_INTERRUPT，系统调用被中断了，直接返回一个 -EINTR 常量，用户自行处理
+2. SA_RESTART，系统调用会被自动重新启动，不需要用户处理。可能存在问题，从终端读入一个字符，用户在终端输入一个'a'字符，在处理'a'字符的时候被信号中断了，等信号处理完毕，如果用户不再输入，就停在那里了，需要用户再次输入同一个字符
+
+![img](https://static001.geekbang.org/resource/image/7c/28/7cb86c73b9e73893e6b0e0433d476928.png)
+
