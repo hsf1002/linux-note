@@ -131,3 +131,37 @@ man signal
 
 ![img](https://static001.geekbang.org/resource/image/7c/28/7cb86c73b9e73893e6b0e0433d476928.png)
 
+##### 信号的发送
+
+中断要注册中断处理函数，但是中断处理函数是在内核驱动里面的，信号也要注册信号处理函数，信号处理函数是在用户态进程里面的。
+
+```
+kill->kill_something_info->kill_pid_info->group_send_sig_info->do_send_sig_info
+tkill->do_tkill->do_send_specific->do_send_sig_info
+tgkill->do_tkill->do_send_specific->do_send_sig_info
+rt_sigqueueinfo->do_rt_sigqueueinfo->kill_proc_info->kill_pid_info->group_send_sig_info->do_send_sig_info
+```
+
+如果 kill 是发送给整个进程，应该 t->signal->shared_pending。是整个进程所有线程共享的信号；如果tkill 发送某个线程，应该 t->pending。是这个线程的 task_struct 独享的。struct sigpending 里面有两个成员
+
+```
+struct sigpending {
+  struct list_head list;
+  sigset_t signal;
+};
+```
+
+不可靠信号：小于 32 的信号，信号来的太快，而sigset_t 集合中的已经存在，就会丢失
+
+可靠信号：大于 32 的信号，通过 list_add_tail 挂在 struct sigpending 里面的链表list上。这样就不会丢，哪怕相同的信号发送多遍，也能处理多遍
+
+当信号挂到了 task_struct 结构之后，最后调用 complete_signal，在找到了一个进程或者线程的 task_struct 之后，调用 signal_wake_up，来企图唤醒它，它主要做两件事：
+
+1. 设置一个标识位 TIF_SIGPENDING，来表示已经有信号等待处理。等待系统调用结束，或者中断处理结束，从内核态返回用户态的时候，再进行信号的处理
+2. 试图唤醒这个进程或者线程，将这个进程或者线程设置为 TASK_RUNNING，然后放在运行队列中
+
+##### 信号的处理
+
+无论是从系统调用返回还是从中断返回，都会调用 exit_to_usermode_loop，如果已经设置了 _TIF_SIGPENDING，就调用 do_signal->handle_signal 进行处理，信号处理就是调用用户提供的信号处理函数，但是并没有看起来简单，因为信号处理函数是在用户态
+
+![img](https://static001.geekbang.org/resource/image/3d/fb/3dcb3366b11a3594b00805896b7731fb.png)
