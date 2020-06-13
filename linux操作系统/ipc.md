@@ -265,3 +265,4 @@ struct idr {
 12. 在 page cache 中找一个空闲页，或者创建一个空闲页
 
 ![img](https://static001.geekbang.org/resource/image/20/51/20e8f4e69d47b7469f374bc9fbcf7251.png)
+
