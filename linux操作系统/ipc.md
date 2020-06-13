@@ -165,3 +165,45 @@ struct sigpending {
 无论是从系统调用返回还是从中断返回，都会调用 exit_to_usermode_loop，如果已经设置了 _TIF_SIGPENDING，就调用 do_signal->handle_signal 进行处理，信号处理就是调用用户提供的信号处理函数，但是并没有看起来简单，因为信号处理函数是在用户态
 
 ![img](https://static001.geekbang.org/resource/image/3d/fb/3dcb3366b11a3594b00805896b7731fb.png)
+
+### 管道
+
+##### 匿名管道
+
+```
+int pipe(int fd[2])
+```
+
+创建一个管道 pipe，返回两个文件描述符，表示管道的两端，一个是管道的读取端描述符 fd[0]，另一个是管道的写入端描述符 fd[1]。
+
+1. __do_pipe_flags->create_pipe_files，生成了两个 fd。fd[0]用于读，fd[1]用于写，匿名管道，创建在文件系统上的，只不过是一种特殊的文件系统，创建一个特殊的文件，对应一个特殊的 inode，即get_pipe_inode，从其实现可以看出这是一个特殊的文件系统 pipefs
+2. dentry 和 inode 对应好了，就开始创建 struct file 对象。先创建用于写入的 pipefifo_fops；再创建读取的也为 pipefifo_fops。然后把 private_data 设置为 pipe_inode_info。这样从 struct file 这个层级上，就能直接操作底层的读写操作
+3. 一个匿名管道创建成功，对于 fd[1]写入，调用 pipe_write，向 pipe_buffer 里面写入数据；对于 fd[0]读入，调用 pipe_read，从 pipe_buffer 里面读取数据
+4. 这两个文件描述符都是在一个进程里面，并没有起到进程间通信的作用，fork创建的子进程会复制父进程的 struct files_struct，fd 的数组会复制一份，但是 fd 指向的 struct file 对于同一个文件还是只有一份，这样就做到了，两个进程各有两个 fd 指向同一个 struct file 的模式，两个进程就可以通过各自的 fd 写入和读取同一个管道文件实现跨进程通信
+
+![img](https://static001.geekbang.org/resource/image/71/b6/71eb7b4d026d04e4093daad7e24feab6.png)
+
+通常的方法是父进程关闭读取的 fd，只保留写入的 fd，而子进程关闭写入的 fd，只保留读取的 fd，如果需要双向通行，则应该创建两个管道。
+
+在 shell 里面运行 A|B 的时候，A 进程和 B 进程都是 shell 创建出来的子进程，A 和 B 之间不存在父子关系。首先从 shell 创建子进程 A，然后在 shell 和 A 之间建立一个管道，其中 shell 保留读取端，A 进程保留写入端，然后 shell 再创建子进程 B。这又是一次 fork，所以，shell 里面保留的读取端的 fd 也被复制到了子进程 B 里面。这个时候，相当于 shell 和 B 都保留读取端，只要 shell 主动关闭读取端，就变成了一管道，写入端在 A 进程，读取端在 B 进程。
+
+![img](https://static001.geekbang.org/resource/image/81/fa/81be4d460aaa804e9176ec70d59fdefa.png)
+
+接下来将这个管道的两端和输入输出关联起来：
+
+在 A 进程中，写入端：dup2(fd[1],STDOUT_FILENO)，将 STDOUT_FILENO 不再指向标准输出，而是指向创建的管道文件，那么以后往标准输出写入的任何东西，都会写入管道文件
+
+在 B 进程中，读取端：dup2(fd[0],STDIN_FILENO)，将 STDIN_FILENO 不再指向标准输入，而是指向创建的管道文件，那么以后从标准输入读取的任何东西，都来自于管道文件
+
+![img](https://static001.geekbang.org/resource/image/c0/e2/c042b12de704995e4ba04173e0a304e2.png)
+
+##### 命名管道
+
+需要通过命令 mkfifo 进行创建。如果是通过代码创建命名管道，也有一个函数，但不是一个系统调用，而是 Glibc 提供的函数。
+
+1. mkfifo 函数会调用 mknodat 系统调用，创建一个字符设备的时候，也调用 mknod。命名管道也是一个设备，也用 mknod。先是通过 user_path_create 对于这个管道文件创建一个 dentry，因为是 S_IFIFO，调用 vfs_mknod。由于这个管道文件是创建在一个普通文件系统上的，假设是在 ext4 文件上，vfs_mknod 会调用 ext4_dir_inode_operations 的 mknod，即 ext4_mknod。ext4_new_inode_start_handle 调用 __ext4_new_inode，在 ext4 文件系统上真的创建一个文件，调用 init_special_inode创建一个内存中特殊的 inode，这个函数在字符设备文件中也遇到过，当时 inode 的 i_fop 指向的是 def_chr_fops，这次换成管道文件了，inode 的 i_fop 变成指向 pipefifo_fops，这和匿名管道一样
+2. 要打开这个管道文件，调用文件系统的 open 函数。沿着文件系统的调用方式，一路调用到 pipefifo_fops 的 open 函数，即 fifo_open。在 fifo_open 里面，创建 pipe_inode_info，这和匿名管道也一样。这个结构里面有个成员是 struct pipe_buffer *bufs。所谓的命名管道，其实是也是内核里面的一串缓存
+3. 命名管道的写入，调用 pipefifo_fops 的 pipe_write ，向 pipe_buffer 里面写入数据
+4. 命名管道的读入，调用 pipefifo_fops 的 pipe_read，从 pipe_buffer 里面读取数据
+
+![img](https://static001.geekbang.org/resource/image/48/97/486e2bc73abbe91d7083bb1f4f678097.png)
