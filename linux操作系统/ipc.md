@@ -207,3 +207,61 @@ int pipe(int fd[2])
 4. 命名管道的读入，调用 pipefifo_fops 的 pipe_read，从 pipe_buffer 里面读取数据
 
 ![img](https://static001.geekbang.org/resource/image/48/97/486e2bc73abbe91d7083bb1f4f678097.png)
+
+##### 共享内存的内核机制
+
+消息队列、共享内存、信号量，它们在使用之前都要生成 key，然后通过 key 得到唯一的 id，并且都是通过 xxxget 函数。在内核里面，这三种进程间通信机制是使用统一的机制管理起来的， ipcxxx。为了维护这三种进程间通信进制，在内核里面，声明了一个有三项的数组
+
+```
+struct ipc_namespace {
+......
+  struct ipc_ids  ids[3];
+......
+}
+
+#define IPC_SEM_IDS  0
+#define IPC_MSG_IDS  1
+#define IPC_SHM_IDS  2
+
+#define sem_ids(ns)  ((ns)->ids[IPC_SEM_IDS])
+#define msg_ids(ns)  ((ns)->ids[IPC_MSG_IDS])
+#define shm_ids(ns)  ((ns)->ids[IPC_SHM_IDS])
+```
+
+in_use 表示当前有多少个 ipc；seq 和 next_id 用于一起生成 ipc 唯一的 id，ipcs_idr 是一棵基数树，sem_ids、msg_ids、shm_ids 各有一棵基数树
+
+```
+struct ipc_ids {
+  int in_use;
+  unsigned short seq;
+  struct rw_semaphore rwsem;
+  struct idr ipcs_idr;
+  int next_id;
+};
+
+struct idr {
+  struct radix_tree_root  idr_rt;
+  unsigned int    idr_next;
+};
+```
+
+完全可以通过 struct kern_ipc_perm 的指针，通过进行强制类型转换后，得到整个结构
+
+![img](https://static001.geekbang.org/resource/image/08/af/082b742753d862cfeae520fb02aa41af.png)
+
+共享内存的创建和映射过程：
+
+1. 调用 shmget 创建共享内存
+2. 先通过 ipc_findkey 在基数树中查找 key 对应的共享内存对象 shmid_kernel 是否已经被创建过，如果已经被创建，就会被查询出来，例如 producer 创建过，在 consumer 中就会查询出来
+3. 如果共享内存没有被创建过，则调用 shm_ops 的 newseg 方法，创建一个共享内存对象 shmid_kernel。例如，在 producer 中就会新建
+4. 在 shmem 文件系统里面创建一个文件，共享内存对象 shmid_kernel 指向这个文件，这个文件用 struct file 表示，称它为 file1
+5. 调用 shmat，将共享内存映射到虚拟地址空间
+6. shm_obtain_object_check 先从基数树里面找到 shmid_kernel 对象
+7. 创建用于内存映射到文件的 file 和 shm_file_data，这里的 struct file 称为 file2
+8. 关联内存区域 vm_area_struct 和用于内存映射到文件的 file，即 file2，调用 file2 的 mmap 函数
+9. file2 的 mmap 函数 shm_mmap，会调用 file1 的 mmap 函数 shmem_mmap，设置 shm_file_data 和 vm_area_struct 的 vm_ops
+10. 内存映射完毕之后，并没有真的分配物理内存，当访问内存的时候，会触发缺页异常 do_page_fault
+11. vm_area_struct 的 vm_ops 的 shm_fault 会调用 shm_file_data 的 vm_ops 的 shmem_fault
+12. 在 page cache 中找一个空闲页，或者创建一个空闲页
+
+![img](https://static001.geekbang.org/resource/image/20/51/20e8f4e69d47b7469f374bc9fbcf7251.png)
