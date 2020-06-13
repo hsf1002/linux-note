@@ -208,7 +208,7 @@ int pipe(int fd[2])
 
 ![img](https://static001.geekbang.org/resource/image/48/97/486e2bc73abbe91d7083bb1f4f678097.png)
 
-##### 共享内存的内核机制
+### 共享内存的内核机制
 
 消息队列、共享内存、信号量，它们在使用之前都要生成 key，然后通过 key 得到唯一的 id，并且都是通过 xxxget 函数。在内核里面，这三种进程间通信机制是使用统一的机制管理起来的， ipcxxx。为了维护这三种进程间通信进制，在内核里面，声明了一个有三项的数组
 
@@ -265,4 +265,20 @@ struct idr {
 12. 在 page cache 中找一个空闲页，或者创建一个空闲页
 
 ![img](https://static001.geekbang.org/resource/image/20/51/20e8f4e69d47b7469f374bc9fbcf7251.png)
+
+### 信号量的内核机制
+
+![img](https://static001.geekbang.org/resource/image/60/7c/6028c83b0aa00e65916988911aa01b7c.png)
+
+其主要流程：
+
+1. 调用 semget 创建信号量集合
+2. ipc_findkey 会在基数树中，根据 key 查找信号量集合 sem_array 对象。如果已经被创建，就会被查询出来
+3. 如果信号量集合没有被创建过，则调用 sem_ops 的 newary 方法，创建一个信号量集合对象 sem_array
+4. 调用 semctl(SETALL) 初始化信号量
+5. sem_obtain_object_check 先从基数树里面找到 sem_array 对象
+6. 根据用户指定的信号量数组，初始化信号量集合，即初始化 sem_array 对象的 struct sem sems[]成员
+7. 调用 semop 操作信号量
+8. 创建信号量操作结构 sem_queue，放入队列
+9. 创建 undo 结构，放入链表
 
