@@ -175,3 +175,100 @@ Socket 系统调用有三级参数 family、type、protocal，通过这三级参
 * listen 第一层调用 inet_stream_ops 的 inet_listen 函数，第二层调用 tcp_prot 的 inet_csk_get_port 函数
 * accept 第一层调用 inet_stream_ops 的 inet_accept 函数，第二层调用 tcp_prot 的 inet_csk_accept 函数
 * connect 第一层调用 inet_stream_ops 的 inet_stream_connect 函数，第二层调用 tcp_prot 的 tcp_v4_connect 函数
+
+### 发送网络包
+
+* VFS 层：write 系统调用找到 struct file，根据里面的 file_operations 的定义，调用 sock_write_iter 函数。sock_write_iter 函数调用 sock_sendmsg 函数
+* Socket 层：从 struct file 里面的 private_data 得到 struct socket，根据里面 ops 的定义，调用 inet_sendmsg 函数
+* Sock 层：从 struct socket 里面的 sk 得到 struct sock，根据里面 sk_prot 的定义，调用 tcp_sendmsg 函数
+* TCP 层：tcp_sendmsg 函数会调用 tcp_write_xmit 函数，tcp_write_xmit 函数会调用 tcp_transmit_skb，在这里实现了 TCP 层面向连接的逻辑
+* IP 层：扩展 struct sock，得到 struct inet_connection_sock，根据里面 icsk_af_ops 的定义，调用 ip_queue_xmit 函数
+
+![img](https://static001.geekbang.org/resource/image/dc/44/dc66535fa7e1a10fd6d728865f6c9344.png)
+
+##### 解析 socket 的 Write
+
+对于 socket ，它的 file_operations 定义如下：
+
+```
+static const struct file_operations socket_file_ops = {
+  .owner =  THIS_MODULE,
+  .llseek =  no_llseek,
+  .read_iter =  sock_read_iter,
+  .write_iter =  sock_write_iter,
+  .poll =    sock_poll,
+  .unlocked_ioctl = sock_ioctl,
+  .mmap =    sock_mmap,
+  .release =  sock_close,
+  .fasync =  sock_fasync,
+  .sendpage =  sock_sendpage,
+  .splice_write = generic_splice_sendpage,
+  .splice_read =  sock_splice_read,
+};
+```
+
+在 sock_write_iter 中，通过 VFS 中的 struct file，将创建好的 socket 结构拿出来，然后调用 sock_sendmsg->sock_sendmsg_nosec->sendmsg，根据 inet_stream_ops 的定义，调用是inet_sendmsg，从 socket 结构中，可以得到更底层的 sock 结构，然后调用 sk_prot 的 sendmsg
+
+##### 解析 tcp_sendmsg
+
+根据 tcp_prot 的定义，实际调用的是 tcp_sendmsg，在内核协议栈里面，网络包的数据都是由 struct sk_buff 维护的，第一件事情就是找到一个空闲的内存空间，将用户要写入的数据，拷贝到 struct sk_buff 的管辖范围内。第二件事情就是发送 struct sk_buff
+
+MTU（Maximum Transmission Unit，最大传输单元）：以以太网为例，为 1500 个 Byte，前面有 6 个 Byte 的目标 MAC 地址，6 个 Byte 的源 MAC 地址，2 个 Byte 的类型，后面有 4 个 Byte 的 CRC 校验，共 1518 个 Byte。在 IP 层，一个 IP 数据报在以太网中传输，如果它的长度大于该 MTU 值，就要进行分片传输。在 TCP 层有个 MSS（Maximum Segment Size，最大分段大小），等于 MTU 减去 IP 头，再减去 TCP 头。即在不分片的情况下，TCP 里面放的最大内容
+
+struct sk_buff 是存储网络包的重要的数据结构，在应用层数据包叫 data，在 TCP 层称为 segment，在 IP 层叫 packet，在数据链路层称为 frame。它是一个链表，将 struct sk_buff 结构串起来。里面有二层的 mac_header、三层的 network_header 和四层的 transport_header，head 指向分配的内存块起始地址。data 这个指针指向的位置是可变的。它有可能随着报文所处的层次而变动。当接收报文时，从网卡驱动开始，通过协议栈层层往上传送数据报，通过增加 skb->data 的值，来逐步剥离协议首部。而要发送报文时，各协议会创建 sk_buff{}，在经过各下层协议时，通过减少 skb->data 的值来增加协议首部。tail 指向数据的结尾，end 指向分配的内存块的结束地址。要分配的 sk_stream_alloc_skb 会最终调用到 __alloc_skb。它除了分配一个 sk_buff 结构之外，还要分配 sk_buff 指向的数据区域。这段数据区域分为：第一部分是连续的数据区域。第二部分是一个 struct skb_shared_info 结构，如果TCP层的数据超过了一个 IP 包的承载能力，按照 MSS 的定义，拆分成一个个的 Segment 放在一个个的 IP 包里面，一次写一点，这样数据是分散的，在 IP 层还要通过内存拷贝合成一个 IP 包。为了减少内存拷贝的代价，有的网络设备支持分散聚合（Scatter/Gather）I/O
+
+![img](https://static001.geekbang.org/resource/image/9a/b8/9ad34c3c748978f915027d5085a858b8.png)
+
+ skb_add_data_nocache 将数据拷贝到连续的数据区域。skb_copy_to_page_nocache 将数据拷贝到不需要连续的页面区域。如果积累的数据报数目太多了，调用 __tcp_push_pending_frames 发送网络包。如果是第一个网络包，需要马上发送，调用 tcp_push_one。最终都会调用 tcp_write_xmit 发送网络包
+
+##### 解析 tcp_write_xmit 
+
+里面涉及到很多传输算法，如：
+
+*  TSO（TCP Segmentation Offload）：如果发送的网络包非常大，要进行分段。可以由协议栈代码在内核做，但是费 CPU，另一种方式是延迟到硬件网卡去做，需要网卡支持对大数据包进行自动分段，可以降低 CPU 负载
+* 拥塞窗口（cwnd，congestion window）：为了避免拼命发包，把网络塞满了，定义一个窗口的概念，在这个窗口之内的才能发送，超过这个窗口的就不能发送，来控制发送的频率，如下：开始的窗口只有一个 mss 大小叫作 slow start（慢启动）。增长速度很快，翻倍增长。一旦到达一个临界值 ssthresh，就变成线性增长，叫做拥塞避免。一旦出现丢包，就是真正拥塞，一种方法是马上降回到一个 mss，然后重复先翻倍再线性对的过程。但是太过激进，第二种方法，是降到当前 cwnd 的一半，然后进行线性增长（红线）
+
+![img](https://static001.geekbang.org/resource/image/40/1f/404a6c5041452c0641ae3cba5319dc1f.png)
+
+* 接收窗口rwnd（receive window）：也叫滑动窗口。如果说拥塞窗口是为了怕把网络塞满，在出现丢包的时候减少发送速度，那么滑动窗口就是为了怕把接收方塞满，而控制发送速度。滑动窗口，其实就是接收方告诉发送方自己的网络包的接收能力，超过这个能力就无法接收了。因为滑动窗口的存在，将发送方的缓存分成了四个部分：
+
+  * 第一部分：发送了并且已经确认的。这部分是已经发送完毕的网络包，没有用了，可以回收
+  * 第二部分：发送了但尚未确认的。这部分发送方要等待，万一发送不成功，还要重新发送，所以不能删除
+  * 第三部分：没有发送但是已经等待发送。这部分是接收方空闲的能力，可以马上发送，接收方收得了
+  * 第四部分：没有发送，并且暂时还不会发送的。这部分超过了接收方的接收能力，再发送接收方就收不
+
+  ![img](https://static001.geekbang.org/resource/image/97/65/9791e2f9ff63a9d8f849df7cd55fe965.png)
+
+  因为滑动窗口的存在，接收方的缓存也分成了三个部分：
+
+  * 第一部分：接受并且确认过的任务。这部分完全接收成功了，可以交给应用层了
+  * 第二部分：还没接收，但是马上就能接收的任务。这部分有的网络包到达了，但是还没确认，不算完全完毕，有的还没有到达，那就是接收方能够接受的最大的网络包数量
+  * 第三部分：还没接收，也没法接收的任务。这部分已经超出接收方能力
+
+  在网络包的交互过程中，接收方会将第二部分的大小，作为 AdvertisedWindow 发送给发送方，发送方就可以根据它来调整发送速度了
+
+  ![img](https://static001.geekbang.org/resource/image/b6/31/b62eea403e665bb196dceba571392531.png)
+
+最后调用 tcp_transmit_skb，真的去发送一个网络包
+
+![img](https://static001.geekbang.org/resource/image/be/0e/be225a97816a664367f29be9046aa30e.png)
+
+填充 TCP 头：源端口，设置为 inet_sport，目标端口，设置为 inet_dport；序列号，设置为 tcb->seq；确认序列号，设置为 tp->rcv_nxt。把所有的 flags 设置为 tcb->tcp_flags。设置选项为 opts。设置窗口大小为 tp->rcv_wnd。全部设置完毕之后，就会调用 icsk_af_ops 的 queue_xmit 方法，icsk_af_ops 指向 ipv4_specific，即调用的是 ip_queue_xmit 函数
+
+```
+const struct inet_connection_sock_af_ops ipv4_specific = {
+        .queue_xmit        = ip_queue_xmit,
+        .send_check        = tcp_v4_send_check,
+        .rebuild_header    = inet_sk_rebuild_header,
+        .sk_rx_dst_set     = inet_sk_rx_dst_set,
+        .conn_request      = tcp_v4_conn_request,
+        .syn_recv_sock     = tcp_v4_syn_recv_sock,
+        .net_header_len    = sizeof(struct iphdr),
+        .setsockopt        = ip_setsockopt,
+        .getsockopt        = ip_getsockopt,
+        .addr2sockaddr     = inet_csk_addr2sockaddr,
+        .sockaddr_len      = sizeof(struct sockaddr_in),
+        .mtu_reduced       = tcp_v4_mtu_reduced,
+};
+```
+
