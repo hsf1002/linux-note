@@ -183,8 +183,16 @@ Socket 系统调用有三级参数 family、type、protocal，通过这三级参
 * Sock 层：从 struct socket 里面的 sk 得到 struct sock，根据里面 sk_prot 的定义，调用 tcp_sendmsg 函数
 * TCP 层：tcp_sendmsg 函数会调用 tcp_write_xmit 函数，tcp_write_xmit 函数会调用 tcp_transmit_skb，在这里实现了 TCP 层面向连接的逻辑
 * IP 层：扩展 struct sock，得到 struct inet_connection_sock，根据里面 icsk_af_ops 的定义，调用 ip_queue_xmit 函数
+* IP 层：ip_route_output_ports 函数里面会调用 fib_lookup 查找路由表
+* 在 IP 层里面要做的另一个事情是填写 IP 层的头
+* 在 IP 层还要做的一件事情就是通过 iptables 规则
+* MAC 层：IP 层调用 ip_finish_output 进行 MAC 层
+* MAC 层需要 ARP 获得 MAC 地址，因而要调用` ___neigh_lookup_noref` 查找属于同一个网段的邻居，他会调用 neigh_probe 发送 ARP
+* 有了 MAC 地址，就可以调用 dev_queue_xmit 发送二层网络包了，它会调用 `__dev_xmit_skb` 会将请求放入队列
+* 设备层：网络包的发送会触发一个软中断 NET_TX_SOFTIRQ 来处理队列中的数据。软中断的处理函数是 net_tx_action
+* 在软中断处理函数中，会将网络包从队列上拿下来，调用网络设备的传输函数 ixgb_xmit_frame，将网络包发到设备的队列上去
 
-![img](https://static001.geekbang.org/resource/image/dc/44/dc66535fa7e1a10fd6d728865f6c9344.png)
+![img](https://static001.geekbang.org/resource/image/79/6f/79cc42f3163d159a66e163c006d9f36f.png)
 
 ##### 解析 socket 的 Write
 
@@ -271,4 +279,83 @@ const struct inet_connection_sock_af_ops ipv4_specific = {
         .mtu_reduced       = tcp_v4_mtu_reduced,
 };
 ```
+
+##### 解析 ip_queue_xmit 
+
+* 第一部分，选取路由，应该从哪个网卡出去。主要由 ip_route_output_ports 函数完成。最终是ip_route_output_key_hash_rcu。其先会调用 fib_lookup，FIB 全称是 Forwarding Information Base，转发信息表，即路由表，可以有多个，一般会有一个主表，RT_TABLE_MAIN。然后 fib_table_lookup 函数在这个表里面进行查找，最后调用 __mkroute_output，创建一个 struct rtable，表示找到的路由表项
+
+![img](https://static001.geekbang.org/resource/image/f6/0e/f6982eb85dc66bd04200474efb3a050e.png)
+
+* 第二部分，准备 IP 层的头，往里面填充内容。服务类型设置为 tos，标识位里面设置是否允许分片 frag_off,如果不允许，而遇到 MTU 太小过不去的情况，就发送 ICMP 报错。TTL 是这个包的存活时间，为了防止一个 IP 包迷路以后一直存活下去，每经过一个路由器 TTL 都减一，减为零则“死去”。设置 protocol，指的是更上层的协议，这里是 TCP。源地址和目标地址由 ip_copy_addrs 设置。最后设置 options
+
+![img](https://static001.geekbang.org/resource/image/6b/2b/6b2ea7148a8e04138a2228c5dbc7182b.png)
+
+* 第三部分，调用 ip_local_out 发送 IP 包，里面调用了 nf_hook。nf 的意思是 Netfilter，这是 Linux 内核的一个机制，用于在网络发送和转发的关键节点上加上 hook 函数，这些函数可以截获数据包，对数据包进行干预。一个著名的实现，是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
+
+  ![img](https://static001.geekbang.org/resource/image/75/4d/75c8257049eed99499e802fcc2eacf4d.png)
+
+  iptables 有表和链的概念，最重要的是两个表：
+
+  * filter 表处理过滤功能，主要包含以下三个链
+    * INPUT 链：过滤所有目标地址是本机的数据包
+    * FORWARD 链：过滤所有路过本机的数据包
+    * OUTPUT 链：过滤所有由本机产生的数据包
+
+  * nat 表处理网络地址转换，可以进行 SNAT（改变源地址）、DNAT（改变目标地址），包含以下三个链
+    * PREROUTING 链：可以在数据包到达时改变目标地址
+    * OUTPUT 链：可以改变本地产生的数据包的目标地址
+    * POSTROUTING 链：在数据包离开时改变数据包的源地址
+
+![img](https://static001.geekbang.org/resource/image/76/da/765e5431fe4b17f62b1b5712cc82abda.png)
+
+ip_local_out 再调用 dst_output，真正的发送数据，最终调用调用 ip_finish_output
+
+##### 解析 ip_finish_output
+
+在 ip_finish_output2 中，先找到 struct rtable 路由表里面的下一跳，下一跳一定和本机在同一个局域网中，可以通过二层进行通信，因而通过 `__ipv4_neigh_lookup_noref`，查找如何通过二层访问下一跳。`__ipv4_neigh_lookup_noref`是从本地的 ARP 表中查找下一跳的 MAC 地址。ARP 表的定义如下：
+
+```
+struct neigh_table arp_tbl = {
+    .family     = AF_INET,
+    .key_len    = 4,    
+    .protocol   = cpu_to_be16(ETH_P_IP),
+    .hash       = arp_hash,
+    .key_eq     = arp_key_eq,
+    .constructor    = arp_constructor,
+    .proxy_redo = parp_redo,
+    .id     = "arp_cache",
+......
+    .gc_interval    = 30 * HZ, 
+    .gc_thresh1 = 128,  
+    .gc_thresh2 = 512,  
+    .gc_thresh3 = 1024,
+};
+```
+
+如果在 ARP 表中没有找到相应的项，则调用 `__neigh_create` 进行创建，先调用 neigh_alloc创建一个 struct neighbour 结构，用于维护 MAC 地址和 ARP 相关的信息。大家都在一个局域网里面，可以通过 MAC 地址访问到，最后是将创建的 struct neighbour 结构放入一个哈希表，这是一个数组加链表的链式哈希表，先计算出哈希值 hash_val，得到相应的链表，然后循环这个链表找到对应的项，如果找不到就在最后插入一项。回到 ip_finish_output2，在 `__neigh_create` 之后，会调用 neigh_output 发送网络包。调用arp_send_dst，创建并发送一个 arp 包，接着调用 dev_queue_xmit 发送二层网络包
+
+qdisc 全称是 queueing discipline，即排队规则。内核如果需要通过某个网络接口发送数据包，都需要按照为这个接口配置的 qdisc（排队规则）把数据包加入队列。最简单的 qdisc 是 pfifo，它不对进入的数据包做任何的处理，数据包采用先入先出的方式通过队列。pfifo_fast 稍微复杂一些，它的队列包括三个波段（band）。在每个波段里面，使用先进先出规则。三个波段的优先级也不相同。band 0 的优先级最高，band 2 的最低。如果 band 0 里面有数据包，系统就不会处理 band 1 里面的数据包，band 1 和 band 2 之间也是一样。数据包是按照服务类型（Type of Service，TOS）被分配到三个波段里面的。TOS 是 IP 头里面的一个字段，代表了当前的包是高优先级的，还是低优先级的。pfifo_fast 分为三个先入先出的队列，称为三个 Band。根据网络包里面的 TOS，看这个包到底应该进入哪个队列。TOS 总共四位，每一位表示的意思不同，总共十六种类型
+
+![img](https://static001.geekbang.org/resource/image/ab/d9/ab6af2f9e1a64868636080a05cfde0d9.png)
+
+`__dev_xmit_skb` 开始进行网络包发送，它首先会将请求放入队列，然后调用 `__qdisc_run` 处理队列中的数据，最终qdisc_restart 将网络包从 Qdisc 的队列中拿下来，然后调用 sch_direct_xmit 进行发送。在 dev_hard_start_xmit 中，是一个 while 循环。每次在队列中取出一个 sk_buff，调用 xmit_one 发送。接下来的调用链为：xmit_one->netdev_start_xmit->__netdev_start_xmit，这个时候，已经到了设备驱动层了，drivers/net/ethernet/intel/ixgb/ixgb_main.c 里面有对于这个网卡的操作的定义
+
+```
+static const struct net_device_ops ixgb_netdev_ops = {
+        .ndo_open               = ixgb_open,
+        .ndo_stop               = ixgb_close,
+        .ndo_start_xmit         = ixgb_xmit_frame,
+        .ndo_set_rx_mode        = ixgb_set_multi,
+        .ndo_validate_addr      = eth_validate_addr,
+        .ndo_set_mac_address    = ixgb_set_mac,
+        .ndo_change_mtu         = ixgb_change_mtu,
+        .ndo_tx_timeout         = ixgb_tx_timeout,
+        .ndo_vlan_rx_add_vid    = ixgb_vlan_rx_add_vid,
+        .ndo_vlan_rx_kill_vid   = ixgb_vlan_rx_kill_vid,
+        .ndo_fix_features       = ixgb_fix_features,
+        .ndo_set_features       = ixgb_set_features,
+};
+```
+
+在 ixgb_xmit_frame 中，得到这个网卡对应的适配器，然后将其放入硬件网卡的队列中。至此，整个发送才算结束
 
