@@ -359,3 +359,48 @@ static const struct net_device_ops ixgb_netdev_ops = {
 
 在 ixgb_xmit_frame 中，得到这个网卡对应的适配器，然后将其放入硬件网卡的队列中。至此，整个发送才算结束
 
+### 接收网络包
+
+
+
+* 硬件网卡接收到网络包之后，通过 DMA 技术，将网络包放入 Ring Buffer
+* 硬件网卡通过中断通知 CPU 新的网络包的到来
+* 网卡驱动程序会注册中断处理函数 ixgb_intr。中断处理函数处理完需要暂时屏蔽中断的核心流程之后，通过软中断 NET_RX_SOFTIRQ 触发接下来的处理过程
+* NET_RX_SOFTIRQ 软中断处理函数 net_rx_action，net_rx_action 会调用 napi_poll，进而调用 ixgb_clean_rx_irq，从 Ring Buffer 中读取数据到内核 struct sk_buff
+* 调用 netif_receive_skb 进入内核网络协议栈，进行一些关于 VLAN 的二层逻辑处理后，调用 ip_rcv 进入三层 IP 层
+* 在 IP 层，处理 iptables 规则，然后调用 ip_local_deliver，交给更上层 TCP 层
+* 在 TCP 层调用 tcp_v4_rcv
+
+##### 设备驱动层
+
+NAPI：当一些网络包到来触发了中断，内核处理完这些网络包之后，先进入主动轮询 poll 网卡的方式，主动去接收到来的网络包。如果一直有，就一直处理，等处理告一段落，就返回干其他的事情。当再有下一批网络包到来的时候，再中断，再轮询 poll。这样就会大大减少中断的数量，提升网络处理的效率
+
+以drivers/net/ethernet/intel/ixgb/ixgb_main.c 为例，在网卡驱动程序初始化的时候，调用 ixgb_init_module，注册一个驱动 ixgb_driver，并且调用它的 probe 函数 ixgb_probe，创建一个 struct net_device 表示这个网络设备，并且 netif_napi_add 函数为这个网络设备注册一个轮询 poll 函数 ixgb_clean，将来一旦出现网络包的时候，就是要通过它来轮询。当一个网卡被激活的时候，调用函数 ixgb_open->ixgb_up，在里面注册一个硬件的中断处理函数。如果一个网络包到来，触发了硬件中断，就会调用 ixgb_intr，里面会调用 __napi_schedule。它会触发一个软中断 NET_RX_SOFTIRQ，通过软中断触发中断处理的延迟处理部分。软中断 NET_RX_SOFTIRQ 对应的中断处理函数是 net_rx_action。其中会得到 struct softnet_data 结构，output_queue 用于网络包的发送，poll_list 用于网络包的接收
+
+```
+struct softnet_data {
+  struct list_head  poll_list;
+......
+  struct Qdisc    *output_queue;
+  struct Qdisc    **output_queue_tailp;
+......
+}
+```
+
+在 net_rx_action是一个循环，在 poll_list 里面取出网络包到达的设备，然后调用 napi_poll 来轮询这些设备，napi_poll 会调用最初设备初始化的时候，注册的 poll 函数，对于 ixgb_driver，对应的函数是 ixgb_clean->ixgb_clean_rx_irq。有一个用于接收网络包的 rx_ring。它是一个环，从网卡硬件接收的包会放在这个环里面。这个环里面的 buffer_info[]是一个数组，存放的是网络包的内容，ixgb_check_copybreak 函数将 buffer_info 里面的内容，拷贝到 struct sk_buff *skb，从而可以作为一个网络包进行后续的处理，然后调用 netif_receive_skb
+
+##### 网络协议栈的二层逻辑
+
+`netif_receive_skb->__netif_receive_skb_core`，deliver_ptype_list_skb 在一个协议列表中逐个匹配。如果能够匹配到，就返回。这些协议的注册在网络协议栈初始化的时候， inet_init 函数调用 dev_add_pack(&ip_packet_type)，添加 IP 协议。协议被放在一个链表里面，假设这个时候的网络包是一个 IP 包，则在这个链表里面一定能够找到 ip_packet_type，在 `__netif_receive_skb_core` 中会调用 ip_packet_type 的 func 函数。接下来，ip_rcv 会被调用
+
+```
+static struct packet_type ip_packet_type __read_mostly = {
+  .type = cpu_to_be16(ETH_P_IP),
+  .func = ip_rcv,
+};
+```
+
+##### 网络协议栈的 IP 层
+
+处理逻辑就从二层到了三层，IP 层，在ip_rcv中得到 IP 头，第一个 hook 点是 NF_INET_PRE_ROUTING，就是 iptables 的 PREROUTING 链。如果里面有规则，则执行规则，然后调用 ip_rcv_finish，得到网络包对应的路由表，然后调用 dst_input，其实是 struct rtable 的成员的 dst 的 input 函数。在 rt_dst_alloc 中，input 函数指向的是 ip_local_deliver。如果 IP 层进行了分段，则进行重新的组合。hook 点在 NF_INET_LOCAL_IN，对应 iptables 里面的 INPUT 链。在经过 iptables 规则处理完毕后，调用 ip_local_deliver_finish。在 IP 头中，有一个字段 protocol 用于指定里面一层的协议，此处是 TCP 协议。从 inet_protos 数组中，找出 TCP 协议对应的处理函数。里面的内容是 struct net_protocol。在系统初始化的时候，网络协议栈的初始化调用的是 inet_init，它会调用 inet_add_protocol，将 TCP 协议对应的处理函数 tcp_protocol、UDP 协议对应的处理函数 udp_protocol，放到 inet_protos 数组中。在上面的网络包的接收过程中，会取出 TCP 协议对应的处理函数 tcp_protocol，然后调用 handler 函数，即 tcp_v4_rcv 函数。
+
