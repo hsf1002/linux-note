@@ -361,7 +361,7 @@ static const struct net_device_ops ixgb_netdev_ops = {
 
 ### 接收网络包
 
-
+![img](https://static001.geekbang.org/resource/image/20/52/20df32a842495d0f629ca5da53e47152.png)
 
 * 硬件网卡接收到网络包之后，通过 DMA 技术，将网络包放入 Ring Buffer
 * 硬件网卡通过中断通知 CPU 新的网络包的到来
@@ -370,6 +370,15 @@ static const struct net_device_ops ixgb_netdev_ops = {
 * 调用 netif_receive_skb 进入内核网络协议栈，进行一些关于 VLAN 的二层逻辑处理后，调用 ip_rcv 进入三层 IP 层
 * 在 IP 层，处理 iptables 规则，然后调用 ip_local_deliver，交给更上层 TCP 层
 * 在 TCP 层调用 tcp_v4_rcv
+* 在 tcp_v4_do_rcv 中，如果是处于 TCP_ESTABLISHED 状态，调用 tcp_rcv_established，其他的状态，调用 tcp_rcv_state_process
+* 在 tcp_rcv_established 中，调用 tcp_data_queue，如果序列号能够接的上，则放入 sk_receive_queue 队列；如果序列号接不上，则暂时放入 out_of_order_queue 队列，等序列号能够接上的时候，再放入 sk_receive_queue 队列
+
+接下来就是用户态读取网络包的过程，这个过程分成几个层次
+
+* VFS 层：read 系统调用找到 struct file，根据里面的 file_operations 的定义，调用 sock_read_iter 函数。sock_read_iter 函数调用 sock_recvmsg 函数
+* Socket 层：从 struct file 里面的 private_data 得到 struct socket，根据里面 ops 的定义，调用 inet_recvmsg 函数
+* Sock 层：从 struct socket 里面的 sk 得到 struct sock，根据里面 sk_prot 的定义，调用 tcp_recvmsg 函数
+* TCP 层：tcp_recvmsg 函数会依次读取 receive_queue 队列、prequeue 队列和 backlog 队列
 
 ##### 设备驱动层
 
@@ -402,5 +411,63 @@ static struct packet_type ip_packet_type __read_mostly = {
 
 ##### 网络协议栈的 IP 层
 
-处理逻辑就从二层到了三层，IP 层，在ip_rcv中得到 IP 头，第一个 hook 点是 NF_INET_PRE_ROUTING，就是 iptables 的 PREROUTING 链。如果里面有规则，则执行规则，然后调用 ip_rcv_finish，得到网络包对应的路由表，然后调用 dst_input，其实是 struct rtable 的成员的 dst 的 input 函数。在 rt_dst_alloc 中，input 函数指向的是 ip_local_deliver。如果 IP 层进行了分段，则进行重新的组合。hook 点在 NF_INET_LOCAL_IN，对应 iptables 里面的 INPUT 链。在经过 iptables 规则处理完毕后，调用 ip_local_deliver_finish。在 IP 头中，有一个字段 protocol 用于指定里面一层的协议，此处是 TCP 协议。从 inet_protos 数组中，找出 TCP 协议对应的处理函数。里面的内容是 struct net_protocol。在系统初始化的时候，网络协议栈的初始化调用的是 inet_init，它会调用 inet_add_protocol，将 TCP 协议对应的处理函数 tcp_protocol、UDP 协议对应的处理函数 udp_protocol，放到 inet_protos 数组中。在上面的网络包的接收过程中，会取出 TCP 协议对应的处理函数 tcp_protocol，然后调用 handler 函数，即 tcp_v4_rcv 函数。
+处理逻辑就从二层到了三层，IP 层，在ip_rcv中得到 IP 头，第一个 hook 点是 NF_INET_PRE_ROUTING，就是 iptables 的 PREROUTING 链。如果里面有规则，则执行规则，然后调用 ip_rcv_finish，得到网络包对应的路由表，然后调用 dst_input，其实是 struct rtable 的成员的 dst 的 input 函数。在 rt_dst_alloc 中，input 函数指向的是 ip_local_deliver。如果 IP 层进行了分段，则进行重新的组合。hook 点在 NF_INET_LOCAL_IN，对应 iptables 里面的 INPUT 链。在经过 iptables 规则处理完毕后，调用 ip_local_deliver_finish。在 IP 头中，有一个字段 protocol 用于指定里面一层的协议，此处是 TCP 协议。从 inet_protos 数组中，找出 TCP 协议对应的处理函数。里面的内容是 struct net_protocol。在系统初始化的时候，网络协议栈的初始化调用的是 inet_init，它会调用 inet_add_protocol，将 TCP 协议对应的处理函数 tcp_protocol、UDP 协议对应的处理函数 udp_protocol，放到 inet_protos 数组中。在上面的网络包的接收过程中，会取出 TCP 协议对应的处理函数 tcp_protocol，然后调用 handler 函数，即 tcp_v4_rcv 函数
 
+##### 网络协议栈的 TCP 层
+
+从 tcp_v4_rcv 函数开始，就从 IP 层到了 TCP 层。得到 TCP 的头之后，开始处理 TCP 层的事情。TCP状态被维护在数据结构 struct sock 里面，根据 IP 地址以及 TCP 头里面的内容，在 tcp_hashinfo 中找到这个包对应的 struct sock，从而得到这个包对应的连接的状态，再根据不同的状态做不同的处理。最主流的网络包的接收过程，涉及三个队列：backlog 队列、prequeue 队列、sk_receive_queue 队列，由于同一个网络包要在三个主体之间交接：
+
+* 第一个主体是软中断的处理过程。在执行 tcp_v4_rcv 函数的时候，依然处于软中断的处理逻辑里，所以必然会占用这个软中断
+* 第二个主体是用户态进程。如果用户态触发系统调用 read 读取网络包，也要从队列里面找
+* 第三个主体是内核协议栈。哪怕用户进程没有调用 read读取网络包，当网络包来的时候，也得接收
+
+1. 如果没有一个用户态进程等着读数据，内核协议栈调用 tcp_add_backlog，暂存在 backlog 队列中，并且离开软中断的处理过程
+
+2. 如果有一个用户态进程等待读取数据，调用 tcp_prequeue，赶紧放入 prequeue 队列，并且离开软中断的处理过程
+
+3. 在这个函数里面，对于 sysctl_tcp_low_latency 的判断，是不是要低时延地处理网络包
+
+4. 如果 sysctl_tcp_low_latency 设置为 0，就放在 prequeue 队列中暂存，这样不用等待网络包处理完毕，就可以离开软中断的处理过程，但是会造成比较长的时延
+
+5. 如果 sysctl_tcp_low_latency 设置为 1，则调用 tcp_v4_do_rcv。
+
+6. 如果连接已经建立处于 TCP_ESTABLISHED 状态调用 tcp_rcv_established，其中调用 tcp_data_queue，将其放入 sk_receive_queue 队列进行处理，tcp_data_queue有四种情况
+
+   * seq == tp->rcv_nxt：来的网络包正是服务端期望的下一个网络包。这个时候用户进程正在等待读取，就直接将网络包拷贝给用户进程。如果用户进程没有正在等待读取，或者因为内存原因没有能够拷贝成功，还是将网络包放入 sk_receive_queue 队列。对于乱序的数据只能暂时放在 out_of_order_queue 乱序队列中
+   * end_seq 不大于 rcv_nxt：服务端期望网络包 5。但来了一个网络包 3，肯定是服务端早就收到了网络包 3，但是 ACK 没有到达客户端，中途丢了，客户端就认为网络包 3 没有发送成功，于是又发送了一遍，这种情况下，要赶紧给客户端再发送一次 ACK，表示早就收到了
+   * seq 不小于 rcv_nxt + tcp_receive_window：客户端发送得太猛了。本来 seq应该在接收窗口里面，这样服务端才来得及处理，现在超出了接收窗口，说明客户端一下子把服务端给塞满了。服务端不能再接收数据包而只能发送 ACK ，在 ACK 中会将接收窗口为 0 的情况告知客户端，客户端就知道不能再发送。此时双方只能交互窗口探测数据包，直到服务端因为用户进程把数据读走了，空出接收窗口，才能在 ACK 里面再次告诉客户端，又有窗口又能发送数据包了
+   * seq 小于 rcv_nxt && end_seq 大于 rcv_nxt：从 seq 到 rcv_nxt 这部分网络包原来的 ACK 客户端没有收到，所以重新发送了一次，从 rcv_nxt 到 end_seq 时新发送的，可以放入 sk_receive_queue 队列
+
+   四种情况都排除掉了，说明网络包一定是一个乱序包
+
+7. 如果是其他状态则调用 tcp_rcv_state_process
+
+![img](https://static001.geekbang.org/resource/image/38/c6/385ff4a348dfd2f64feb0d7ba81e2bc6.png)
+
+##### Socket 层
+
+当接收的网络包进入各种队列之后，接下来就要等待用户进程去读取它们。读取一个 socket，就像读取一个文件一样，通过 read 系统调用。最终它会调用到用来表示一个打开文件的结构 stuct file 指向的 file_operations 操作。对于 socket 来讲，它的 file_operations 定义如下：
+
+```
+static const struct file_operations socket_file_ops = {
+  .owner =  THIS_MODULE,
+  .llseek =  no_llseek,
+  .read_iter =  sock_read_iter,
+  .write_iter =  sock_write_iter,
+  .poll =    sock_poll,
+  .unlocked_ioctl = sock_ioctl,
+  .mmap =    sock_mmap,
+  .release =  sock_close,
+  .fasync =  sock_fasync,
+  .sendpage =  sock_sendpage,
+  .splice_write = generic_splice_sendpage,
+  .splice_read =  sock_splice_read,
+};
+```
+
+1. 在 sock_read_iter 中，通过 VFS 中的 struct file，将创建好的 socket 结构拿出来，然后调用 sock_recvmsg->sock_recvmsg_nosec
+2. 调用socket 的 ops 的 recvmsg，根据 inet_stream_ops 的定义，调用 inet_recvmsg
+3. 从 socket 结构，可以得到更底层的 sock 结构，然后调用 sk_prot 的 recvmsg 方法。根据 tcp_prot 的定义，调用 tcp_recvmsg
+4. tcp_recvmsg 里面有一个 while 循环，不断地读取网络包。有三个队列，receive_queue 队列、prequeue 队列和 backlog 队列。需要把前一个队列处理完毕，才处理后一个队列
+5. 先处理 sk_receive_queue 队列。如果找到了网络包就跳到 found_ok_skb。调用 skb_copy_datagram_msg，将网络包拷贝到用户进程中，然后直接进入下一层循环。直到 sk_receive_queue 队列处理完毕
+6. 到了 sysctl_tcp_low_latency 判断。如果不需要低时延，则会有 prequeue 队列。跳到 do_prequeue 这里，调用 tcp_prequeue_process 进行处理。如果 sysctl_tcp_low_latency 设置为 1，即没有 prequeue 队列，或者 prequeue 队列为空，则需要处理 backlog 队列，在 release_sock 函数中会依次处理队列中的网络包
