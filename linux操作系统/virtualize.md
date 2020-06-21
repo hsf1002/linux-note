@@ -51,3 +51,15 @@ qemu 和 kvm 整合之后，CPU 的性能问题解决了。Qemu 还会模拟其�
 * parent 表示父类的名称
 * class_init 用于将 TypeImpl 初始化为 MachineClass
 * instance_init 用于将 MachineClass 初始化为 MachineState
+
+CPU 的虚拟化过程：
+
+1. 首先，定义 CPU 类型的 TypeInfo 和 TypeImpl、继承关系，并且声明它的类初始化函数
+2. 在 qemu 的 main 函数中调用 MachineClass 的 init 函数，既会初始化 CPU，也会初始化内存
+3. CPU 初始化的时候，会调用 pc_new_cpu 创建一个虚拟 CPU，它会调用 CPU 这个类的初始化函数
+4. 每一个虚拟 CPU 会调用 qemu_thread_create 创建一个线程，线程的执行函数为 qemu_kvm_cpu_thread_fn
+5. 在虚拟 CPU 对应的线程执行函数中，先调用 kvm_vm_ioctl(KVM_CREATE_VCPU)，在内核的 KVM 里面，创建一个结构 struct vcpu_vmx，表示这个虚拟 CPU。在这个结构里面，有一个 VMCS，用于保存当前虚拟机 CPU 的运行时的状态，用于状态切换
+6. 在虚拟 CPU 对应的线程执行函数中，继续调用 kvm_vcpu_ioctl(KVM_RUN)，在内核的 KVM 里面，运行这个虚拟机 CPU。运行方式是保存宿主机的寄存器，加载客户机的寄存器，然后调用 `__ex(ASM_VMX_VMLAUNCH)` 或者 `__ex(ASM_VMX_VMRESUME)`，进入客户机模式运行。一旦退出客户机模式，就会保存客户机寄存器，加载宿主机寄存器，进入宿主机模式运行，并且会记录退出虚拟机模式的原因。大部分的原因是等待 I/O，因而宿主机调用 kvm_handle_io 进行处理
+
+![img](https://static001.geekbang.org/resource/image/c4/67/c43639f7024848aa3e828bcfc10ca467.png)
+
