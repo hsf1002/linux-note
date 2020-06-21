@@ -39,3 +39,15 @@ qemu 和 kvm 整合之后，CPU 的性能问题解决了。Qemu 还会模拟其�
 * CPU 和内存主要使用硬件辅助虚拟化进行加速，需要配备特殊的硬件才能工作
 * 网络和存储主要使用特殊的半虚拟化驱动加速，需要加载特殊的驱动程序
 
+### 虚拟化之CPU
+
+定义一个 qemu 模块会调用 type_init。例如kvm 的模块在 accel/kvm/kvm-all.c 文件
+
+![img](https://static001.geekbang.org/resource/image/07/30/078dc698ef1b3df93ee9569e55ea2f30.png)
+
+每个模块都会有一个定义 TypeInfo，通过 type_init 变为全局的 TypeImpl。TypeImpl 有以下成员：
+
+* name 表示当前类型的名称
+* parent 表示父类的名称
+* class_init 用于将 TypeImpl 初始化为 MachineClass
+* instance_init 用于将 MachineClass 初始化为 MachineState
