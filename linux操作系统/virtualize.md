@@ -91,3 +91,29 @@ CPU 的虚拟化是用户态的 qemu 和内核态的 KVM 共同配合完成的�
 
 ![img](https://static001.geekbang.org/resource/image/01/9b/0186c533b7ef706df880dfd775c2449b.jpg)
 
+##### 虚拟化之存储
+
+在虚拟化技术的早期，不同的虚拟化技术会针对不同硬盘设备和网络设备实现不同的驱动，虚拟机里面的操作系统也要根据不同的虚拟化技术和物理存储和网络设备，选择加载不同的驱动。由于硬盘设备和网络设备太多，驱动纷繁复杂。后来慢慢就形成了一定的标准：virtio。virtio 负责对于虚拟机提供统一的接口。在虚拟机里面的操作系统加载的驱动，以后都统一加载 virtio 就可以了
+
+![img](https://static001.geekbang.org/resource/image/1e/33/1e13ffd5ac846c52739291cb489d0233.png)
+
+virtio 的架构可以分为四层：
+
+* 首先，在虚拟机里面的 virtio 前端，针对不同类型的设备有不同的驱动程序，但是接口都是统一的。例如，硬盘就是 virtio_blk，网络就是 virtio_net
+* 其次，在宿主机的 qemu 里面，实现 virtio 后端的逻辑，主要就是操作硬件的设备。例如通过写一个物理机硬盘上的文件来完成虚拟机写入硬盘的操作。再如向内核协议栈发送一个网络包完成虚拟机对于网络的操作
+* 在 virtio 的前端和后端之间，有一个通信层，里面包含 virtio 层和 virtio-ring 层。virtio 这一层实现的是虚拟队列接口，是前后端通信的桥梁。而 virtio-ring 则是该桥梁的具体实现
+* virtio 使用 virtqueue 进行前端和后端的高速通信。不同类型的设备队列数目不同。virtio-net 使用两个队列，一个用于接收，另一个用于发送；而 virtio-blk 仅使用一个队列。如果客户机要向宿主机发送数据，客户机会将数据的 buffer 添加到 virtqueue 中，然后通过写入寄存器通知宿主机。这样宿主机就可以从 virtqueue 中收到的 buffer 里面的数据
+
+![img](https://static001.geekbang.org/resource/image/2e/f3/2e9ef612f7b80ec9fcd91e200f4946f3.png)
+
+VirtIODevice，VirtQueue，vring 之间的关系如下图所示：
+
+![img](https://static001.geekbang.org/resource/image/e1/6d/e18dae0a5951392c4a8e8630e53a616d.jpg)
+
+存储虚拟化的过程分为前端、后端和中间的队列：
+
+* 前端有前端的块设备驱动 Front-end driver，在客户机的内核里面，它符合普通设备驱动的格式，对外通过 VFS 暴露文件系统接口给客户机里面的应用
+* 后端有后端的设备驱动 Back-end driver，在宿主机的 qemu 进程中，当收到客户机的写入请求的时候，调用文件系统的 write 函数，写入宿主机的 VFS 文件系统，最终写到物理硬盘设备上的 qcow2 文件
+* 中间的队列用于前端和后端之间传输数据，在前端的设备驱动和后端的设备驱动，都有类似的数据结构 virt-queue 来管理这些队列
+
+![img](https://static001.geekbang.org/resource/image/1f/4b/1f0c3043a11d6ea1a802f7d0f3b0b34b.jpg)
