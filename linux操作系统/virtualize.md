@@ -117,3 +117,32 @@ VirtIODevice，VirtQueue，vring 之间的关系如下图所示：
 * 中间的队列用于前端和后端之间传输数据，在前端的设备驱动和后端的设备驱动，都有类似的数据结构 virt-queue 来管理这些队列
 
 ![img](https://static001.geekbang.org/resource/image/1f/4b/1f0c3043a11d6ea1a802f7d0f3b0b34b.jpg)
+
+qemu 初始化的时候，virtio 的后端有数据结构 VirtIODevice，VirtQueue 和 vring 一模一样，前端和后端对应起来，都应该指向刚才创建的那一段内存。qemu 后端的 VirtIODevice 的 VirtQueue 的 vring 的地址，被设置成了刚才给队列分配的内存的 GPA
+
+![img](https://static001.geekbang.org/resource/image/25/d0/2572f8b1e75b9eaab6560866fcb31fd0.jpg)
+
+中间 virtio 队列的格式：
+
+![img](https://static001.geekbang.org/resource/image/49/db/49414d5acc81933b66410bbba102b0db.jpg)
+
+vring 包含三个成员：
+
+* vring_desc：指向分配的内存块，用于存放客户机和 qemu 之间传输的数据
+* avail->ring[]：发送端维护的环形队列，指向需要接收端处理的 vring_desc
+* used->ring[]：接收端维护的环形队列，指向自己已经处理过了的 vring_desc
+
+存储虚拟化的场景下整个写入的过程：
+
+1. 在虚拟机里面，应用层调用 write 系统调用写入文件
+2. write 系统调用进入虚拟机里面的内核，经过 VFS，通用块设备层，I/O 调度层，到达块设备驱动
+3. 虚拟机里面的块设备驱动 virtio_blk 和通用的块设备驱动一样，有一个 request  queue，另外有一个函数 make_request_fn 会被设置为 blk_mq_make_request，这个函数用于将请求放入队列
+4. 虚拟机里面的块设备驱动 virtio_blk 会注册一个中断处理函数 vp_interrupt。当 qemu 写入完成之后，它会通知虚拟机里面的块设备驱动
+5. blk_mq_make_request 最终调用 virtqueue_add，将请求添加到传输队列 virtqueue 中，然后调用 virtqueue_notify 通知 qemu
+6. 在 qemu 中，本来虚拟机正处于 KVM_RUN 的状态，即客户机状态，qemu 收到通知后，通过 VM exit 指令退出客户机状态，进入宿主机状态，根据退出原因，得知有 I/O 需要处理
+7. qemu 调用 virtio_blk_handle_output，最终调用 virtio_blk_handle_vq，virtio_blk_handle_vq 里面有一个循环，在循环中，virtio_blk_get_request 函数从传输队列中拿出请求，然后调用 virtio_blk_handle_request 处理请求
+8. virtio_blk_handle_request 会调用 blk_aio_pwritev，通过 BlockBackend 驱动写入 qcow2 文件
+9. 写入完毕之后，virtio_blk_req_complete 会调用 virtio_notify 通知虚拟机里面的驱动。数据写入完成，刚才注册的中断处理函数 vp_interrupt 会收到这个通知
+
+![img](https://static001.geekbang.org/resource/image/79/0c/79ad143a3149ea36bc80219940d7d00c.jpg)
+
