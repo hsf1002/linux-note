@@ -194,3 +194,4 @@ static const struct file_operations tun_fops = {
 9. 宿主机内核协议栈处理完毕之后，会发送给 tap 虚拟网卡，完成从虚拟机里面到宿主机的整个发送过程
 
 ![img](https://static001.geekbang.org/resource/image/e3/44/e329505cfcd367612f8ae47054ec8e44.jpg)
+
