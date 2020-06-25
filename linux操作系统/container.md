@@ -56,6 +56,9 @@ Status: Downloaded newer image for nginx:latest
 CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                  NAMES
 73ff0c8bea6e        nginx               "nginx -g 'daemon of…"   2 minutes ago       Up 2 minutes        0.0.0.0:8080->80/tcp   modest_payne
 
+// 通过container ID查看容器信息
+# docker inspect 73ff0c8bea6e
+
 // 打印出 nginx 的欢迎页面
 # curl http://localhost:8080
 <!DOCTYPE html>
@@ -166,5 +169,98 @@ Dcoker对于内存的限制：
 
 ![img](https://static001.geekbang.org/resource/image/5a/c5/5a499cb50a1b214a39ddf19cbb63dcc5.jpg)
 
-### 
+### Namespace技术
+
+Linux 内核里面实现了以下几种不同类型的 namespace：
+
+* UTS，对应的宏为 CLONE_NEWUTS，表示不同的 namespace 可以配置不同的 hostname
+* User：对应的宏为 CLONE_NEWUSER，表示不同的 namespace 可以配置不同的用户和组
+* Mount：对应的宏为 CLONE_NEWNS，表示不同的 namespace 的文件系统挂载点是隔离的
+* PID：对应的宏为 CLONE_NEWPID，表示不同的 namespace 有完全独立的 pid，也即一个 namespace 的进程和另一个 namespace 的进程，pid 可以是一样的，但是代表不同的进程
+* Network：对应的宏为 CLONE_NEWNET，表示不同的 namespace 有独立的网络协议栈
+
+ /proc/pid/ns 里面，能够看到这个进程所属于的 6 种 namespace，它们属于同一个 namespace：
+
+```
+# ls -l /proc/58212/ns 
+lrwxrwxrwx 1 root root 0 Jul 16 19:19 ipc -> ipc:[4026532278]
+lrwxrwxrwx 1 root root 0 Jul 16 19:19 mnt -> mnt:[4026532276]
+lrwxrwxrwx 1 root root 0 Jul 16 01:43 net -> net:[4026532281]
+lrwxrwxrwx 1 root root 0 Jul 16 19:19 pid -> pid:[4026532279]
+lrwxrwxrwx 1 root root 0 Jul 16 19:19 user -> user:[4026531837]
+lrwxrwxrwx 1 root root 0 Jul 16 19:19 uts -> uts:[4026532277]
+
+# ls -l /proc/58253/ns 
+lrwxrwxrwx 1 33 tape 0 Jul 16 19:20 ipc -> ipc:[4026532278]
+lrwxrwxrwx 1 33 tape 0 Jul 16 19:20 mnt -> mnt:[4026532276]
+lrwxrwxrwx 1 33 tape 0 Jul 16 19:20 net -> net:[4026532281]
+lrwxrwxrwx 1 33 tape 0 Jul 16 19:20 pid -> pid:[4026532279]
+lrwxrwxrwx 1 33 tape 0 Jul 16 19:20 user -> user:[4026531837]
+lrwxrwxrwx 1 33 tape 0 Jul 16 19:20 uts -> uts:[4026532277]
+```
+
+namespace的常用操作命令：
+
+1.  nsenter：用来运行一个进程，进入指定的 namespace
+
+```
+// 可以运行 /bin/bash，并且进入 nginx 所在容器的 namespace
+# nsenter --target 58212 --mount --uts --ipc --net --pid -- env --ignore-environment -- /bin/bash
+
+root@f604f0e34bc2:/# ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+23: eth0@if24: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:03 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.3/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+```
+
+2. unshare：离开当前的 namespace，创建且加入新的 namespace，然后执行参数中指定的命令
+
+```
+// pid 和 net 都进入了新的 namespace
+# unshare --mount --ipc --pid --net --mount-proc=/proc --fork /bin/bash
+
+// 从 shell 上运行上面这行命令的话，好像没有什么变化，但是因为 pid 和 net 都进入了新的 namespace，所以查看进程列表和 ip 地址的时候应该会发现有所不同
+// 看不到宿主机上的 IP 地址和网卡了
+# ip addr
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+
+// 看不到宿主机上的所有进程
+# ps aux
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.0 115568  2136 pts/0    S    22:55   0:00 /bin/bash
+root        13  0.0  0.0 155360  1872 pts/0    R+   22:55   0:00 ps aux
+```
+
+namespace的常用操作函数：
+
+1. clone：创建一个新的进程，并把它放到新的 namespace 中
+
+```
+// 参数 flags可以设置为 CLONE_NEWUTS、CLONE_NEWUSER、CLONE_NEWNS、CLONE_NEWPID。CLONE_NEWNET 会将 clone 出来的新进程放到新的 namespace 中
+int clone(int (*fn)(void *), void *child_stack, int flags, void *arg);
+```
+
+2. setns：将当前进程加入到已有的 namespace 中
+
+```
+// fd 指向 /proc/[pid]/ns/ 目录里相应 namespace 对应的文件，表示要加入哪个 namespace。nstype 用来指定 namespace 的类型，可以设置为 CLONE_NEWUTS、CLONE_NEWUSER、CLONE_NEWNS、CLONE_NEWPID 和 CLONE_NEWNET
+int setns(int fd, int nstype);
+```
+
+3. unshare：使当前进程退出当前的 namespace，并加入到新创建的 namespace
+
+```
+// flags 用于指定一个或者多个上面的 CLONE_NEWUTS、CLONE_NEWUSER、CLONE_NEWNS、CLONE_NEWPID 和 CLONE_NEWNET
+int unshare(int flags);
+```
+
+![img](https://static001.geekbang.org/resource/image/56/d7/56bb9502b58628ff3d1bee83b6f53cd7.png)
+
+在内核里面，对于任何一个进程 task_struct 来讲，里面都会有一个成员 struct nsproxy，用于保存 namespace 相关信息，里面有 struct uts_namespace、struct ipc_namespace、struct mnt_namespace、struct pid_namespace、struct net *net_ns 和 struct cgroup_namespace *cgroup_ns。创建 namespace 的时候，在内核中会调用 copy_namespaces，调用顺序依次是 copy_mnt_ns、copy_utsname、copy_ipcs、copy_pid_ns、copy_cgroup_ns 和 copy_net_ns，来复制 namespace
 
