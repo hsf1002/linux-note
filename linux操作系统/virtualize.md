@@ -146,3 +146,51 @@ vring 包含三个成员：
 
 ![img](https://static001.geekbang.org/resource/image/79/0c/79ad143a3149ea36bc80219940d7d00c.jpg)
 
+##### 虚拟化之网络
+
+网络虚拟化有和存储虚拟化类似的地方，它们都是基于 virtio，因而在看网络虚拟化的过程中，有和存储虚拟化很像的数据结构和原理。网络虚拟化也有自己的特殊性。例如，存储虚拟化是将宿主机上的文件作为客户机上的硬盘，而网络虚拟化需要依赖于内核协议栈进行网络包的封装与解封装
+
+qemu 会将客户机发送给它的网络包，转换成为文件流，写入"/dev/net/tun"字符设备。内核中 TUN/TAP 字符设备驱动会收到这个写入的文件流，然后交给 TUN/TAP 的虚拟网卡驱动。它会将文件流再次转成网络包，交给 TCP/IP 栈，最终从虚拟 TAP 网卡 tap0 发出来，成为标准的网络包
+
+![img](https://static001.geekbang.org/resource/image/24/d3/243e93913b18c3ab00be5676bef334d3.png)
+
+内核的实现在 drivers/net/tun.c 文件中。这是一个字符设备驱动程序，里面注册了一个 tun_miscdev 字符设备，从它的定义可以看出，这就是"/dev/net/tun"字符设备
+
+```
+static struct miscdevice tun_miscdev = {
+  .minor = TUN_MINOR,
+  .name = "tun",
+  .nodename = "net/tun",
+  .fops = &tun_fops,
+};
+
+static const struct file_operations tun_fops = {
+  .owner  = THIS_MODULE,
+  .llseek = no_llseek,
+  .read_iter  = tun_chr_read_iter,
+  .write_iter = tun_chr_write_iter,
+  .poll  = tun_chr_poll,
+  .unlocked_ioctl  = tun_chr_ioctl,
+  .open  = tun_chr_open,
+  .release = tun_chr_close,
+  .fasync = tun_chr_fasync,
+};
+```
+
+在 struct tun_file 中，有一个成员 struct tun_struct，它里面有一个 struct net_device，这个用来表示宿主机上的 tuntap 网络设备。在 struct tun_file 中，还有 struct socket 和 struct sock，因为要用到内核的网络协议栈，所以就需要这两个结构，"/dev/net/tun"对应的 struct file 的 private_data 指向它，因而可以接收 qemu 发过来的数据。除此之外，它还可以通过 struct sock 来操作内核协议栈，然后将网络包从宿主机上的 tuntap 网络设备发出去，宿主机上的 tuntap 网络设备对应的 struct net_device 也归它管，tun_set_iff 创建了 struct tun_struct 和 struct net_device，并且将这个 tuntap 网络设备通过 register_netdevice 注册到内核中。这样就能在宿主机上通过 ip addr 看到这个网卡了
+
+![img](https://static001.geekbang.org/resource/image/98/fd/9826223c7375bec19bd13588f3875ffd.png)
+
+网络虚拟化场景下网络包的发送过程：
+
+1. 在虚拟机里面的用户态，应用程序通过 write 系统调用写入 socket
+2. 写入的内容经过 VFS 层，内核协议栈，到达虚拟机里面的内核的网络设备驱动，即 virtio_net
+3. virtio_net 网络设备有一个操作结构 struct net_device_ops，里面定义了发送一个网络包调用的函数为 start_xmit
+4. 在 virtio_net 的前端驱动和 qemu 中的后端驱动之间，有两个队列 virtqueue，一个用于发送，一个用于接收。需要在 start_xmit 中调用 virtqueue_add，将网络包放入发送队列，然后调用 virtqueue_notify 通知 qemu
+5. qemu 本来处于 KVM_RUN 的状态，收到通知后，通过 VM exit 指令退出客户机模式，进入宿主机模式。发送网络包的时候，virtio_net_handle_tx_bh 函数会被调用
+6. 接下来是一个 for 循环，在循环中调用 virtqueue_pop，从传输队列中获取要发送的数据，然后调用 qemu_sendv_packet_async 进行发送
+7. qemu 会调用 writev 向字符设备文件写入，进入宿主机的内核
+8. 在宿主机内核中字符设备文件的 file_operations 里面的 write_iter 会被调用，即 tun_chr_write_iter。在 tun_chr_write_iter 函数中，tun_get_user 将要发送的网络包从 qemu 拷贝到宿主机内核里面来，然后调用 netif_rx_ni 开始调用宿主机内核协议栈进行处理
+9. 宿主机内核协议栈处理完毕之后，会发送给 tap 虚拟网卡，完成从虚拟机里面到宿主机的整个发送过程
+
+![img](https://static001.geekbang.org/resource/image/e3/44/e329505cfcd367612f8ae47054ec8e44.jpg)
