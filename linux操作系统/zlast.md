@@ -84,3 +84,13 @@ q，即 quit，用于退出 gdb 环境
 4. 修改 qemu 的启动参数和里面虚拟机的启动参数，从而使得 gdb 可以远程 attach 到 qemu 里面的内核上
 5. 使用 gdb 运行内核的二进制文件，执行 gdb vmlinux
 
+##### kernel的启动流程
+
+1. 在 1M 空间最上面的 0xF0000 到 0xFFFFF 这 64K 映射给 ROM，通过读这部分地址，可以访问 BIOS 
+2. 在启动盘的第一个扇区，512K 的大小，为 MBR（Master Boot Record，主引导记录 / 扇区）。保存了 boot.img，BIOS 会将他加载到内存中的 0x7c00 来运行
+3. boot.img 会加载 grub2 的另一个镜像 core.img
+4. core.img 由 lzma_decompress.img、diskboot.img、kernel.img 和一系列的模块组成，功能比较丰富
+5. boot.img 将控制权交给 diskboot.img 后，diskboot.img 的任务就是将 core.img 的其他部分加载进来，先是解压缩程序 lzma_decompress.img，再往下是 kernel.img，最后是各个模块 module 对应的映像
+6. kernel.img 里面的 grub_main 会展示操作系统的列表，可以进行选择
+7. kernel_init 运行 1 号进程。 它会在用户态运行
+8. kthreadd 运行 2 号进程。它会在内核态运行
