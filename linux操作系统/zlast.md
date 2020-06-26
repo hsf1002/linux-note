@@ -60,3 +60,27 @@ asmlinkage int sys_sayhelloworld(char * words, int count){
 }
 ```
 
+##### GDB调试
+
+常用命令参数：
+
+```
+l，即 list，用于显示多行源代码
+b，即 break，用于设置断点
+r，即 run，用于开始运行程序
+n，即 next，用于执行下一条语句。如果该语句为函数调用，则不会进入函数内部执行
+p，即 print，用于打印内部变量值
+s，即 step，用于执行下一条语句。如果该语句为函数调用，则进入函数，执行其中的第一条语句
+c，即 continue，用于继续程序的运行，直到遇到下一个断点
+bt，即 backtrace，用于查看函数调用信息
+q，即 quit，用于退出 gdb 环境
+```
+
+ 通过宿主机上的 gdb 来 debug 虚拟机里面的内核的步骤：
+
+1. 需要将 debug 所需信息也放入二进制文件里面去。把“CONFIG_DEBUG_INFO”和“CONFIG_FRAME_POINTER”两个变量设置为 yes
+2. 安装 gdb。kernel 运行在 qemu 虚拟机里面，gdb 运行在宿主机上，所以应该在宿主机上进行安装
+3. 找到 gdb 要运行的那个内核的二进制文件。根据 grub 里面的配置，应该在 /boot/vmlinuz-4.15.18 
+4. 修改 qemu 的启动参数和里面虚拟机的启动参数，从而使得 gdb 可以远程 attach 到 qemu 里面的内核上
+5. 使用 gdb 运行内核的二进制文件，执行 gdb vmlinux
+
