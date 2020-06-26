@@ -308,3 +308,42 @@ cgroup 文件系统多挂载到 /sys/fs/cgroup 下，通过上面的命令行，
 
 ![img](https://static001.geekbang.org/resource/image/c9/c4/c9cc56d20e6a4bac0f9657e6380a96c4.png)
 
+### 数据中心操作系统
+
+![img](https://static001.geekbang.org/resource/image/49/47/497c8c2c0cb193e0380ed1d7c82ac147.jpeg)
+
+将操作系统的功能和模块与 Kubernetes 的功能和模块做了一个对比，Kubernetes 作为数据中心的操作系统还是主要管理数据中心里面的四种硬件资源：CPU、内存、存储、网络。Kubernetes 将多个 Docker 组装成一个 Pod 的概念。在一个 Pod 里面，往往有一个 Docker 为主，多个 Docker 为辅。Kubernetes 里面有 Controller 的概念，可以控制 Pod 们的运行状态以及占用的资源。如果 10 个变 9 个了，就选一台机器添加一个；如果 10 个变 11 个了，就随机删除一个。操作系统上的进程有时候有亲和性的要求，比如它可能希望在某一个 CPU 上运行，不切换 CPU，从而提高运行效率。或者两个线程要求在一个 CPU 上，从而可以使用 Per CPU 变量不加锁，交互和协作比较方便。有的时候一个线程想避开另一个线程，不要共用 CPU，以防相互干扰。Kubernetes 的 Scheduler 也有亲和性功能
+
+Docker 可以将 CPU 内存资源进行抽象，在服务器之间迁移，数据统一的存储常常有三种形式：
+
+* 对象存储：将文件作为一个完整对象的方式来保存。每一个文件对我们来说，都应该有一个唯一标识这个对象的 key，而文件的内容就是 value。对于任何一个文件对象，都可以通过 HTTP RESTful API 来远程获取对象。能够容纳的数据量往往非常大。在数据中心里面保存文档、视频等是很好的方式，缺点是没办法像操作文件一样操作它
+* 分布式文件系统：使用它和使用本地的文件系统几乎没有什么区别，只不过是通过网络的方式访问远程的文件系统。多个容器能看到统一的文件系统，一个容器写入文件系统，另一个容器能够看到，可以实现共享。缺点是分布式文件系统的性能和规模是个矛盾，规模一大性能就难以保证，性能好则规模不会很大，所以不像对象存储一样能够保持海量的数据
+* 分布式块存储：相当于云硬盘，即存储虚拟化的方式，只不过将盘挂载给容器而不是虚拟机。块存储没有分布式文件系统这一层，一旦挂载到某一个容器，可以有本地的文件系统，缺点是，一般情况下，不同容器挂载的块存储都是不共享的，好处是在同样规模的情况下，性能相对分布式文件系统要好。如果为了解决一个容器从一台服务器迁移到另一台服务器，如何保持数据存储的问题，块存储是一个很好的选择
+
+对象存储使用 HTTP 进行访问，任何容器都能访问到，不需要 Kubernetes 去管理它。而分布式文件系统和分布式块存储，需要对接到 Kubernetes，让 Kubernetes 可以管理它们。Kubernetes 提供 Container Storage Interface（CSI）的标准接口，不同的存储可以实现这个接口来对接 Kubernetes
+
+Kubernetes 有自己的网络模型，里面是这样规定的：
+
+1. IP-per-Pod，每个 Pod 都拥有一个独立 IP 地址，Pod 内所有容器共享一个网络命名空间
+2. 集群内所有 Pod 都在一个直接连通的扁平网络中，可通过 IP 直接访问
+   * 所有容器之间无需 NAT 就可以直接互相访问
+   * 所有 Node 和所有容器之间无需 NAT 就可以直接互相访问
+   * 容器自己看到的 IP 跟其它容器看到的一样
+
+要实现这样的网络模型，有很多种方式，例如 Kubernetes 自己提供 Calico、Flannel。也可以对接 Openvswitch 这样的虚拟交换机，也可以使用 brctl 这种传统的桥接模式，也可以对接硬件交换机
+
+进程的类型：
+
+1. 第一种进程是交互式命令行，运行起来就是执行一个任务，结束了马上返回结果。在 Kubernetes 里面有对应的概念叫作 Job，Job 负责批量处理短暂的一次性任务 (Short Lived One-off Tasks)，即仅执行一次的任务，它保证批处理任务的一个或多个 Pod 成功结束
+2. 第二种进程是 nohup（长期运行）的进程。在 Kubernetes 里对应的概念是 Deployment，使用 Deployment 来创建 ReplicaSet。ReplicaSet 在后台创建 Pod。即Doployment 里面会声明希望某个进程以 N 的 Pod 副本的形式运行，并且长期运行，一旦副本变少就会自动添加
+3. 第三种进程是系统服务。在 Kubernetes 里面对应的概念是 DaemonSet，它保证在每个节点上都运行一个容器副本，常用来部署一些集群的日志、监控或者其他系统管理应用
+4. 第四种进程是周期性进程，即 Crontab，常常用来设置一些周期性的任务。在 Kubernetes 里面对应的概念是 CronJob（定时任务），就类似于 Linux 系统的 Crontab，在指定的时间周期运行指定的任务
+
+对于存储来讲，Kubernetes 有 Volume 的概念。它的生命周期与 Pod 绑定在一起，容器挂掉后，Kubelet 再次重启容器时，Volume 的数据依然还在，而 Pod 删除时，Volume 才会真的被清理。数据是否丢失取决于具体的 Volume 类型
+
+对于网络来讲，Kubernetes 有自己的 DNS，有 Service 的概念。Kubernetes Service 是一个 Pod 的逻辑分组，这一组 Pod 能够被 Service 访问。每一个 Service 都一个名字，Kubernetes 会将 Service 的名字作为域名解析成为一个虚拟的 Cluster IP，然后通过负载均衡，转发到后端的 Pod。虽然 Pod 可能漂移，IP 会变，但是 Service 会一直不变
+
+对应到 Linux 操作系统的 iptables，Kubernetes 在有个概念叫 Network Policy，Network Policy 提供了基于策略的网络控制，用于隔离应用并减少攻击面。它使用标签选择器模拟传统的分段网络，并通过策略控制它们之间的流量以及来自外部的流量
+
+![img](https://static001.geekbang.org/resource/image/1a/e5/1a8450f1fcda83b75c9ba301ebf9fbe5.jpg)
+
