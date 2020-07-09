@@ -16,8 +16,6 @@
 #include <stddef.h>
 #include <signal.h>
 #include <ctype.h>
-#include "get_num.h"
-
 
 
 
@@ -25,23 +23,10 @@
  * 通过私有文件映射，开发一个简易版的cat命令程序
  * 将命令行指定文件映射到内存，然后将内存中的内容写入标准输出
  
- 
-./mmcat ./get_num.h 
-#ifndef GET_NUM_H
-#define GET_NUM_H
+ ./a.out hello
+hello world
 
-#define GN_NONNEG       01      /* Value must be >= 0 */
-#define GN_GT_0         02      /* Value must be > 0 */
 
-/* By default, integers are decimal */
-#define GN_ANY_BASE   0100      /* Can use any base - like strtol(3) */
-#define GN_BASE_8     0200      /* Value is expressed in octal */
-#define GN_BASE_16    0400      /* Value is expressed in hexadecimal */
-
-long getLong(const char *arg, int flags, const char *name);
-int getInt(const char *arg, int flags, const char *name);
-
-#endif 
  * 
  */
 int main(int argc, char *argv[])
@@ -84,4 +69,3 @@ int main(int argc, char *argv[])
 
     exit(EXIT_SUCCESS);
 }
-
