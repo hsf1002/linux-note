@@ -55,6 +55,27 @@ slept for:  9.624827 sec
 remaining:  0.375207557
 slept for: 10.005106 sec
 
+------------------------------------------------------------------------------
+./t_nanosleep 10 5000
+^Ccaught signal 
+nanosleep interrupted: Interrupted system call
+slept for:  1.689316 sec 
+remaining:  8.311123025
+^Ccaught signal 
+nanosleep interrupted: Interrupted system call
+slept for:  4.511913 sec 
+remaining:  5.488677808
+^Ccaught signal 
+nanosleep interrupted: Interrupted system call
+slept for:  5.769097 sec 
+remaining:  4.231637394
+^Ccaught signal 
+nanosleep interrupted: Interrupted system call
+slept for:  8.905031 sec 
+remaining:  1.095875502
+slept for: 10.001068 sec 
+sleep complete!
+
  */
 int
 main(int argc, char *argv[])    

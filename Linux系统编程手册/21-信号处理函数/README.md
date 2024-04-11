@@ -45,11 +45,10 @@ volatile sig_atomic_t flag;
 
 int sigsetjmp(sigjmp_buf env, int savemask);
 // 若直接调用则返回0，若从siglongjmp调用返回则返回非0值
-
-void siglongjmp(sigjmp_buf env, int val);
-
 // 若savemask非0，则sigsetjmp在env中保存进程的当前信号屏蔽字，调用siglongjmp从其中恢复保存的信号屏蔽字
 // 若savemask是0，则不会保存和恢复进程的信号屏蔽字
+
+void siglongjmp(sigjmp_buf env, int val);
 ```
 
 4. 使用abort终止进程并产生核心转储文件

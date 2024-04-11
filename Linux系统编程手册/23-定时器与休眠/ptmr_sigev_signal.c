@@ -12,11 +12,34 @@
 #include <signal.h>
 #include <time.h>
 #include <sys/time.h>
-#include "cur_time.h"
 
 
 #define TIMER_SIG SIGRTMAX
 
+/**
+ * 
+ *  按照格式化要求显示时间格式
+ *
+ *  cc -g -fPIC -Wall cur_time.c -shared -o libcurtime.so
+ */
+char *
+curr_time(const char *format)
+{
+    static char buf[BUFSIZ];  
+    time_t t;
+    size_t s;
+    struct tm *tm;
+
+    t = time(NULL);
+    tm = localtime(&t);
+
+    if (tm == NULL)
+        return NULL;
+
+    s = strftime(buf, BUFSIZ, (format != NULL) ? format : "%c", tm);
+
+    return (s == 0) ? NULL : buf;
+}
 
 /**
  * 
@@ -67,6 +90,7 @@ handler(int signo, siginfo_t *si, void *uc)
 
     printf("[%s] got signal %d \n", curr_time("%T"), signo);
     printf("    *sival_ptr         = %ld\n", (long)*tidptr);
+    // 定时器溢出次数：定时器超时后发送的同一个信号如果挂起未处理，那么在下次超时发生后，上一个信号会丢失
     printf("    timer_getoverrun() = %ld\n", timer_getoverrun(*tidptr));
 }
 
@@ -109,6 +133,26 @@ LD_LIBRARY_PATH=. ./ptmr_sigev_signal 1:3
     *sival_ptr         = 21168208
     timer_getoverrun() = 0
 ^C
+
+---------------------------------------------------------------------------
+
+./ptmr_sigev_signal 2:5
+Timer ID: 93894628578016 (2:5) 
+[19:25:00] got signal 64 
+    *sival_ptr         = 93894628578016
+    timer_getoverrun() = 0
+[19:25:05] got signal 64 
+    *sival_ptr         = 93894628578016
+    timer_getoverrun() = 0
+[19:25:10] got signal 64 
+    *sival_ptr         = 93894628578016
+    timer_getoverrun() = 0
+[19:25:15] got signal 64 
+    *sival_ptr         = 93894628578016
+    timer_getoverrun() = 0
+^C
+
+
  */
 int
 main(int argc, char *argv[])    

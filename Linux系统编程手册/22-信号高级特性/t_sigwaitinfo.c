@@ -18,10 +18,10 @@
 /**
  *   
  * 使用sigsuspend的替代方案sigwaitinfo
- * 
+ *  cc -g -Wall -o sig_waitinfo t_sigwaitinfo.c libgetnum.so
  *
 
- cc -g -Wall -o sig_waitinfo t_sigwaitinfo.c libgetnum.so
+
 // 睡眠100秒
 hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sig_waitinfo 100 &
 [1] 20389
@@ -43,6 +43,8 @@ hefeng@sw-hefeng:/home/workspace1/logs/test$ ./sig_waitinfo: pid is 20389
 // 发送第五个标准信号4
  hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20389 4  20 1
 ./sigqueue PID: 20411, UID: 1000
+ 
+ 
  hefeng@sw-hefeng:/home/workspace1/logs/test$ ./sig_waitinfo: finished delay
 // 先接收标准信号（先发送的后接收？），再接收实时信号（接收顺序按照信号编号排序）
 got signal: 4 (Illegal instruction)

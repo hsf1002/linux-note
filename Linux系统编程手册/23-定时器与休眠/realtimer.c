@@ -70,7 +70,7 @@ sigalrm_handler(int signo)
 /**
  *   
  * 
- * 
+ * cc realtimer.c -o realtimer libgetnum.so
  * 
 skydeiMac:23-定时器与休眠 sky$ ./realtimer 1 800000 1 0
         Elapsed  value  interval 
@@ -101,7 +101,55 @@ Main:     5.51    0.29   2.00
 ALARM:    5.80    2.00   2.00
 that's all folks
 
+-----------------------------------------------------------------
+./realtimer 1 800000 1 0
+        Elapsed  value  interval 
+     已流逝时长 下次定时器时长 定时器间隔时长
+START:    0.00
+Main:     0.50    1.30   1.00
+Main:     1.00    0.80   1.00
+Main:     1.50    0.30   1.00
+ALARM:    1.80    1.00   1.00
+Main:     2.00    0.80   1.00
+Main:     2.50    0.30   1.00
+ALARM:    2.80    1.00   1.00
+Main:     3.00    0.80   1.00
+Main:     3.50    0.30   1.00
+ALARM:    3.80    1.00   1.00
+Main:     4.00    0.80   1.00
+Main:     4.50    0.30   1.00
+ALARM:    4.80    1.00   1.00
+that's all folks
 
+
+./realtimer 3 800000 2 0
+        Elapsed  value  interval 
+START:    0.00
+Main:     0.50    3.30   2.00
+Main:     1.00    2.80   2.00
+Main:     1.50    2.30   2.00
+Main:     2.00    1.80   2.00
+Main:     2.50    1.30   2.00
+Main:     3.00    0.80   2.00
+Main:     3.50    0.30   2.00
+ALARM:    3.80    2.00   2.00
+Main:     4.00    1.80   2.00
+Main:     4.50    1.30   2.00
+Main:     5.00    0.80   2.00
+Main:     5.50    0.30   2.00
+ALARM:    5.80    2.00   2.00
+Main:     6.00    1.80   2.00
+Main:     6.50    1.30   2.00
+Main:     7.00    0.80   2.00
+Main:     7.50    0.30   2.00
+ALARM:    7.80    2.00   2.00
+Main:     8.00    1.80   2.00
+        Elapsed  value  interval 
+Main:     8.50    1.30   2.00
+Main:     9.00    0.80   2.00
+Main:     9.50    0.30   2.00
+ALARM:    9.80    2.00   2.00
+that's all folks
 
 
  */

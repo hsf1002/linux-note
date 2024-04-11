@@ -15,6 +15,13 @@
 /**
  *   
  * 发送多个信号
+ * ./sig_sendor 1263915 9 10
+./sig_sendor: sending signal 10 to process 1263915 9 times
+getInt error (in sig-num-2): null or empty string
+./sig_sendor 1263915 1 2
+./sig_sendor: sending signal 2 to process 1263915 1 times
+getInt error (in sig-num-2): null or empty string
+
  */
 int
 main(int argc, char *argv[])    
@@ -46,4 +53,5 @@ main(int argc, char *argv[])
 
     exit(EXIT_SUCCESS);
 }
+
 

@@ -12,6 +12,8 @@
 /**
  * 
  *  按照格式化要求显示时间格式
+ *
+ *  cc -g -fPIC -Wall cur_time.c -shared -o libcurtime.so
  */
 char *
 curr_time(const char *format)

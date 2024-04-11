@@ -21,6 +21,30 @@ static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 // 过期定时器的数量
 static int exprire_cnt = 0;
 
+/**
+ * 
+ *  按照格式化要求显示时间格式
+ *
+ *  cc -g -fPIC -Wall cur_time.c -shared -o libcurtime.so
+ */
+char *
+curr_time(const char *format)
+{
+    static char buf[BUFSIZ];  
+    time_t t;
+    size_t s;
+    struct tm *tm;
+
+    t = time(NULL);
+    tm = localtime(&t);
+
+    if (tm == NULL)
+        return NULL;
+
+    s = strftime(buf, BUFSIZ, (format != NULL) ? format : "%c", tm);
+
+    return (s == 0) ? NULL : buf;
+}
 
 /**
  * 
@@ -134,6 +158,38 @@ main: expire cnt = 12
     timer_getoverrun() = 0 
 main: expire cnt = 13 
 ^C
+
+---------------------------------------------------------------------
+cc -g -Wall -o ptmr_sigev_thread ptmr_sigev_thread.c -lrt
+./ptmr_sigev_thread 1:3
+Timer ID: 93873340457984 (1:3) 
+[09:54:46] Thread notify 
+    timer ID = 93873340457984
+    timer_getoverrun() = 0 
+main: expire cnt = 1 
+[09:54:49] Thread notify 
+    timer ID = 93873340457984
+    timer_getoverrun() = 0 
+main: expire cnt = 2 
+[09:54:52] Thread notify 
+    timer ID = 93873340457984
+    timer_getoverrun() = 0 
+main: expire cnt = 3 
+[09:54:55] Thread notify 
+    timer ID = 93873340457984
+    timer_getoverrun() = 0 
+main: expire cnt = 4 
+[09:54:58] Thread notify 
+    timer ID = 93873340457984
+    timer_getoverrun() = 0 
+main: expire cnt = 5 
+[09:55:01] Thread notify 
+    timer ID = 93873340457984
+    timer_getoverrun() = 0 
+main: expire cnt = 6 
+^C
+
+
 
  */
 int

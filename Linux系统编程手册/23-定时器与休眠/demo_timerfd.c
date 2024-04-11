@@ -13,8 +13,33 @@
 #include <time.h>
 #include <sys/time.h>
 #include <stdint.h>
-#include "cur_time.h"
+//#include "cur_time.h"
 #include "get_num.h"
+
+/**
+ * 
+ *  按照格式化要求显示时间格式
+ *
+ *  cc -g -fPIC -Wall cur_time.c -shared -o libcurtime.so
+ */
+char *
+curr_time(const char *format)
+{
+    static char buf[BUFSIZ];  
+    time_t t;
+    size_t s;
+    struct tm *tm;
+
+    t = time(NULL);
+    tm = localtime(&t);
+
+    if (tm == NULL)
+        return NULL;
+
+    s = strftime(buf, BUFSIZ, (format != NULL) ? format : "%c", tm);
+
+    return (s == 0) ? NULL : buf;
+}
 
 /**
  * 
@@ -59,6 +84,7 @@ itimerspec_from_str(const char *str, struct itimerspec *tsp)
  * 使用文件描述符进行POSIX定时器通知
 
 cc -g -Wall -o timer_fd demo_timerfd.c libgetnum.so libcurtime.so
+cc demo_timerfd.c -o demo_timerfd libgetnum.so libcurtime.so
 
 hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./timer_fd 5:10 4
 14:11:45 start
@@ -81,6 +107,15 @@ hefeng@sw-hefeng:/home/workspace1/logs/test$ fg
 LD_LIBRARY_PATH=. ./timer_fd 10:5 4
 14:14:38  20.942: expiration read: 2; total=3
 14:14:42  25.  0: expiration read: 1; total=4
+
+--------------------------------------------------------------------
+ ./demo_timerfd 5:10 4
+19:27:14 start
+19:27:19  5.  0: expiration read: 1; total=1
+19:27:29  15.  0: expiration read: 1; total=2
+19:27:39  24.1000: expiration read: 1; total=3
+19:27:49  35.  0: expiration read: 1; total=4
+
 
  */
 int

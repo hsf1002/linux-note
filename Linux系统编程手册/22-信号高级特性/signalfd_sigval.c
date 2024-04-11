@@ -19,7 +19,8 @@
  *   
  * sigwaitinfo的替代方案
  * 
- * 
+ * cc signalfd_sigval.c -o signalfd_sigval
+
 // 设置5个阻塞信号
 hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./signalfd_sigval 40 41 42 43 44 &
 [1] 20820
@@ -66,6 +67,31 @@ hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./sigqueue 20820 
  [1]+  实时信号 11         LD_LIBRARY_PATH=. ./signalfd_sigval 40 41 42 43 44
 hefeng@sw-hefeng:/home/workspace1/logs/test$ ps|grep signal
 
+-------------------------------------------------------------------------------------------
+接收：
+./signalfd_sigval 41 42 43 44 45
+./signalfd_sigval: pid is 1607420
+./signalfd_sigval: got signal 41  ,si_pid = 1607426n  ,ssi_int = 11n
+./signalfd_sigval: got signal 42  ,si_pid = 1607433n  ,ssi_int = 21n
+./signalfd_sigval: got signal 43  ,si_pid = 1607437n  ,ssi_int = 31n
+./signalfd_sigval: got signal 44  ,si_pid = 1607440n  ,ssi_int = 41n
+./signalfd_sigval: got signal 45  ,si_pid = 1607443n  ,ssi_int = 51n
+实时信号 12
+
+
+发送：
+hefeng@hefeng:/home/work1/workplace/github/linux-note/Linux系统编程手册/22-信号高级特性$ ./t_sigqueue 1607420 41 10 1
+./t_sigqueue PID: 1607426, UID: 1000
+hefeng@hefeng:/home/work1/workplace/github/linux-note/Linux系统编程手册/22-信号高级特性$ ./t_sigqueue 1607420 42 20 1
+./t_sigqueue PID: 1607433, UID: 1000
+hefeng@hefeng:/home/work1/workplace/github/linux-note/Linux系统编程手册/22-信号高级特性$ ./t_sigqueue 1607420 43 30 1
+./t_sigqueue PID: 1607437, UID: 1000
+hefeng@hefeng:/home/work1/workplace/github/linux-note/Linux系统编程手册/22-信号高级特性$ ./t_sigqueue 1607420 44 40 1
+./t_sigqueue PID: 1607440, UID: 1000
+hefeng@hefeng:/home/work1/workplace/github/linux-note/Linux系统编程手册/22-信号高级特性$ ./t_sigqueue 1607420 45 50 1
+./t_sigqueue PID: 1607443, UID: 1000
+hefeng@hefeng:/home/work1/workplace/github/linux-note/Linux系统编程手册/22-信号高级特性$ ./t_sigqueue 1607420 46 60 1
+./t_sigqueue PID: 1607446, UID: 1000
 
 
 
@@ -76,7 +102,6 @@ main(int argc, char *argv[])
     struct sigaction sa;
     siginfo_t si;
     sigset_t block_mask;
-    int sig_no;
     struct signalfd_siginfo fdsi;
     ssize_t s;
     int fd;
@@ -105,7 +130,7 @@ main(int argc, char *argv[])
             perror("read error");
 
         // 否则打印出接收到的信号信息
-        printf("got signal: %d (%s)\n", sig_no, strsignal(sig_no));
+        printf("%s: got signal %d", argv[0], fdsi.ssi_signo);
 
         if (SI_QUEUE == fdsi.ssi_code)
         {

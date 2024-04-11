@@ -35,6 +35,7 @@ handler(int signo)
  *   
  * 使用sigsuspend
  * 
+ * cc t_suspend.c -o t_suspend libsignalinfo.so
  
 LD_LIBRARY_PATH=. ./t_suspend
 ./t_suspend: pid is 89306
@@ -67,6 +68,37 @@ caught signal: 3 (Quit: 3)
 ---------Exit loop
 Restored signal mask: 
 		<empty signal set>
+
+---------------------------------------------------------------------------
+./t_suspend
+./t_suspend: pid is 1477823
+initial signal mask: 
+		<empty signal set>
+---------------loop_num: 1
+critical section start, mask: 
+		2 (Interrupt)
+		3 (Quit)
+before suspend, pending signals: 
+		<empty signal set>
+^Ccaught signal: 2 (Interrupt)  // 第一次按下CONTROL+C   
+---------------loop_num: 2
+critical section start, mask: 
+		2 (Interrupt)
+		3 (Quit)
+before suspend, pending signals: 
+		<empty signal set>
+^Ccaught signal: 2 (Interrupt)  // 第二次按下CONTROL+C   
+---------------loop_num: 3
+critical section start, mask: 
+		2 (Interrupt)
+		3 (Quit)
+before suspend, pending signals: 
+		<empty signal set>
+^\caught signal: 3 (Quit)       // 第一次按下CONTROL+\ 
+---------Exit loop
+Restored signal mask: 
+		<empty signal set>
+
  */
 int
 main(int argc, char *argv[])    

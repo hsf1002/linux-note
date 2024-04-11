@@ -222,7 +222,7 @@ struct itimerspec
 获取定时器的当前值：
 
 ```
-int timer_settime(timer_t timerid, struct itimerspec *curr_value);
+int timer_gettime(timer_t timerid, struct itimerspec *curr_value);
 // 返回值：若成功，返回0，若出错，返回-1
 // curr_value.it_value返回定时器下次到期的剩余时间
 // 若curr_value.it_value两个字段都是0，那么定时器处于停止状态

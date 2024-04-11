@@ -46,6 +46,7 @@ siginfo_handler(int signo, siginfo_t *s, void *ucontext)
  *   
  * 接收处理发送实时信号
  * 
+ * cc catch_rtsigs.c -o catch_rtsigs libgetnum.so
  
 hefeng@sw-hefeng:/home/workspace1/logs/test$ LD_LIBRARY_PATH=. ./catch_rtsigs 80 &
 [1] 21074
@@ -94,6 +95,48 @@ hefeng@sw-hefeng:/home/workspace1/logs/test$ ps|grep catch
 [1]+  已完成               LD_LIBRARY_PATH=. ./catch_rtsigs 80
 hefeng@sw-hefeng:/home/workspace1/logs/test$ ps|grep catch
 
+
+
+----------------------------------------发送
+ ./t_sigqueue 1476518 10 88 1
+./t_sigqueue PID: 1476530, UID: 1000
+
+./t_sigqueue 1476518 30 888 2
+./t_sigqueue PID: 1476538, UID: 1000
+
+./t_sigqueue 1476518 40 8888 3
+./t_sigqueue PID: 1476542, UID: 1000
+
+
+----------------------------------------接收
+./catch_rtsigs 90
+./catch_rtsigs: pid is 1476518
+sigaction error: Invalid argument
+sigaction error: Invalid argument
+sigaction error: Invalid argument
+sigaction error: Invalid argument
+./catch_rtsigs: signals blocked - sleeping 90 seconds
+./catch_rtsigs: sleep completed
+caught signal: 10
+, s_signo = 10, s_code = -1 (SI_QUEUE), s_value = 89
+    s_pid = 1476530, s_uid = 1000 
+caught signal: 28               // 其中一个signo 30丢失，可能被 signo 28 (SIGWINCH)影响导致
+, s_signo = 28, s_code = 128 (other), s_value = 0       
+    s_pid = 0, s_uid = 0 
+caught signal: 30
+, s_signo = 30, s_code = -1 (SI_QUEUE), s_value = 889
+    s_pid = 1476538, s_uid = 1000 
+caught signal: 40
+, s_signo = 40, s_code = -1 (SI_QUEUE), s_value = 8889
+    s_pid = 1476542, s_uid = 1000 
+caught signal: 40
+, s_signo = 40, s_code = -1 (SI_QUEUE), s_value = 8889
+    s_pid = 1476542, s_uid = 1000 
+caught signal: 40
+, s_signo = 40, s_code = -1 (SI_QUEUE), s_value = 8889
+    s_pid = 1476542, s_uid = 1000 
+^\退出 (核心已转储)
+
  */
 int
 main(int argc, char *argv[])    
@@ -111,9 +154,9 @@ main(int argc, char *argv[])
     handler_sleep_time = (argc > 2) ? getInt(argv[2], GN_NONNEG, "handler-sleep-time") : 1;
 
     sa.sa_sigaction = siginfo_handler;
-    // 必须指定SA_SIGINFO标记
+    // 必须指定SA_SIGINFO标记，因为信号处理函数的第二个参数类型是 siginfo_t
     sa.sa_flags = SA_SIGINFO;
-    // 除了SIGKILL和SIGSTOP，阻塞所有信号
+    // 除了SIGKILL和SIGSTOP，捕获所有信号
     sigfillset(&sa.sa_mask);
 
     for (signo=1; signo<NSIG; signo++)

@@ -27,11 +27,11 @@ handler(int signo)
 
 /**
  *   
- * 
+ * cc timed_read.c -o timed_read libgetnum.so
  * 为阻塞调用read设置超时
  * 
 
-./timed_read 5
+./timed_read 5  // 不重启read
 caught signal 
 111
 222
@@ -40,6 +40,18 @@ caught signal
 num = -1
 errno = 4
 read timeout: Interrupted system call
+
+
+./timed_read 5 8  // 重启read
+caught signal 
+kdevi  
+111
+222
+333
+444
+num = 6
+errno = 0
+successfull read (6 bytes): kdevi
 
  */
 int

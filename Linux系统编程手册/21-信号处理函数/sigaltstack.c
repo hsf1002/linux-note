@@ -31,7 +31,7 @@ sigsegv_handler(int sig)
 }
 
 /**
- *   无需死循环
+ *   无限死循环
  */
 static void
 overflow_stack(int call_num)
@@ -138,6 +138,97 @@ call   83 - top of stack near 0x7ffee98f64f0
 caught signal 11 (Segmentation fault: 11)
 // 信号处理函数的栈顶：
 top of handler stack near     0x105b51a98
+
+-------------------------------------------------------------------------------
+cc sigaltstack.c -o sigaltstack
+./sigaltstack 
+top of standard stack is near 0x7ffd1e912b3c
+alternate stack is at    0x5627534fb6b0 - 0x56275351bfff 
+call    1 - top of stack near 0x7ffd1e8fa460
+call    2 - top of stack near 0x7ffd1e8e1d90
+call    3 - top of stack near 0x7ffd1e8c96c0
+call    4 - top of stack near 0x7ffd1e8b0ff0
+call    5 - top of stack near 0x7ffd1e898920
+call    6 - top of stack near 0x7ffd1e880250
+call    7 - top of stack near 0x7ffd1e867b80
+call    8 - top of stack near 0x7ffd1e84f4b0
+call    9 - top of stack near 0x7ffd1e836de0
+call   10 - top of stack near 0x7ffd1e81e710
+call   11 - top of stack near 0x7ffd1e806040
+call   12 - top of stack near 0x7ffd1e7ed970
+call   13 - top of stack near 0x7ffd1e7d52a0
+call   14 - top of stack near 0x7ffd1e7bcbd0
+call   15 - top of stack near 0x7ffd1e7a4500
+call   16 - top of stack near 0x7ffd1e78be30
+call   17 - top of stack near 0x7ffd1e773760
+call   18 - top of stack near 0x7ffd1e75b090
+call   19 - top of stack near 0x7ffd1e7429c0
+call   20 - top of stack near 0x7ffd1e72a2f0
+call   21 - top of stack near 0x7ffd1e711c20
+call   22 - top of stack near 0x7ffd1e6f9550
+call   23 - top of stack near 0x7ffd1e6e0e80
+call   24 - top of stack near 0x7ffd1e6c87b0
+call   25 - top of stack near 0x7ffd1e6b00e0
+call   26 - top of stack near 0x7ffd1e697a10
+call   27 - top of stack near 0x7ffd1e67f340
+call   28 - top of stack near 0x7ffd1e666c70
+call   29 - top of stack near 0x7ffd1e64e5a0
+call   30 - top of stack near 0x7ffd1e635ed0
+call   31 - top of stack near 0x7ffd1e61d800
+call   32 - top of stack near 0x7ffd1e605130
+call   33 - top of stack near 0x7ffd1e5eca60
+call   34 - top of stack near 0x7ffd1e5d4390
+call   35 - top of stack near 0x7ffd1e5bbcc0
+call   36 - top of stack near 0x7ffd1e5a35f0
+call   37 - top of stack near 0x7ffd1e58af20
+call   38 - top of stack near 0x7ffd1e572850
+call   39 - top of stack near 0x7ffd1e55a180
+call   40 - top of stack near 0x7ffd1e541ab0
+call   41 - top of stack near 0x7ffd1e5293e0
+call   42 - top of stack near 0x7ffd1e510d10
+call   43 - top of stack near 0x7ffd1e4f8640
+call   44 - top of stack near 0x7ffd1e4dff70
+call   45 - top of stack near 0x7ffd1e4c78a0
+call   46 - top of stack near 0x7ffd1e4af1d0
+call   47 - top of stack near 0x7ffd1e496b00
+call   48 - top of stack near 0x7ffd1e47e430
+call   49 - top of stack near 0x7ffd1e465d60
+call   50 - top of stack near 0x7ffd1e44d690
+call   51 - top of stack near 0x7ffd1e434fc0
+call   52 - top of stack near 0x7ffd1e41c8f0
+call   53 - top of stack near 0x7ffd1e404220
+call   54 - top of stack near 0x7ffd1e3ebb50
+call   55 - top of stack near 0x7ffd1e3d3480
+call   56 - top of stack near 0x7ffd1e3badb0
+call   57 - top of stack near 0x7ffd1e3a26e0
+call   58 - top of stack near 0x7ffd1e38a010
+call   59 - top of stack near 0x7ffd1e371940
+call   60 - top of stack near 0x7ffd1e359270
+call   61 - top of stack near 0x7ffd1e340ba0
+call   62 - top of stack near 0x7ffd1e3284d0
+call   63 - top of stack near 0x7ffd1e30fe00
+call   64 - top of stack near 0x7ffd1e2f7730
+call   65 - top of stack near 0x7ffd1e2df060
+call   66 - top of stack near 0x7ffd1e2c6990
+call   67 - top of stack near 0x7ffd1e2ae2c0
+call   68 - top of stack near 0x7ffd1e295bf0
+call   69 - top of stack near 0x7ffd1e27d520
+call   70 - top of stack near 0x7ffd1e264e50
+call   71 - top of stack near 0x7ffd1e24c780
+call   72 - top of stack near 0x7ffd1e2340b0
+call   73 - top of stack near 0x7ffd1e21b9e0
+call   74 - top of stack near 0x7ffd1e203310
+call   75 - top of stack near 0x7ffd1e1eac40
+call   76 - top of stack near 0x7ffd1e1d2570
+call   77 - top of stack near 0x7ffd1e1b9ea0
+call   78 - top of stack near 0x7ffd1e1a17d0
+call   79 - top of stack near 0x7ffd1e189100
+call   80 - top of stack near 0x7ffd1e170a30
+call   81 - top of stack near 0x7ffd1e158360
+call   82 - top of stack near 0x7ffd1e13fc90
+call   83 - top of stack near 0x7ffd1e1275c0
+caught signal 11 (Segmentation fault) 
+top of handler stack near     0x5627534fd064
 
  */
 int
