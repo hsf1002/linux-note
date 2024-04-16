@@ -7,6 +7,9 @@
 #include <ctype.h>
 
 
+/* cc -g -fPIC -Wall ugid_functions.c -shared -o libugid.so */
+
+
 /**
  * uid->username
  */
@@ -44,6 +47,7 @@ userid_from_name(const char *name)
 /**
  *  gid->gname
  */
+char *
 groupname_from_id(gid_t gid)
 {
     struct group *grp;
@@ -55,6 +59,7 @@ groupname_from_id(gid_t gid)
 /**
  * gname->gid
  */
+gid_t
 groupid_from_name(const char *name)
 {
     struct group *grp;

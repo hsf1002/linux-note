@@ -21,6 +21,10 @@ skydeiMac:04-通用的IO模型 sky$ ./seek_io tfile s10000 R5
 s10000: seek success
 R5:
 00 00 00 00 00
+
+----------------------------------------------------------------
+
+
 */
 int
 main(int argc, char *argv[])

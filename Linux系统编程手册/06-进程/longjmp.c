@@ -20,11 +20,22 @@ f1(int argc)
 }
 
 /**
- *  
+ * cc longjmp.c 
+
 skydeiMac:06-进程 sky$ ./a.out 
 calling f1() after initial setjmp()
 we jumped back from f1()
+
 skydeiMac:06-进程 sky$ ./a.out x
+calling f1() after initial setjmp()
+we jumped back from f2()
+
+----------------------------------------------------
+./a.out 
+calling f1() after initial setjmp()
+we jumped back from f1()
+
+./a.out hf
 calling f1() after initial setjmp()
 we jumped back from f2()
 

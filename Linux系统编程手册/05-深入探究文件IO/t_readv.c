@@ -10,6 +10,18 @@
 /**
  * 
  * 分散输入的例子
+ * 
+ * 
+./t_readv t_test.txt 
+0----- 1
+1----- 5
+2----- 105
+third_buf_len = 100 
+total bytes requsted: 105, bytes read: 105 
+iov[0].base = i
+iov[1].base = 1024
+iov[1].base = 1024
+iov[2].base = helloworld, in line with the promise of this age, I want to exhort each of your graduates here to ta
  */
 int
 main(int argc, char *argv[])

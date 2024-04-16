@@ -27,6 +27,19 @@ skydeiMac:06-进程 sky$ ./longjmp_vars
 inside do_jmp(): n = 777, r = 888, v = 999
 after longjmp(), n = 111, r = 222, v = 999
 
+-----------------------------------------------------------------
+// 以常规方式编译，寄存器变量默认被优化
+cc -o longjmp_vars longjmp_vars.c 
+./longjmp_vars 
+inside do_jmp(): n = 777, r = 888, v = 999
+after longjmp(), n = 777, r = 222, v = 999 
+
+// 以优化方式编译后：auto 局部变量被优化
+cc -O -o longjmp_vars longjmp_vars.c 
+./longjmp_vars 
+inside do_jmp(): n = 777, r = 888, v = 999
+after longjmp(), n = 111, r = 222, v = 999 
+
  */
 int
 main(int argc, char *argv[])    

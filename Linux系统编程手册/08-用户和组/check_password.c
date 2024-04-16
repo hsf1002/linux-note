@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 #include <pwd.h>
@@ -10,11 +11,28 @@
 #include <limits.h>
 #include <shadow.h>
 #include <ctype.h>
+#include <errno.h>
 
 
 
 /**
  *   根据shadow密码文件验证用户
+ * 
+ * cc check_password.c -o check_password -lcrypt
+ 
+sudo ./check_password 
+[sudo] hefeng 的密码： 
+username: hsf1002
+get passwd error: Success
+password: 
+段错误
+
+sudo ./check_password 
+username: hefeng
+password: 
+successfully authenticated: UID=1000
+
+ * 
  */
 int
 main(int argc, char *argv[])    
@@ -71,7 +89,8 @@ main(int argc, char *argv[])
     if (NULL == encryted)
         perror("crypt error");
     // 将用户输入的字符串加密结果与实际阴影文件的密码记录相比较
-    if (!auchok = (0 == strcmp(encryted, pwd->pw_passwd)))
+    authok = (0 == strcmp(encryted, pwd->pw_passwd));
+    if (!authok)
     {
         perror("incorrect password");
         exit(EXIT_FAILURE);

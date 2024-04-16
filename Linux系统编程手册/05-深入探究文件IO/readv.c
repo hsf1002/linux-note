@@ -1,7 +1,17 @@
 #include <stdio.h>
 #include <sys/uio.h>
 #include <fcntl.h>
- 
+
+/**
+ * 
+ * cc readv.c -o readv
+ * 
+ * ./readv 
+rsize = 15
+wsize = 15
+
+*/
+
 int main(void)
 {
     int fd;
@@ -18,7 +28,7 @@ int main(void)
         perror("open error");
         return -1;
     }
-    int rsize = readv(fd, iov, 2);
+    int rsize = readv(fd, iov, 2); // 第三个参数是iov的个数
     printf("rsize = %d\n",rsize);
 
     close(fd);
@@ -29,7 +39,7 @@ int main(void)
         return -1;
     }
 
-    int wsize = writev(fd,iov,2);
+    int wsize = writev(fd,iov,2); // 第三个参数是iov的个数
     printf("wsize = %d\n",wsize);
 
     close(fd);

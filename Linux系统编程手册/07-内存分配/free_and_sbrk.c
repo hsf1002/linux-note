@@ -30,6 +30,14 @@ allocating 1000*10240 bytes
 program break is now:           0x10701d000
 after free(), program break is:   0x10701d000
 
+-------------------------------------------------------------------
+./free_and_sbrk 1000 10240 2
+
+initial program break:           0x55c55b9bc000
+allocating 1000*10240 bytes
+program break is now:           0x55c55c384000
+after free(), program break is:   0x55c55c384000
+
 */
 int
 main(int argc, char *argv[])    

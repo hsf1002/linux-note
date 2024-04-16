@@ -8,20 +8,30 @@
 extern char **environ;
 
 /**
+ * 
  *  修改环境变量
+ * cc modify_env.c 
 
 ./a.out "GREET=Hi" "HI=hi" "HELLO=hello"
 GREET=Fantanstic
 HI=hi
 HELLO=hello 
+
+--------------------------------------------------
+./a.out "GREET=Hi" "HI=hi" "HELLO=hello"
+GREET=Fantanstic
+HI=hi
+HELLO=hello
+
+
  */
 int
 main(int argc, char *argv[])    
 {
     // macOS未定义，清除整个环境
-  //  clearenv();
+    clearenv();
     // 使用另一种方式，清除整个环境
-    *environ = NULL;
+    //*environ = NULL;
 
     // 在命令行中逐个添加
     for (int i=1; i<argc; i++)

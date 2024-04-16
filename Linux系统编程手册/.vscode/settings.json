@@ -1,6 +1,9 @@
 {
     "files.associations": {
         "errno.h": "c",
-        "limits.h": "c"
+        "limits.h": "c",
+        "errno-base.h": "c",
+        "err.h": "c",
+        "pwd.h": "c"
     }
 }
