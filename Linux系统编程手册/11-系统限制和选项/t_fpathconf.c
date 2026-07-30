@@ -28,10 +28,19 @@ fpathconf_print(const char *msg, int fd, int name)
 }
 
 /**
+ * cc t_fpathconf.c -o t_fpathconf
 
+MacOS --------------------------------------------------------------
 _PC_NAME_MAX:         not found
 _PC_PATH_MAX:         not found
 _PC_PIPE_BUF:         512
+
+ubuntu --------------------------------------------------------------
+./t_fpathconf 
+_PC_NAME_MAX:         255
+_PC_PATH_MAX:         4096
+_PC_PIPE_BUF:         4096
+
 * 
  */
 int

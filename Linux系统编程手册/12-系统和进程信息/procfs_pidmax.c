@@ -11,6 +11,24 @@
 
 /**
  *   访问/proc/sys/kernel/pid_max文件
+ * 
+ * cc procfs_pidmax.c -o procfs_pidmax
+ * 
+./procfs_pidmax 
+4194304
+./procfs_pidmax 4194300
+open pid_max error: Permission denied
+read pid_max error: Bad file descriptor
+write pid_max error: Bad file descriptor
+/proc/sys/kernel/pid_max now containscat /proc/sys/kernel/pid_max
+old value: 
+
+实际无权限修改
+sudo echo 4194300 > /proc/sys/kernel/pid_max
+bash: /proc/sys/kernel/pid_max: 权限不够
+ll /proc/sys/kernel/pid_max
+-rw-r--r-- 1 root root 0 2月  19 17:05 /proc/sys/kernel/pid_max
+
  */
 int
 main(int argc, char *argv[])    
@@ -34,7 +52,8 @@ main(int argc, char *argv[])
     {
         if (write(fd, argv[1], strlen(argv[1])) != strlen(argv[1]))
             perror("write pid_max error");
-        system("echo /proc/sys/kernel/pid_max now contains" "'cat /proc/sys/kernel/pid_max'");
+        system("echo /proc/sys/kernel/pid_max now contains "
+               "`cat /proc/sys/kernel/pid_max`");
     }
 
     exit(EXIT_SUCCESS);

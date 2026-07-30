@@ -12,11 +12,20 @@
 
 /**
  *   uname返回信息
+ * cc t_uname.c -o t_uname
 
 node_name:   skydeiMac.local
 system_name: Darwin
 release:     17.7.0
 version:     Darwin Kernel Version 17.7.0: Thu Jun 21 22:53:14 PDT 2018; root:xnu-4570.71.2~1/RELEASE_X86_64
+machine:     x86_64
+
+------------------------------------------------------
+./t_uname 
+node_name:   hefeng
+system_name: Linux
+release:     5.15.0-94-generic
+version:     #104~20.04.1-Ubuntu SMP Tue Jan 16 13:34:09 UTC 2024
 machine:     x86_64
 
 */

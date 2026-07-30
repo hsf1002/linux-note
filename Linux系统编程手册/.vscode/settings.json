@@ -4,6 +4,8 @@
         "limits.h": "c",
         "errno-base.h": "c",
         "err.h": "c",
-        "pwd.h": "c"
+        "pwd.h": "c",
+        "unistd.h": "c",
+        "cstdlib": "c"
     }
 }
